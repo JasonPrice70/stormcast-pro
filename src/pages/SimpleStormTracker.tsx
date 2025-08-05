@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Polyline, CircleMarker } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, CircleMarker, Polygon } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import './SimpleStormTracker.css';
@@ -155,6 +155,19 @@ const demoStorms = [
         forecastHour: 60
       }
     ],
+    cone: {
+      type: 'Polygon',
+      coordinates: [[
+        [-85.0, 28.5], [-86.1, 29.2], [-87.5, 30.1], [-88.8, 31.5], [-89.5, 33.0],
+        [-89.8, 34.8], [-89.6, 35.2], [-89.0, 35.5], [-88.2, 35.3], [-87.1, 34.8],
+        [-86.0, 33.9], [-85.2, 32.7], [-84.8, 31.2], [-84.9, 29.8], [-85.0, 28.5]
+      ]],
+      properties: {
+        stormName: 'EMILY',
+        advisoryNumber: '15A',
+        validTime: '2025-08-05T06:00:00Z'
+      }
+    },
     advisoryUrl: 'https://www.nhc.noaa.gov/',
     trackUrl: '#',
     coneUrl: '#'
@@ -240,6 +253,19 @@ const demoStorms = [
         forecastHour: 48
       }
     ],
+    cone: {
+      type: 'Polygon',
+      coordinates: [[
+        [-78.0, 22.0], [-78.5, 23.2], [-79.0, 24.8], [-79.2, 26.5], [-79.0, 28.0],
+        [-78.5, 28.5], [-78.0, 28.2], [-77.5, 27.5], [-77.2, 26.2], [-77.4, 24.5],
+        [-77.7, 23.0], [-78.0, 22.0]
+      ]],
+      properties: {
+        stormName: 'FRANKLIN',
+        advisoryNumber: '8A',
+        validTime: '2025-08-05T06:00:00Z'
+      }
+    },
     advisoryUrl: 'https://www.nhc.noaa.gov/',
     trackUrl: '#',
     coneUrl: '#'
@@ -250,13 +276,16 @@ const SimpleStormTracker: React.FC = () => {
   const [useDemo, setUseDemo] = useState(true); // Start with demo data to test
   const [showHistoricalPaths, setShowHistoricalPaths] = useState(true);
   const [showForecastPaths, setShowForecastPaths] = useState(true);
+  const [showForecastCones, setShowForecastCones] = useState(true);
+  const [fetchLiveTrackData, setFetchLiveTrackData] = useState(false); // Control live track data fetching
   
   // Use both hooks
   const demoData = useDemoData();
   const liveData = useNHCData({ 
     autoRefresh: false, // Disable auto-refresh - only call once per page load
     fetchOnMount: false, // Don't fetch on mount - only when user clicks "Live Data"
-    useProxy: true // Enable CORS proxy for development
+    useProxy: true, // Enable CORS proxy for development
+    fetchTrackData: fetchLiveTrackData // Control track data fetching
   });
 
   // Choose which data source to use
@@ -515,6 +544,55 @@ const SimpleStormTracker: React.FC = () => {
             </React.Fragment>
           );
         })}
+
+        {/* Render forecast cones */}
+        {showForecastCones && displayStorms.map((storm) => {
+          if (!storm.cone || !storm.cone.coordinates) return null;
+          
+          try {
+            // Convert cone coordinates to Leaflet format
+            let coneCoordinates: [number, number][] = [];
+            
+            if (storm.cone.type === 'Polygon') {
+              // Single polygon
+              coneCoordinates = storm.cone.coordinates[0].map((coord: number[]) => [coord[1], coord[0]] as [number, number]);
+            } else if (storm.cone.type === 'MultiPolygon') {
+              // Multiple polygons - use the first one
+              coneCoordinates = storm.cone.coordinates[0][0].map((coord: number[]) => [coord[1], coord[0]] as [number, number]);
+            }
+            
+            if (coneCoordinates.length === 0) return null;
+            
+            return (
+              <Polygon
+                key={`${storm.id}-cone`}
+                positions={coneCoordinates}
+                pathOptions={{
+                  color: '#ffaa00',
+                  weight: 2,
+                  opacity: 0.8,
+                  fillColor: '#ffaa00',
+                  fillOpacity: 0.2
+                }}
+              >
+                <Popup>
+                  <div style={{ fontSize: '0.9rem' }}>
+                    <strong>{storm.name} - Forecast Cone</strong><br />
+                    <strong>Advisory:</strong> {storm.cone.properties?.advisoryNumber || 'N/A'}<br />
+                    <strong>Valid Time:</strong> {storm.cone.properties?.validTime ? new Date(storm.cone.properties.validTime).toLocaleString() : 'N/A'}<br />
+                    <div style={{ fontSize: '0.8rem', marginTop: '5px', fontStyle: 'italic' }}>
+                      The cone represents the probable path of the storm center (66% confidence).
+                      The entire storm may extend well beyond this area.
+                    </div>
+                  </div>
+                </Popup>
+              </Polygon>
+            );
+          } catch (error) {
+            console.warn('Error rendering cone for storm', storm.name, ':', error);
+            return null;
+          }
+        })}
       </MapContainer>
       </div>
 
@@ -654,8 +732,41 @@ const SimpleStormTracker: React.FC = () => {
                     />
                     <span style={{ color: '#ff3333' }}>━━━━</span> Forecast Path
                   </label>
+                  <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.8rem', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={showForecastCones}
+                      onChange={(e) => setShowForecastCones(e.target.checked)}
+                      style={{ marginRight: '6px' }}
+                    />
+                    <span style={{ color: '#ffaa00' }}>▲▲▲</span> Forecast Cone
+                  </label>
                 </div>
               </div>
+              
+              {/* Live Track Data Control */}
+              {dataSource === 'live' && (
+                <div style={{ marginTop: '10px', padding: '8px 0', borderTop: '1px solid #e0e0e0' }}>
+                  <div style={{ fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '5px', color: '#1a237e' }}>
+                    Track Data Options
+                  </div>
+                  <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.8rem', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={fetchLiveTrackData}
+                      onChange={(e) => setFetchLiveTrackData(e.target.checked)}
+                      style={{ marginRight: '6px' }}
+                    />
+                    Fetch Live Track Data
+                  </label>
+                  <div style={{ fontSize: '0.7rem', color: '#666', marginTop: '3px', marginLeft: '20px' }}>
+                    {fetchLiveTrackData ? 
+                      'Fetching forecast paths and cones from NHC (may cause CORS errors)' : 
+                      'Using basic storm positions only (prevents CORS errors)'
+                    }
+                  </div>
+                </div>
+              )}
               
               <div className="control-panel-buttons">
                 <button 

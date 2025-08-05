@@ -40,9 +40,11 @@ const ALTERNATIVE_APIS = [
 class NHCApiService {
   private corsProxy: string
   private currentProxyIndex: number = 0
+  private fetchTrackData: boolean
 
-  constructor(useProxy = false) {
+  constructor(useProxy = false, fetchTrackData = true) {
     this.corsProxy = useProxy ? CORS_PROXIES[this.currentProxyIndex] : ''
+    this.fetchTrackData = fetchTrackData
   }
 
   /**
@@ -219,19 +221,36 @@ class NHCApiService {
     try {
       // NHC provides GeoJSON forecast track data
       const year = new Date().getFullYear()
-      const forecastUrl = `${this.corsProxy}${NHC_BASE_URL}/gis/forecast/archive/${year}/${stormId.toUpperCase()}_5day_latest.geojson`
+      const baseUrl = `${NHC_BASE_URL}/gis/forecast/archive/${year}/${stormId.toUpperCase()}_5day_latest.geojson`
       
-      console.log('Fetching forecast track from:', forecastUrl)
+      // Try multiple approaches for fetching the data
+      const proxiesToTry = this.corsProxy ? [this.corsProxy] : CORS_PROXIES.slice(0, 3)
       
-      const response = await axios.get(forecastUrl, {
-        timeout: 10000,
-        headers: { 'Accept': 'application/json' }
-      })
+      for (const proxy of proxiesToTry) {
+        try {
+          const forecastUrl = `${proxy}${baseUrl}`
+          console.log('Fetching forecast track from:', forecastUrl)
+          
+          const response = await axios.get(forecastUrl, {
+            timeout: 8000,
+            headers: { 'Accept': 'application/json' }
+          })
 
-      return this.parseForecastGeoJSON(response.data)
+          const result = this.parseForecastGeoJSON(response.data)
+          if (result.length > 0) {
+            console.log(`Successfully fetched ${result.length} forecast points for ${stormId}`)
+            return result
+          }
+        } catch (error) {
+          console.warn(`Forecast track fetch failed with proxy ${proxy}:`, error instanceof Error ? error.message : 'Unknown error')
+          continue
+        }
+      }
+      
+      console.warn(`No forecast track data available for storm ${stormId}`)
+      return []
     } catch (error) {
       console.warn('Failed to fetch forecast track for', stormId, ':', error)
-      // Return empty array if forecast data is not available
       return []
     }
   }
@@ -243,19 +262,36 @@ class NHCApiService {
     try {
       // NHC provides best track data
       const year = new Date().getFullYear()
-      const trackUrl = `${this.corsProxy}${NHC_BASE_URL}/gis/best_track/archive/${year}/${stormId.toUpperCase()}_best_track.geojson`
+      const baseUrl = `${NHC_BASE_URL}/gis/best_track/archive/${year}/${stormId.toUpperCase()}_best_track.geojson`
       
-      console.log('Fetching historical track from:', trackUrl)
+      // Try multiple approaches for fetching the data
+      const proxiesToTry = this.corsProxy ? [this.corsProxy] : CORS_PROXIES.slice(0, 3)
       
-      const response = await axios.get(trackUrl, {
-        timeout: 10000,
-        headers: { 'Accept': 'application/json' }
-      })
+      for (const proxy of proxiesToTry) {
+        try {
+          const trackUrl = `${proxy}${baseUrl}`
+          console.log('Fetching historical track from:', trackUrl)
+          
+          const response = await axios.get(trackUrl, {
+            timeout: 8000,
+            headers: { 'Accept': 'application/json' }
+          })
 
-      return this.parseHistoricalGeoJSON(response.data)
+          const result = this.parseHistoricalGeoJSON(response.data)
+          if (result.length > 0) {
+            console.log(`Successfully fetched ${result.length} historical points for ${stormId}`)
+            return result
+          }
+        } catch (error) {
+          console.warn(`Historical track fetch failed with proxy ${proxy}:`, error instanceof Error ? error.message : 'Unknown error')
+          continue
+        }
+      }
+      
+      console.warn(`No historical track data available for storm ${stormId}`)
+      return []
     } catch (error) {
       console.warn('Failed to fetch historical track for', stormId, ':', error)
-      // Return empty array if historical data is not available
       return []
     }
   }
@@ -265,12 +301,90 @@ class NHCApiService {
    */
   async getStormCone(stormId: string): Promise<any> {
     try {
-      const coneUrl = `${this.corsProxy}${GIS_BASE_URL}/forecast/archive/${new Date().getFullYear()}/${stormId}_latest_CONE.kmz`
+      // NHC provides GeoJSON cone data
+      const year = new Date().getFullYear()
+      const baseUrl = `${NHC_BASE_URL}/gis/forecast/archive/${year}/${stormId.toUpperCase()}_latest_CONE.geojson`
       
-      // Return cone coordinates for map visualization
-      return this.parseConeData(coneUrl)
+      // Try multiple approaches for fetching the data
+      const proxiesToTry = this.corsProxy ? [this.corsProxy] : CORS_PROXIES.slice(0, 3)
+      
+      for (const proxy of proxiesToTry) {
+        try {
+          const coneUrl = `${proxy}${baseUrl}`
+          console.log('Fetching forecast cone from:', coneUrl)
+          
+          const response = await axios.get(coneUrl, {
+            timeout: 8000,
+            headers: { 'Accept': 'application/json' }
+          })
+
+          const result = this.parseConeGeoJSON(response.data)
+          if (result) {
+            console.log(`Successfully fetched forecast cone for ${stormId}`)
+            return result
+          }
+        } catch (error) {
+          console.warn(`Forecast cone fetch failed with proxy ${proxy}:`, error instanceof Error ? error.message : 'Unknown error')
+          continue
+        }
+      }
+      
+      console.warn(`No forecast cone data available for storm ${stormId}`)
+      return null
     } catch (error) {
-      console.error('Error fetching storm cone:', error)
+      console.warn('Failed to fetch forecast cone for', stormId, ':', error)
+      return null
+    }
+  }
+
+  /**
+   * Parse cone GeoJSON data from NHC
+   */
+  private parseConeGeoJSON(geoJsonData: any): any {
+    try {
+      // Handle proxy-wrapped responses
+      let data = geoJsonData
+      if (data && data.contents && typeof data.contents === 'string') {
+        try {
+          data = JSON.parse(data.contents)
+        } catch (parseError) {
+          console.warn('Failed to parse proxy-wrapped GeoJSON:', parseError)
+          return null
+        }
+      }
+
+      if (!data || !data.features) {
+        console.warn('Invalid GeoJSON data for cone - no features found')
+        return null
+      }
+
+      // Find the cone polygon (usually the first feature)
+      const coneFeature = data.features.find((feature: any) => 
+        feature.geometry && 
+        (feature.geometry.type === 'Polygon' || feature.geometry.type === 'MultiPolygon')
+      )
+
+      if (!coneFeature) {
+        console.warn('No polygon found in cone GeoJSON')
+        return null
+      }
+
+      const coords = coneFeature.geometry.coordinates
+      const props = coneFeature.properties || {}
+
+      return {
+        type: coneFeature.geometry.type,
+        coordinates: coords,
+        properties: {
+          stormName: props.STORMNAME || props.NAME,
+          advisoryNumber: props.ADVISNUM || props.ADVNUM,
+          stormType: props.STORMTYPE || props.TYPE,
+          validTime: props.VALIDTIME || props.DTG,
+          basin: props.BASIN
+        }
+      }
+    } catch (error) {
+      console.error('Error parsing cone GeoJSON:', error)
       return null
     }
   }
@@ -315,19 +429,55 @@ class NHCApiService {
             coneUrl: storm.cone?.url || ''
           };
 
-          // Fetch forecast and historical data
-          try {
-            const [forecastData, historicalData] = await Promise.all([
-              this.getStormTrack(storm.id || storm.binNumber || ''),
-              this.getStormHistoricalTrack(storm.id || storm.binNumber || '')
-            ]);
-            
-            processedStorm.forecast = forecastData;
-            processedStorm.historical = historicalData;
-            
-            console.log(`Storm ${storm.name}: ${forecastData.length} forecast points, ${historicalData.length} historical points`);
-          } catch (error) {
-            console.warn(`Failed to fetch track data for ${storm.name}:`, error);
+          // Fetch forecast, historical, and cone data (but don't fail if they're unavailable)
+          if (this.fetchTrackData) {
+            try {
+              console.log(`Attempting to fetch track data for storm: ${storm.name} (${storm.id || storm.binNumber})`)
+              
+              const [forecastData, historicalData, coneData] = await Promise.allSettled([
+                this.getStormTrack(storm.id || storm.binNumber || ''),
+                this.getStormHistoricalTrack(storm.id || storm.binNumber || ''),
+                this.getStormCone(storm.id || storm.binNumber || '')
+              ]);
+              
+              // Handle forecast data
+              if (forecastData.status === 'fulfilled') {
+                processedStorm.forecast = forecastData.value;
+              } else {
+                console.warn(`Forecast data failed for ${storm.name}:`, forecastData.reason?.message);
+                processedStorm.forecast = [];
+              }
+              
+              // Handle historical data
+              if (historicalData.status === 'fulfilled') {
+                processedStorm.historical = historicalData.value;
+              } else {
+                console.warn(`Historical data failed for ${storm.name}:`, historicalData.reason?.message);
+                processedStorm.historical = [];
+              }
+              
+              // Handle cone data
+              if (coneData.status === 'fulfilled') {
+                processedStorm.cone = coneData.value;
+              } else {
+                console.warn(`Cone data failed for ${storm.name}:`, coneData.reason?.message);
+                processedStorm.cone = null;
+              }
+              
+              console.log(`Storm ${storm.name}: ${processedStorm.forecast.length} forecast points, ${processedStorm.historical.length} historical points, cone: ${processedStorm.cone ? 'available' : 'not available'}`);
+            } catch (error) {
+              console.warn(`Failed to fetch any track data for ${storm.name}:`, error);
+              // Set defaults
+              processedStorm.forecast = [];
+              processedStorm.historical = [];
+              processedStorm.cone = null;
+            }
+          } else {
+            console.log(`Skipping track data fetch for ${storm.name} (track data fetching disabled)`);
+            // Set defaults when track data fetching is disabled
+            processedStorm.forecast = [];
+            processedStorm.historical = [];
+            processedStorm.cone = null;
           }
 
           console.log(`Processed storm:`, processedStorm);
@@ -373,14 +523,25 @@ class NHCApiService {
    */
   private parseForecastGeoJSON(geoJsonData: any): StormForecastPoint[] {
     try {
-      if (!geoJsonData || !geoJsonData.features) {
-        console.warn('Invalid GeoJSON data for forecast')
+      // Handle proxy-wrapped responses
+      let data = geoJsonData
+      if (data && data.contents && typeof data.contents === 'string') {
+        try {
+          data = JSON.parse(data.contents)
+        } catch (parseError) {
+          console.warn('Failed to parse proxy-wrapped GeoJSON:', parseError)
+          return []
+        }
+      }
+
+      if (!data || !data.features) {
+        console.warn('Invalid GeoJSON data for forecast - no features found')
         return []
       }
 
       const forecastPoints: StormForecastPoint[] = []
 
-      geoJsonData.features.forEach((feature: any) => {
+      data.features.forEach((feature: any) => {
         if (feature.geometry && feature.geometry.type === 'Point') {
           const coords = feature.geometry.coordinates
           const props = feature.properties || {}
@@ -418,14 +579,25 @@ class NHCApiService {
    */
   private parseHistoricalGeoJSON(geoJsonData: any): StormHistoricalPoint[] {
     try {
-      if (!geoJsonData || !geoJsonData.features) {
-        console.warn('Invalid GeoJSON data for historical track')
+      // Handle proxy-wrapped responses
+      let data = geoJsonData
+      if (data && data.contents && typeof data.contents === 'string') {
+        try {
+          data = JSON.parse(data.contents)
+        } catch (parseError) {
+          console.warn('Failed to parse proxy-wrapped GeoJSON:', parseError)
+          return []
+        }
+      }
+
+      if (!data || !data.features) {
+        console.warn('Invalid GeoJSON data for historical track - no features found')
         return []
       }
 
       const historicalPoints: StormHistoricalPoint[] = []
 
-      geoJsonData.features.forEach((feature: any) => {
+      data.features.forEach((feature: any) => {
         if (feature.geometry && feature.geometry.type === 'Point') {
           const coords = feature.geometry.coordinates
           const props = feature.properties || {}
@@ -471,7 +643,7 @@ class NHCApiService {
     return null
   }
 
-  /**
+    /**
    * Parse track data from KML/GeoJSON
    */
   private async parseTrackData(trackUrl: string): Promise<StormForecastPoint[]> {
@@ -483,24 +655,7 @@ class NHCApiService {
       console.error('Error parsing track data:', error)
       return []
     }
-  }
-
-  /**
-   * Parse cone data from KMZ
-   */
-  private async parseConeData(coneUrl: string): Promise<any> {
-    try {
-      // Parse KMZ file to extract cone boundary coordinates
-      // This would require a KMZ/KML parser
-      console.log('Parsing cone data from:', coneUrl)
-      return null
-    } catch (error) {
-      console.error('Error parsing cone data:', error)
-      return null
-    }
-  }
-
-  /**
+  }  /**
    * Fallback mock data when API is unavailable
    */
   private getMockStorms(): ProcessedStorm[] {

@@ -7,6 +7,7 @@ interface UseNHCDataOptions {
   refreshInterval?: number
   useProxy?: boolean
   fetchOnMount?: boolean
+  fetchTrackData?: boolean
 }
 
 interface UseNHCDataReturn {
@@ -23,7 +24,8 @@ export const useNHCData = (options: UseNHCDataOptions = {}): UseNHCDataReturn =>
     autoRefresh = true,
     refreshInterval = 5 * 60 * 1000, // 5 minutes
     useProxy = false,
-    fetchOnMount = true
+    fetchOnMount = true,
+    fetchTrackData = true
   } = options
 
   const [storms, setStorms] = useState<ProcessedStorm[]>([])
@@ -31,14 +33,13 @@ export const useNHCData = (options: UseNHCDataOptions = {}): UseNHCDataReturn =>
   const [error, setError] = useState<string | null>(null)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
 
-  const nhcApi = new NHCApiService(useProxy)
-
   const fetchStorms = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
 
-      const activeStorms = await nhcApi.getActiveStorms()
+      const nhcApiInstance = new NHCApiService(useProxy, fetchTrackData)
+      const activeStorms = await nhcApiInstance.getActiveStorms()
       
       // The storms now already include forecast and historical data
       setStorms(activeStorms)
@@ -68,7 +69,7 @@ export const useNHCData = (options: UseNHCDataOptions = {}): UseNHCDataReturn =>
     } finally {
       setLoading(false)
     }
-  }, [nhcApi])
+  }, [useProxy, fetchTrackData])
 
   const refresh = useCallback(async () => {
     await fetchStorms()

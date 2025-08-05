@@ -109,6 +109,7 @@ export interface ProcessedStorm {
   lastUpdate: Date
   forecast: StormForecastPoint[]
   historical: StormHistoricalPoint[]
+  cone?: any  // Forecast cone data (optional)
   advisoryUrl: string
   trackUrl: string
   coneUrl: string
