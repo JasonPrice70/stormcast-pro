@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { NHCActiveStorms, NHCStorm, ProcessedStorm } from '../types/nhc'
+import { NHCActiveStorms, NHCStorm, ProcessedStorm, StormForecastPoint, StormHistoricalPoint } from '../types/nhc'
 
 // NHC API endpoints
 const NHC_BASE_URL = 'https://www.nhc.noaa.gov'
@@ -107,7 +107,7 @@ class NHCApiService {
         
         // Validate response data
         if (response.data && response.data.activeStorms) {
-          return this.processStormData(response.data.activeStorms);
+          return await this.processStormData(response.data.activeStorms);
         } else {
           throw new Error('Invalid response format from NHC API');
         }
@@ -159,11 +159,11 @@ class NHCApiService {
           
           // Standard NHC format
           if (stormData.activeStorms) {
-            return this.processStormData(stormData.activeStorms);
+            return await this.processStormData(stormData.activeStorms);
           } 
           // Direct array format
           else if (Array.isArray(stormData)) {
-            return this.processStormData(stormData);
+            return await this.processStormData(stormData);
           } 
           // Empty storms (no active storms)
           else if (stormData && Object.keys(stormData).length === 0) {
@@ -215,16 +215,47 @@ class NHCApiService {
   /**
    * Get forecast track data for a specific storm
    */
-  async getStormTrack(stormId: string): Promise<[number, number][]> {
+  async getStormTrack(stormId: string): Promise<StormForecastPoint[]> {
     try {
-      // NHC provides GeoJSON track data
-      const trackUrl = `${this.corsProxy}${GIS_BASE_URL}/forecast/archive/${new Date().getFullYear()}/${stormId}_5day_latest.kml`
+      // NHC provides GeoJSON forecast track data
+      const year = new Date().getFullYear()
+      const forecastUrl = `${this.corsProxy}${NHC_BASE_URL}/gis/forecast/archive/${year}/${stormId.toUpperCase()}_5day_latest.geojson`
       
-      // For now, return processed coordinates
-      // In a real implementation, you'd parse the KML/GeoJSON data
-      return this.parseTrackData(trackUrl)
+      console.log('Fetching forecast track from:', forecastUrl)
+      
+      const response = await axios.get(forecastUrl, {
+        timeout: 10000,
+        headers: { 'Accept': 'application/json' }
+      })
+
+      return this.parseForecastGeoJSON(response.data)
     } catch (error) {
-      console.error('Error fetching storm track:', error)
+      console.warn('Failed to fetch forecast track for', stormId, ':', error)
+      // Return empty array if forecast data is not available
+      return []
+    }
+  }
+
+  /**
+   * Get historical track data for a specific storm
+   */
+  async getStormHistoricalTrack(stormId: string): Promise<StormHistoricalPoint[]> {
+    try {
+      // NHC provides best track data
+      const year = new Date().getFullYear()
+      const trackUrl = `${this.corsProxy}${NHC_BASE_URL}/gis/best_track/archive/${year}/${stormId.toUpperCase()}_best_track.geojson`
+      
+      console.log('Fetching historical track from:', trackUrl)
+      
+      const response = await axios.get(trackUrl, {
+        timeout: 10000,
+        headers: { 'Accept': 'application/json' }
+      })
+
+      return this.parseHistoricalGeoJSON(response.data)
+    } catch (error) {
+      console.warn('Failed to fetch historical track for', stormId, ':', error)
+      // Return empty array if historical data is not available
       return []
     }
   }
@@ -247,7 +278,7 @@ class NHCApiService {
   /**
    * Process raw NHC storm data into our format
    */
-  private processStormData(storms: NHCStorm[]): ProcessedStorm[] {
+  private async processStormData(storms: NHCStorm[]): Promise<ProcessedStorm[]> {
     console.log('Processing storm data:', storms);
     
     if (!Array.isArray(storms)) {
@@ -256,35 +287,55 @@ class NHCApiService {
     }
 
     try {
-      return storms.map((storm, index) => {
-        console.log(`Processing storm ${index + 1}:`, storm);
-        
-        // Provide defaults for missing fields
-        const processedStorm: ProcessedStorm = {
-          id: storm.id || `unknown-${index}`,
-          name: storm.name || 'Unknown Storm',
-          classification: storm.classification || 'Unknown',
-          category: this.getStormCategory(storm.intensity || '0'),
-          position: [
-            typeof storm.latitudeNumeric === 'number' ? storm.latitudeNumeric : parseFloat(storm.latitude || '0'),
-            typeof storm.longitudeNumeric === 'number' ? storm.longitudeNumeric : parseFloat(storm.longitude || '0')
-          ] as [number, number],
-          maxWinds: parseInt(storm.intensity || '0') || 0,
-          pressure: parseInt(storm.pressure || '0') || 0,
-          movement: this.formatMovement(
-            typeof storm.movementDir === 'number' ? storm.movementDir : parseFloat(storm.movementDir || '0'),
-            typeof storm.movementSpeed === 'number' ? storm.movementSpeed : parseFloat(storm.movementSpeed || '0')
-          ),
-          lastUpdate: storm.lastUpdate ? new Date(storm.lastUpdate) : new Date(),
-          forecast: [], // Will be populated by getStormTrack
-          advisoryUrl: storm.publicAdvisory?.url || '',
-          trackUrl: storm.track?.url || '',
-          coneUrl: storm.cone?.url || ''
-        };
+      const processedStorms = await Promise.all(
+        storms.map(async (storm, index) => {
+          console.log(`Processing storm ${index + 1}:`, storm);
+          
+          // Provide defaults for missing fields
+          const processedStorm: ProcessedStorm = {
+            id: storm.id || `unknown-${index}`,
+            name: storm.name || 'Unknown Storm',
+            classification: storm.classification || 'Unknown',
+            category: this.getStormCategory(storm.intensity || '0'),
+            position: [
+              typeof storm.latitudeNumeric === 'number' ? storm.latitudeNumeric : parseFloat(storm.latitude || '0'),
+              typeof storm.longitudeNumeric === 'number' ? storm.longitudeNumeric : parseFloat(storm.longitude || '0')
+            ] as [number, number],
+            maxWinds: parseInt(storm.intensity || '0') || 0,
+            pressure: parseInt(storm.pressure || '0') || 0,
+            movement: this.formatMovement(
+              typeof storm.movementDir === 'number' ? storm.movementDir : parseFloat(storm.movementDir || '0'),
+              typeof storm.movementSpeed === 'number' ? storm.movementSpeed : parseFloat(storm.movementSpeed || '0')
+            ),
+            lastUpdate: storm.lastUpdate ? new Date(storm.lastUpdate) : new Date(),
+            forecast: [],
+            historical: [],
+            advisoryUrl: storm.publicAdvisory?.url || '',
+            trackUrl: storm.track?.url || '',
+            coneUrl: storm.cone?.url || ''
+          };
 
-        console.log(`Processed storm:`, processedStorm);
-        return processedStorm;
-      });
+          // Fetch forecast and historical data
+          try {
+            const [forecastData, historicalData] = await Promise.all([
+              this.getStormTrack(storm.id || storm.binNumber || ''),
+              this.getStormHistoricalTrack(storm.id || storm.binNumber || '')
+            ]);
+            
+            processedStorm.forecast = forecastData;
+            processedStorm.historical = historicalData;
+            
+            console.log(`Storm ${storm.name}: ${forecastData.length} forecast points, ${historicalData.length} historical points`);
+          } catch (error) {
+            console.warn(`Failed to fetch track data for ${storm.name}:`, error);
+          }
+
+          console.log(`Processed storm:`, processedStorm);
+          return processedStorm;
+        })
+      );
+
+      return processedStorms;
     } catch (error) {
       console.error('Error processing storm data:', error);
       console.error('Raw storm data:', storms);
@@ -318,24 +369,116 @@ class NHCApiService {
   }
 
   /**
+   * Parse forecast GeoJSON data from NHC
+   */
+  private parseForecastGeoJSON(geoJsonData: any): StormForecastPoint[] {
+    try {
+      if (!geoJsonData || !geoJsonData.features) {
+        console.warn('Invalid GeoJSON data for forecast')
+        return []
+      }
+
+      const forecastPoints: StormForecastPoint[] = []
+
+      geoJsonData.features.forEach((feature: any) => {
+        if (feature.geometry && feature.geometry.type === 'Point') {
+          const coords = feature.geometry.coordinates
+          const props = feature.properties || {}
+
+          // Extract forecast hour from properties
+          const forecastHour = this.extractForecastHour(props)
+          if (forecastHour === null) return
+
+          forecastPoints.push({
+            latitude: coords[1],
+            longitude: coords[0],
+            dateTime: props.VALIDTIME || props.DTG || new Date().toISOString(),
+            maxWinds: parseInt(props.MAXWIND) || parseInt(props.INTENSITY) || 0,
+            gusts: parseInt(props.GUST) || 0,
+            pressure: parseInt(props.MSLP) || parseInt(props.PRESSURE) || 0,
+            movement: {
+              direction: parseInt(props.SPEED) || 0,
+              speed: parseInt(props.DIRECTION) || 0
+            },
+            forecastHour: forecastHour
+          })
+        }
+      })
+
+      // Sort by forecast hour
+      return forecastPoints.sort((a, b) => a.forecastHour - b.forecastHour)
+    } catch (error) {
+      console.error('Error parsing forecast GeoJSON:', error)
+      return []
+    }
+  }
+
+  /**
+   * Parse historical GeoJSON data from NHC
+   */
+  private parseHistoricalGeoJSON(geoJsonData: any): StormHistoricalPoint[] {
+    try {
+      if (!geoJsonData || !geoJsonData.features) {
+        console.warn('Invalid GeoJSON data for historical track')
+        return []
+      }
+
+      const historicalPoints: StormHistoricalPoint[] = []
+
+      geoJsonData.features.forEach((feature: any) => {
+        if (feature.geometry && feature.geometry.type === 'Point') {
+          const coords = feature.geometry.coordinates
+          const props = feature.properties || {}
+
+          historicalPoints.push({
+            latitude: coords[1],
+            longitude: coords[0],
+            dateTime: props.ISO_TIME || props.DTG || props.SYNOPTIME || new Date().toISOString(),
+            maxWinds: parseInt(props.USA_WIND) || parseInt(props.INTENSITY) || 0,
+            pressure: parseInt(props.USA_PRES) || parseInt(props.PRESSURE) || 0,
+            category: this.getStormCategory((parseInt(props.USA_WIND) || 0).toString()),
+            classification: props.USA_STATUS || props.STATUS || 'Unknown'
+          })
+        }
+      })
+
+      // Sort by date
+      return historicalPoints.sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime())
+    } catch (error) {
+      console.error('Error parsing historical GeoJSON:', error)
+      return []
+    }
+  }
+
+  /**
+   * Extract forecast hour from properties
+   */
+  private extractForecastHour(props: any): number | null {
+    // Try different property names that NHC uses
+    if (props.FHOUR !== undefined) return parseInt(props.FHOUR)
+    if (props.FCST_HR !== undefined) return parseInt(props.FCST_HR)
+    if (props.TAU !== undefined) return parseInt(props.TAU)
+    
+    // Try to extract from time strings
+    if (props.VALIDTIME) {
+      const baseTime = new Date(props.SYNOPTIME || props.DTG)
+      const validTime = new Date(props.VALIDTIME)
+      if (!isNaN(baseTime.getTime()) && !isNaN(validTime.getTime())) {
+        return Math.round((validTime.getTime() - baseTime.getTime()) / (1000 * 60 * 60))
+      }
+    }
+
+    return null
+  }
+
+  /**
    * Parse track data from KML/GeoJSON
    */
-  private async parseTrackData(trackUrl: string): Promise<[number, number][]> {
+  private async parseTrackData(trackUrl: string): Promise<StormForecastPoint[]> {
     try {
-      // In a real implementation, you'd parse KML or fetch GeoJSON
-      // For now, returning sample coordinates
-      console.log('Parsing track data from:', trackUrl)
-      
-      // This would involve parsing XML/KML or fetching GeoJSON
-      // and extracting coordinate pairs
-      
-      return [
-        [25.5, -80.0],
-        [26.2, -81.1],
-        [27.0, -82.5],
-        [28.1, -84.0],
-        [29.5, -85.8]
-      ]
+      // This method is deprecated in favor of parseForecastGeoJSON
+      console.log('parseTrackData is deprecated, use parseForecastGeoJSON instead')
+      return []
     } catch (error) {
       console.error('Error parsing track data:', error)
       return []
@@ -373,11 +516,37 @@ class NHCApiService {
         movement: 'NNW at 12 mph',
         lastUpdate: new Date(),
         forecast: [
-          [25.5, -80.0],
-          [26.2, -81.1],
-          [27.0, -82.5],
-          [28.1, -84.0],
-          [29.5, -85.8]
+          {
+            latitude: 25.5,
+            longitude: -80.0,
+            dateTime: '2025-08-05T06:00:00Z',
+            maxWinds: 115,
+            gusts: 140,
+            pressure: 960,
+            movement: { direction: 330, speed: 12 },
+            forecastHour: 12
+          },
+          {
+            latitude: 26.2,
+            longitude: -81.1,
+            dateTime: '2025-08-05T18:00:00Z',
+            maxWinds: 120,
+            gusts: 145,
+            pressure: 955,
+            movement: { direction: 330, speed: 12 },
+            forecastHour: 24
+          }
+        ],
+        historical: [
+          {
+            latitude: 24.0,
+            longitude: -78.5,
+            dateTime: '2025-08-04T06:00:00Z',
+            maxWinds: 100,
+            pressure: 970,
+            category: 2,
+            classification: 'Hurricane'
+          }
         ],
         advisoryUrl: '',
         trackUrl: '',

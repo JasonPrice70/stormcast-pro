@@ -84,6 +84,17 @@ export interface StormForecastPoint {
     direction: number
     speed: number
   }
+  forecastHour: number
+}
+
+export interface StormHistoricalPoint {
+  latitude: number
+  longitude: number
+  dateTime: string
+  maxWinds: number
+  pressure: number
+  category: number
+  classification: string
 }
 
 export interface ProcessedStorm {
@@ -96,7 +107,8 @@ export interface ProcessedStorm {
   pressure: number
   movement: string
   lastUpdate: Date
-  forecast: [number, number][]
+  forecast: StormForecastPoint[]
+  historical: StormHistoricalPoint[]
   advisoryUrl: string
   trackUrl: string
   coneUrl: string

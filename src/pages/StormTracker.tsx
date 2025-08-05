@@ -49,7 +49,7 @@ const StormTracker = () => {
 
     const positions: [number, number][] = [
       storm.position, // Current position
-      ...storm.forecast
+      ...storm.forecast.map(point => [point.latitude, point.longitude] as [number, number])
     ]
 
     return (
@@ -206,8 +206,10 @@ const StormTracker = () => {
                 <div className="forecast-points">
                   {selectedStorm.forecast.slice(0, 5).map((point, index) => (
                     <div key={index} className="forecast-point">
-                      <div><strong>Point {index + 1}:</strong></div>
-                      <div>Position: {point[0].toFixed(1)}°N, {Math.abs(point[1]).toFixed(1)}°W</div>
+                      <div><strong>+{point.forecastHour}h:</strong></div>
+                      <div>Position: {point.latitude.toFixed(1)}°N, {Math.abs(point.longitude).toFixed(1)}°W</div>
+                      <div>Winds: {point.maxWinds} mph</div>
+                      <div>Pressure: {point.pressure} mb</div>
                     </div>
                   ))}
                 </div>

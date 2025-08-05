@@ -194,3 +194,51 @@
   font-size: 0.8rem;
   opacity: 0.8;
 }
+
+.leaflet-top .leaflet-control {
+	margin-top: 110px;
+	}
+
+/* Path Visibility Controls */
+.path-controls {
+  margin-top: 10px;
+  padding: 8px 0;
+  border-top: 1px solid #e0e0e0;
+}
+
+.path-controls-title {
+  font-size: 0.9rem;
+  font-weight: bold;
+  margin-bottom: 5px;
+  color: #1a237e;
+}
+
+.path-controls-options {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.path-control-option {
+  display: flex;
+  align-items: center;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.path-control-option input[type="checkbox"] {
+  margin-right: 6px;
+}
+
+.path-control-legend {
+  font-weight: bold;
+  margin-right: 4px;
+}
+
+.path-control-legend.historical {
+  color: #666666;
+}
+
+.path-control-legend.forecast {
+  color: #ff3333;
+}

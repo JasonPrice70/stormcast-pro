@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, CircleMarker } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import './SimpleStormTracker.css';
@@ -65,6 +65,96 @@ const demoStorms = [
     pressure: 960,
     movement: 'NW at 15 mph',
     lastUpdate: new Date('2025-08-04T18:00:00Z'),
+    historical: [
+      {
+        latitude: 24.5,
+        longitude: -81.0,
+        dateTime: '2025-08-02T06:00:00Z',
+        maxWinds: 80,
+        pressure: 990,
+        category: 1,
+        classification: 'Hurricane'
+      },
+      {
+        latitude: 25.2,
+        longitude: -82.1,
+        dateTime: '2025-08-02T18:00:00Z',
+        maxWinds: 95,
+        pressure: 975,
+        category: 2,
+        classification: 'Hurricane'
+      },
+      {
+        latitude: 26.8,
+        longitude: -83.5,
+        dateTime: '2025-08-03T06:00:00Z',
+        maxWinds: 110,
+        pressure: 965,
+        category: 3,
+        classification: 'Hurricane'
+      },
+      {
+        latitude: 27.8,
+        longitude: -84.2,
+        dateTime: '2025-08-04T06:00:00Z',
+        maxWinds: 115,
+        pressure: 962,
+        category: 3,
+        classification: 'Hurricane'
+      }
+    ],
+    forecast: [
+      {
+        latitude: 29.2,
+        longitude: -86.1,
+        dateTime: '2025-08-05T06:00:00Z',
+        maxWinds: 125,
+        gusts: 155,
+        pressure: 955,
+        movement: { direction: 315, speed: 15 },
+        forecastHour: 12
+      },
+      {
+        latitude: 30.1,
+        longitude: -87.5,
+        dateTime: '2025-08-05T18:00:00Z',
+        maxWinds: 130,
+        gusts: 160,
+        pressure: 950,
+        movement: { direction: 320, speed: 16 },
+        forecastHour: 24
+      },
+      {
+        latitude: 31.5,
+        longitude: -88.8,
+        dateTime: '2025-08-06T06:00:00Z',
+        maxWinds: 125,
+        gusts: 150,
+        pressure: 955,
+        movement: { direction: 325, speed: 18 },
+        forecastHour: 36
+      },
+      {
+        latitude: 33.0,
+        longitude: -89.5,
+        dateTime: '2025-08-06T18:00:00Z',
+        maxWinds: 100,
+        gusts: 125,
+        pressure: 975,
+        movement: { direction: 330, speed: 20 },
+        forecastHour: 48
+      },
+      {
+        latitude: 34.8,
+        longitude: -89.8,
+        dateTime: '2025-08-07T06:00:00Z',
+        maxWinds: 75,
+        gusts: 95,
+        pressure: 990,
+        movement: { direction: 335, speed: 22 },
+        forecastHour: 60
+      }
+    ],
     advisoryUrl: 'https://www.nhc.noaa.gov/',
     trackUrl: '#',
     coneUrl: '#'
@@ -79,6 +169,77 @@ const demoStorms = [
     pressure: 990,
     movement: 'N at 12 mph',
     lastUpdate: new Date('2025-08-04T18:00:00Z'),
+    historical: [
+      {
+        latitude: 19.5,
+        longitude: -76.5,
+        dateTime: '2025-08-03T06:00:00Z',
+        maxWinds: 35,
+        pressure: 1005,
+        category: 0,
+        classification: 'Tropical Depression'
+      },
+      {
+        latitude: 20.2,
+        longitude: -77.1,
+        dateTime: '2025-08-03T18:00:00Z',
+        maxWinds: 45,
+        pressure: 1000,
+        category: 0,
+        classification: 'Tropical Storm'
+      },
+      {
+        latitude: 21.1,
+        longitude: -77.6,
+        dateTime: '2025-08-04T06:00:00Z',
+        maxWinds: 60,
+        pressure: 995,
+        category: 0,
+        classification: 'Tropical Storm'
+      }
+    ],
+    forecast: [
+      {
+        latitude: 23.2,
+        longitude: -78.5,
+        dateTime: '2025-08-05T06:00:00Z',
+        maxWinds: 70,
+        gusts: 85,
+        pressure: 985,
+        movement: { direction: 0, speed: 12 },
+        forecastHour: 12
+      },
+      {
+        latitude: 24.8,
+        longitude: -79.0,
+        dateTime: '2025-08-05T18:00:00Z',
+        maxWinds: 80,
+        gusts: 100,
+        pressure: 980,
+        movement: { direction: 10, speed: 14 },
+        forecastHour: 24
+      },
+      {
+        latitude: 26.5,
+        longitude: -79.2,
+        dateTime: '2025-08-06T06:00:00Z',
+        maxWinds: 90,
+        gusts: 110,
+        pressure: 975,
+        movement: { direction: 15, speed: 16 },
+        forecastHour: 36
+      },
+      {
+        latitude: 28.0,
+        longitude: -79.0,
+        dateTime: '2025-08-06T18:00:00Z',
+        maxWinds: 85,
+        gusts: 105,
+        pressure: 978,
+        movement: { direction: 20, speed: 18 },
+        forecastHour: 48
+      }
+    ],
     advisoryUrl: 'https://www.nhc.noaa.gov/',
     trackUrl: '#',
     coneUrl: '#'
@@ -87,6 +248,8 @@ const demoStorms = [
 
 const SimpleStormTracker: React.FC = () => {
   const [useDemo, setUseDemo] = useState(true); // Start with demo data to test
+  const [showHistoricalPaths, setShowHistoricalPaths] = useState(true);
+  const [showForecastPaths, setShowForecastPaths] = useState(true);
   
   // Use both hooks
   const demoData = useDemoData();
@@ -257,6 +420,101 @@ const SimpleStormTracker: React.FC = () => {
             </Popup>
           </Marker>
         ))}
+
+        {/* Render historical storm paths */}
+        {showHistoricalPaths && displayStorms.map((storm) => {
+          if (!storm.historical || storm.historical.length === 0) return null;
+          
+          const historicalPath: [number, number][] = storm.historical.map((point: any) => [point.latitude, point.longitude]);
+          
+          return (
+            <React.Fragment key={`${storm.id}-historical`}>
+              {/* Historical path line */}
+              <Polyline
+                positions={historicalPath}
+                pathOptions={{
+                  color: '#666666',
+                  weight: 3,
+                  opacity: 0.8,
+                  dashArray: '5, 5'
+                }}
+              />
+              
+              {/* Historical position markers */}
+              {storm.historical.map((point: any, index: number) => (
+                <CircleMarker
+                  key={`${storm.id}-hist-${index}`}
+                  center={[point.latitude, point.longitude]}
+                  radius={4}
+                  pathOptions={{
+                    color: '#444444',
+                    fillColor: point.category >= 1 ? '#ff6600' : '#0099ff',
+                    fillOpacity: 0.7,
+                    weight: 1
+                  }}
+                >
+                  <Popup>
+                    <div style={{ fontSize: '0.9rem' }}>
+                      <strong>{storm.name} - Historical Position</strong><br />
+                      <strong>Date:</strong> {new Date(point.dateTime).toLocaleString()}<br />
+                      <strong>Winds:</strong> {point.maxWinds} mph<br />
+                      <strong>Pressure:</strong> {point.pressure} mb<br />
+                      <strong>Category:</strong> {point.category > 0 ? point.category : 'N/A'}
+                    </div>
+                  </Popup>
+                </CircleMarker>
+              ))}
+            </React.Fragment>
+          );
+        })}
+
+        {/* Render forecast storm paths */}
+        {showForecastPaths && displayStorms.map((storm) => {
+          if (!storm.forecast || storm.forecast.length === 0) return null;
+          
+          const forecastPath: [number, number][] = storm.forecast.map((point: any) => [point.latitude, point.longitude]);
+          
+          return (
+            <React.Fragment key={`${storm.id}-forecast`}>
+              {/* Forecast path line */}
+              <Polyline
+                positions={forecastPath}
+                pathOptions={{
+                  color: '#ff3333',
+                  weight: 4,
+                  opacity: 0.9,
+                  dashArray: '10, 5'
+                }}
+              />
+              
+              {/* Forecast position markers */}
+              {storm.forecast.map((point: any, index: number) => (
+                <CircleMarker
+                  key={`${storm.id}-forecast-${index}`}
+                  center={[point.latitude, point.longitude]}
+                  radius={6}
+                  pathOptions={{
+                    color: '#cc0000',
+                    fillColor: '#ff3333',
+                    fillOpacity: 0.8,
+                    weight: 2
+                  }}
+                >
+                  <Popup>
+                    <div style={{ fontSize: '0.9rem' }}>
+                      <strong>{storm.name} - Forecast Position</strong><br />
+                      <strong>Time:</strong> {new Date(point.dateTime).toLocaleString()}<br />
+                      <strong>Forecast Hour:</strong> +{point.forecastHour}h<br />
+                      <strong>Max Winds:</strong> {point.maxWinds} mph<br />
+                      <strong>Gusts:</strong> {point.gusts} mph<br />
+                      <strong>Pressure:</strong> {point.pressure} mb
+                    </div>
+                  </Popup>
+                </CircleMarker>
+              ))}
+            </React.Fragment>
+          );
+        })}
       </MapContainer>
       </div>
 
@@ -366,6 +624,39 @@ const SimpleStormTracker: React.FC = () => {
                   Updated: {lastUpdated.toLocaleTimeString()}
                 </span>
               )}
+              
+              {/* Path Visibility Controls */}
+              <div style={{ marginTop: '10px', padding: '8px 0', borderTop: '1px solid #e0e0e0' }}>
+                <div style={{ fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '5px', color: '#1a237e' }}>
+                  Storm Paths
+                  {dataSource === 'live' && (
+                    <div style={{ fontSize: '0.7rem', fontWeight: 'normal', color: '#666', marginTop: '2px' }}>
+                      Fetching real NHC forecast & historical data...
+                    </div>
+                  )}
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.8rem', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={showHistoricalPaths}
+                      onChange={(e) => setShowHistoricalPaths(e.target.checked)}
+                      style={{ marginRight: '6px' }}
+                    />
+                    <span style={{ color: '#666666' }}>━━━━</span> Historical Path
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.8rem', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={showForecastPaths}
+                      onChange={(e) => setShowForecastPaths(e.target.checked)}
+                      style={{ marginRight: '6px' }}
+                    />
+                    <span style={{ color: '#ff3333' }}>━━━━</span> Forecast Path
+                  </label>
+                </div>
+              </div>
+              
               <div className="control-panel-buttons">
                 <button 
                   onClick={refresh}

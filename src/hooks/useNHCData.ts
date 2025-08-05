@@ -40,20 +40,8 @@ export const useNHCData = (options: UseNHCDataOptions = {}): UseNHCDataReturn =>
 
       const activeStorms = await nhcApi.getActiveStorms()
       
-      // Fetch forecast tracks for each storm
-      const stormsWithTracks = await Promise.all(
-        activeStorms.map(async (storm) => {
-          try {
-            const track = await nhcApi.getStormTrack(storm.id)
-            return { ...storm, forecast: track }
-          } catch (err) {
-            console.warn(`Failed to fetch track for ${storm.name}:`, err)
-            return storm
-          }
-        })
-      )
-
-      setStorms(stormsWithTracks)
+      // The storms now already include forecast and historical data
+      setStorms(activeStorms)
       setLastUpdated(new Date())
       console.log('Successfully updated storm data');
     } catch (err) {
