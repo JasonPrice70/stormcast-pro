@@ -3,13 +3,28 @@ frontend:
   phases:
     preBuild:
       commands:
-        - npm ci
-        - echo "Node version:" && node --version
-        - echo "NPM version:" && npm --version
-        - echo "Available scripts:" && npm run
+        - echo "Starting preBuild phase..."
+        - node --version
+        - npm --version
+        - echo "Cleaning npm cache..."
+        - npm cache clean --force
+        - echo "Installing dependencies with npm install..."
+        - npm install
+        - echo "Checking TypeScript installation..."
+        - npx tsc --version || echo "TypeScript check failed, continuing..."
+        - echo "preBuild phase completed successfully"
     build:
       commands:
+        - echo "Starting build phase..."
+        - echo "Setting NODE_ENV to production"
+        - export NODE_ENV=production
+        - echo "Current directory contents:"
+        - ls -la
+        - echo "Running build command..."
         - npm run build
+        - echo "Build completed, checking output:"
+        - ls -la dist/ || echo "No dist folder found"
+        - echo "Build phase completed"
   artifacts:
     baseDirectory: dist
     files:
@@ -17,6 +32,3 @@ frontend:
   cache:
     paths:
       - node_modules/**/*
-  runtime:
-    nodejs:
-      version: 18

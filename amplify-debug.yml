@@ -1,0 +1,34 @@
+version: 1
+frontend:
+  phases:
+    preBuild:
+      commands:
+        - echo "=== AMPLIFY BUILD DEBUG INFO ==="
+        - echo "Node version:" && node --version
+        - echo "NPM version:" && npm --version
+        - echo "Current working directory:" && pwd
+        - echo "Directory contents:" && ls -la
+        - echo "Package.json exists:" && test -f package.json && echo "YES" || echo "NO"
+        - echo "=== INSTALLING DEPENDENCIES ==="
+        - npm install --production=false
+        - echo "=== DEPENDENCY INSTALLATION COMPLETE ==="
+        - echo "node_modules exists:" && test -d node_modules && echo "YES" || echo "NO"
+        - echo "TypeScript available:" && npx tsc --version || echo "TypeScript not found"
+    build:
+      commands:
+        - echo "=== STARTING BUILD PROCESS ==="
+        - echo "Using safe build approach..."
+        - npm run build:safe
+        - echo "=== BUILD COMPLETE ==="
+        - echo "Checking build output..."
+        - test -d dist && echo "dist folder exists" || echo "ERROR: dist folder not found"
+        - test -f dist/index.html && echo "index.html exists" || echo "ERROR: index.html not found"
+        - echo "Build artifacts:"
+        - ls -la dist/ 2>/dev/null || echo "Could not list dist contents"
+  artifacts:
+    baseDirectory: dist
+    files:
+      - '**/*'
+  cache:
+    paths:
+      - node_modules/**/*
