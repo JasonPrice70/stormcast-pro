@@ -20,7 +20,14 @@ const isDevelopment = () => {
   return typeof window !== 'undefined' && 
          (window.location.hostname === 'localhost' || 
           window.location.hostname === '127.0.0.1' ||
-          window.location.hostname.includes('local'));
+          window.location.hostname.includes('local') ||
+          window.location.hostname.includes('192.168.') ||
+          window.location.hostname.includes('10.0.') ||
+          window.location.port === '3000' ||
+          window.location.port === '3001' ||
+          window.location.port === '3002' ||
+          window.location.port === '5173' ||
+          window.location.port === '5174');
 };
 
 // Alternative API endpoints that may work without CORS issues
@@ -223,7 +230,34 @@ class NHCApiService {
       const year = new Date().getFullYear()
       const baseUrl = `${NHC_BASE_URL}/gis/forecast/archive/${year}/${stormId.toUpperCase()}_5day_latest.geojson`
       
-      // Try multiple approaches for fetching the data
+      const isDevMode = isDevelopment()
+      
+      // In production, try direct connection first
+      if (!isDevMode) {
+        try {
+          console.log('Production mode: Attempting direct connection for forecast track:', baseUrl)
+          const response = await axios.get(baseUrl, {
+            timeout: 8000,
+            headers: { 'Accept': 'application/json' }
+          })
+          
+          const result = this.parseForecastGeoJSON(response.data)
+          if (result.length > 0) {
+            console.log(`Successfully fetched ${result.length} forecast points for ${stormId} (direct)`)
+            return result
+          }
+        } catch (error) {
+          // Log the specific error but continue to proxies if needed
+          const err = error as any
+          if (err.response?.status === 404) {
+            console.log(`Forecast track file not found for ${stormId} (this is normal if no forecast is available)`)
+            return []
+          }
+          console.warn(`Direct forecast track fetch failed for ${stormId}:`, err.message)
+        }
+      }
+      
+      // Try CORS proxies (development mode or production fallback)
       const proxiesToTry = this.corsProxy ? [this.corsProxy] : CORS_PROXIES.slice(0, 3)
       
       for (const proxy of proxiesToTry) {
@@ -242,12 +276,17 @@ class NHCApiService {
             return result
           }
         } catch (error) {
-          console.warn(`Forecast track fetch failed with proxy ${proxy}:`, error instanceof Error ? error.message : 'Unknown error')
+          const err = error as any
+          if (err.response?.status === 404) {
+            console.log(`Forecast track file not found for ${stormId} via proxy (this is normal if no forecast is available)`)
+            return []
+          }
+          console.warn(`Forecast track fetch failed with proxy ${proxy}:`, err.message)
           continue
         }
       }
       
-      console.warn(`No forecast track data available for storm ${stormId}`)
+      console.log(`No forecast track data available for storm ${stormId}`)
       return []
     } catch (error) {
       console.warn('Failed to fetch forecast track for', stormId, ':', error)
@@ -264,7 +303,34 @@ class NHCApiService {
       const year = new Date().getFullYear()
       const baseUrl = `${NHC_BASE_URL}/gis/best_track/archive/${year}/${stormId.toUpperCase()}_best_track.geojson`
       
-      // Try multiple approaches for fetching the data
+      const isDevMode = isDevelopment()
+      
+      // In production, try direct connection first
+      if (!isDevMode) {
+        try {
+          console.log('Production mode: Attempting direct connection for historical track:', baseUrl)
+          const response = await axios.get(baseUrl, {
+            timeout: 8000,
+            headers: { 'Accept': 'application/json' }
+          })
+          
+          const result = this.parseHistoricalGeoJSON(response.data)
+          if (result.length > 0) {
+            console.log(`Successfully fetched ${result.length} historical points for ${stormId} (direct)`)
+            return result
+          }
+        } catch (error) {
+          // Log the specific error but continue to proxies if needed
+          const err = error as any
+          if (err.response?.status === 404) {
+            console.log(`Historical track file not found for ${stormId} (this is normal if no historical track is available)`)
+            return []
+          }
+          console.warn(`Direct historical track fetch failed for ${stormId}:`, err.message)
+        }
+      }
+      
+      // Try CORS proxies (development mode or production fallback)
       const proxiesToTry = this.corsProxy ? [this.corsProxy] : CORS_PROXIES.slice(0, 3)
       
       for (const proxy of proxiesToTry) {
@@ -283,12 +349,17 @@ class NHCApiService {
             return result
           }
         } catch (error) {
-          console.warn(`Historical track fetch failed with proxy ${proxy}:`, error instanceof Error ? error.message : 'Unknown error')
+          const err = error as any
+          if (err.response?.status === 404) {
+            console.log(`Historical track file not found for ${stormId} via proxy (this is normal if no historical track is available)`)
+            return []
+          }
+          console.warn(`Historical track fetch failed with proxy ${proxy}:`, err.message)
           continue
         }
       }
       
-      console.warn(`No historical track data available for storm ${stormId}`)
+      console.log(`No historical track data available for storm ${stormId}`)
       return []
     } catch (error) {
       console.warn('Failed to fetch historical track for', stormId, ':', error)
@@ -305,7 +376,34 @@ class NHCApiService {
       const year = new Date().getFullYear()
       const baseUrl = `${NHC_BASE_URL}/gis/forecast/archive/${year}/${stormId.toUpperCase()}_latest_CONE.geojson`
       
-      // Try multiple approaches for fetching the data
+      const isDevMode = isDevelopment()
+      
+      // In production, try direct connection first
+      if (!isDevMode) {
+        try {
+          console.log('Production mode: Attempting direct connection for forecast cone:', baseUrl)
+          const response = await axios.get(baseUrl, {
+            timeout: 8000,
+            headers: { 'Accept': 'application/json' }
+          })
+          
+          const result = this.parseConeGeoJSON(response.data)
+          if (result) {
+            console.log(`Successfully fetched forecast cone for ${stormId} (direct)`)
+            return result
+          }
+        } catch (error) {
+          // Log the specific error but continue to proxies if needed
+          const err = error as any
+          if (err.response?.status === 404) {
+            console.log(`Forecast cone file not found for ${stormId} (this is normal if no cone data is available)`)
+            return null
+          }
+          console.warn(`Direct forecast cone fetch failed for ${stormId}:`, err.message)
+        }
+      }
+      
+      // Try CORS proxies (development mode or production fallback)
       const proxiesToTry = this.corsProxy ? [this.corsProxy] : CORS_PROXIES.slice(0, 3)
       
       for (const proxy of proxiesToTry) {
@@ -324,12 +422,17 @@ class NHCApiService {
             return result
           }
         } catch (error) {
-          console.warn(`Forecast cone fetch failed with proxy ${proxy}:`, error instanceof Error ? error.message : 'Unknown error')
+          const err = error as any
+          if (err.response?.status === 404) {
+            console.log(`Forecast cone file not found for ${stormId} via proxy (this is normal if no cone data is available)`)
+            return null
+          }
+          console.warn(`Forecast cone fetch failed with proxy ${proxy}:`, err.message)
           continue
         }
       }
       
-      console.warn(`No forecast cone data available for storm ${stormId}`)
+      console.log(`No forecast cone data available for storm ${stormId}`)
       return null
     } catch (error) {
       console.warn('Failed to fetch forecast cone for', stormId, ':', error)
