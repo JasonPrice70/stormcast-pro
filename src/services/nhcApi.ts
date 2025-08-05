@@ -17,17 +17,41 @@ const CORS_PROXIES = [
 
 // Development detection
 const isDevelopment = () => {
-  return typeof window !== 'undefined' && 
-         (window.location.hostname === 'localhost' || 
-          window.location.hostname === '127.0.0.1' ||
-          window.location.hostname.includes('local') ||
-          window.location.hostname.includes('192.168.') ||
-          window.location.hostname.includes('10.0.') ||
-          window.location.port === '3000' ||
-          window.location.port === '3001' ||
-          window.location.port === '3002' ||
-          window.location.port === '5173' ||
-          window.location.port === '5174');
+  if (typeof window === 'undefined') return false; // Server-side rendering
+  
+  const hostname = window.location.hostname;
+  const port = window.location.port;
+  
+  // Check for local development environments
+  const isLocalhost = hostname === 'localhost' || 
+                     hostname === '127.0.0.1' || 
+                     hostname.includes('local') ||
+                     hostname.includes('192.168.') ||
+                     hostname.includes('10.0.');
+                     
+  // Check for development ports
+  const isDevPort = port === '3000' || 
+                   port === '3001' || 
+                   port === '3002' || 
+                   port === '5173' || 
+                   port === '5174';
+  
+  // AWS Amplify domains are production
+  const isAmplifyDomain = hostname.includes('.amplifyapp.com');
+  
+  // Netlify domains are production  
+  const isNetlifyDomain = hostname.includes('.netlify.app') || hostname.includes('.netlify.com');
+  
+  // Vercel domains are production
+  const isVercelDomain = hostname.includes('.vercel.app');
+  
+  // If it's a known production domain, it's not development
+  if (isAmplifyDomain || isNetlifyDomain || isVercelDomain) {
+    return false;
+  }
+  
+  // Otherwise, check for local development indicators
+  return isLocalhost || isDevPort;
 };
 
 // Alternative API endpoints that may work without CORS issues
@@ -97,41 +121,15 @@ class NHCApiService {
     let lastError: any;
     let attempts = 0;
     const isDevMode = isDevelopment();
-    const maxAttempts = isDevMode ? CORS_PROXIES.length : CORS_PROXIES.length + 1; // Skip direct in dev
-
-    console.log(`Starting NHC data fetch (${isDevMode ? 'Development' : 'Production'} mode) with ${maxAttempts} attempts...`);
-
-    // Only try direct connection in production (not localhost)
-    if (!isDevMode && attempts === 0) {
-      try {
-        console.log('Attempting direct connection to NHC API...');
-        const response = await axios.get<NHCActiveStorms>(ACTIVE_STORMS_URL, {
-          timeout: 8000,
-          headers: {
-            'Accept': 'application/json, text/plain, */*',
-            'X-Requested-With': 'XMLHttpRequest'
-          }
-        });
-        console.log('Successfully fetched storm data directly');
-        
-        // Validate response data
-        if (response.data && response.data.activeStorms) {
-          return await this.processStormData(response.data.activeStorms);
-        } else {
-          throw new Error('Invalid response format from NHC API');
-        }
-      } catch (error: any) {
-        console.warn('Direct connection failed:', error.message);
-        lastError = error;
-        attempts++;
-      }
-    }
-
-    // Start with proxies immediately in development mode
-    const startIndex = isDevMode ? 0 : (attempts > 0 ? attempts - 1 : 0);
     
-    // Try CORS proxies
-    for (let i = startIndex; i < CORS_PROXIES.length; i++) {
+    console.log(`Starting NHC data fetch (${isDevMode ? 'Development' : 'Production'} mode)...`);
+    console.log(`Current hostname: ${typeof window !== 'undefined' ? window.location.hostname : 'server'}`);
+
+    // Note: Even in production (AWS Amplify), we still need CORS proxies because it's a browser environment
+    // Only server-side environments can make direct calls to NHC API
+    
+    // Try CORS proxies for both development and production browser environments
+    for (let i = 0; i < CORS_PROXIES.length; i++) {
       const proxy = CORS_PROXIES[i];
       
       try {
@@ -142,7 +140,8 @@ class NHCApiService {
           {
             headers: {
               'Accept': 'application/json, text/plain, */*',
-              'X-Requested-With': 'XMLHttpRequest'
+              'X-Requested-With': 'XMLHttpRequest',
+              'User-Agent': 'StormCast Pro Weather Application/1.0 (https://github.com/JasonPrice70/stormcast-pro)'
             },
             timeout: 12000
           }
@@ -209,14 +208,14 @@ class NHCApiService {
     } else if (lastError?.message?.includes('Access-Control-Allow-Origin') || lastError?.message?.includes('localhost:3002')) {
       throw new Error('CORS proxy port mismatch detected. The proxy is configured for a different localhost port. Try requesting access to CORS-anywhere.');
     } else if (lastError?.message?.includes('CORS') || lastError?.code === 'ERR_NETWORK') {
-      const devMessage = isDevMode ? 
+      const envMessage = isDevMode ? 
         'Development environment detected: NHC API blocks localhost requests due to CORS policy. This is normal - use CORS proxies or demo data.' : 
-        'Unable to connect to hurricane data feed due to CORS restrictions.';
-      throw new Error(`${devMessage} Try requesting access to CORS proxy services.`);
+        'Production environment: Browser-based apps cannot directly access NHC API due to CORS restrictions. Using CORS proxy services.';
+      throw new Error(`${envMessage} Try requesting access to CORS proxy services or use demo data.`);
     } else if (lastError?.code === 'ECONNABORTED') {
       throw new Error('Connection timeout while fetching hurricane data. Try getting CORS proxy access first.');
     } else {
-      const envNote = isDevMode ? ' (Development environment - consider using demo data)' : '';
+      const envNote = isDevMode ? ' (Development environment - consider using demo data)' : ' (Production environment - CORS proxy access may be needed)';
       throw new Error(`Unable to fetch live hurricane data: ${lastError?.message || 'Unknown error'}${envNote}. Try CORS proxy access or use demo data.`);
     }
   }
@@ -230,34 +229,7 @@ class NHCApiService {
       const year = new Date().getFullYear()
       const baseUrl = `${NHC_BASE_URL}/gis/forecast/archive/${year}/${stormId.toUpperCase()}_5day_latest.geojson`
       
-      const isDevMode = isDevelopment()
-      
-      // In production, try direct connection first
-      if (!isDevMode) {
-        try {
-          console.log('Production mode: Attempting direct connection for forecast track:', baseUrl)
-          const response = await axios.get(baseUrl, {
-            timeout: 8000,
-            headers: { 'Accept': 'application/json' }
-          })
-          
-          const result = this.parseForecastGeoJSON(response.data)
-          if (result.length > 0) {
-            console.log(`Successfully fetched ${result.length} forecast points for ${stormId} (direct)`)
-            return result
-          }
-        } catch (error) {
-          // Log the specific error but continue to proxies if needed
-          const err = error as any
-          if (err.response?.status === 404) {
-            console.log(`Forecast track file not found for ${stormId} (this is normal if no forecast is available)`)
-            return []
-          }
-          console.warn(`Direct forecast track fetch failed for ${stormId}:`, err.message)
-        }
-      }
-      
-      // Try CORS proxies (development mode or production fallback)
+      // Note: Browser environments (including AWS Amplify) need CORS proxies for NHC API access
       const proxiesToTry = this.corsProxy ? [this.corsProxy] : CORS_PROXIES.slice(0, 3)
       
       for (const proxy of proxiesToTry) {
@@ -267,7 +239,10 @@ class NHCApiService {
           
           const response = await axios.get(forecastUrl, {
             timeout: 8000,
-            headers: { 'Accept': 'application/json' }
+            headers: { 
+              'Accept': 'application/json',
+              'User-Agent': 'StormCast Pro Weather Application/1.0 (https://github.com/JasonPrice70/stormcast-pro)'
+            }
           })
 
           const result = this.parseForecastGeoJSON(response.data)
@@ -278,7 +253,7 @@ class NHCApiService {
         } catch (error) {
           const err = error as any
           if (err.response?.status === 404) {
-            console.log(`Forecast track file not found for ${stormId} via proxy (this is normal if no forecast is available)`)
+            console.log(`Forecast track file not found for ${stormId} (this is normal if no forecast is available)`)
             return []
           }
           console.warn(`Forecast track fetch failed with proxy ${proxy}:`, err.message)
@@ -303,34 +278,7 @@ class NHCApiService {
       const year = new Date().getFullYear()
       const baseUrl = `${NHC_BASE_URL}/gis/best_track/archive/${year}/${stormId.toUpperCase()}_best_track.geojson`
       
-      const isDevMode = isDevelopment()
-      
-      // In production, try direct connection first
-      if (!isDevMode) {
-        try {
-          console.log('Production mode: Attempting direct connection for historical track:', baseUrl)
-          const response = await axios.get(baseUrl, {
-            timeout: 8000,
-            headers: { 'Accept': 'application/json' }
-          })
-          
-          const result = this.parseHistoricalGeoJSON(response.data)
-          if (result.length > 0) {
-            console.log(`Successfully fetched ${result.length} historical points for ${stormId} (direct)`)
-            return result
-          }
-        } catch (error) {
-          // Log the specific error but continue to proxies if needed
-          const err = error as any
-          if (err.response?.status === 404) {
-            console.log(`Historical track file not found for ${stormId} (this is normal if no historical track is available)`)
-            return []
-          }
-          console.warn(`Direct historical track fetch failed for ${stormId}:`, err.message)
-        }
-      }
-      
-      // Try CORS proxies (development mode or production fallback)
+      // Note: Browser environments (including AWS Amplify) need CORS proxies for NHC API access
       const proxiesToTry = this.corsProxy ? [this.corsProxy] : CORS_PROXIES.slice(0, 3)
       
       for (const proxy of proxiesToTry) {
@@ -340,7 +288,10 @@ class NHCApiService {
           
           const response = await axios.get(trackUrl, {
             timeout: 8000,
-            headers: { 'Accept': 'application/json' }
+            headers: { 
+              'Accept': 'application/json',
+              'User-Agent': 'StormCast Pro Weather Application/1.0 (https://github.com/JasonPrice70/stormcast-pro)'
+            }
           })
 
           const result = this.parseHistoricalGeoJSON(response.data)
@@ -351,7 +302,7 @@ class NHCApiService {
         } catch (error) {
           const err = error as any
           if (err.response?.status === 404) {
-            console.log(`Historical track file not found for ${stormId} via proxy (this is normal if no historical track is available)`)
+            console.log(`Historical track file not found for ${stormId} (this is normal if no historical track is available)`)
             return []
           }
           console.warn(`Historical track fetch failed with proxy ${proxy}:`, err.message)
@@ -376,34 +327,7 @@ class NHCApiService {
       const year = new Date().getFullYear()
       const baseUrl = `${NHC_BASE_URL}/gis/forecast/archive/${year}/${stormId.toUpperCase()}_latest_CONE.geojson`
       
-      const isDevMode = isDevelopment()
-      
-      // In production, try direct connection first
-      if (!isDevMode) {
-        try {
-          console.log('Production mode: Attempting direct connection for forecast cone:', baseUrl)
-          const response = await axios.get(baseUrl, {
-            timeout: 8000,
-            headers: { 'Accept': 'application/json' }
-          })
-          
-          const result = this.parseConeGeoJSON(response.data)
-          if (result) {
-            console.log(`Successfully fetched forecast cone for ${stormId} (direct)`)
-            return result
-          }
-        } catch (error) {
-          // Log the specific error but continue to proxies if needed
-          const err = error as any
-          if (err.response?.status === 404) {
-            console.log(`Forecast cone file not found for ${stormId} (this is normal if no cone data is available)`)
-            return null
-          }
-          console.warn(`Direct forecast cone fetch failed for ${stormId}:`, err.message)
-        }
-      }
-      
-      // Try CORS proxies (development mode or production fallback)
+      // Note: Browser environments (including AWS Amplify) need CORS proxies for NHC API access
       const proxiesToTry = this.corsProxy ? [this.corsProxy] : CORS_PROXIES.slice(0, 3)
       
       for (const proxy of proxiesToTry) {
@@ -413,7 +337,10 @@ class NHCApiService {
           
           const response = await axios.get(coneUrl, {
             timeout: 8000,
-            headers: { 'Accept': 'application/json' }
+            headers: { 
+              'Accept': 'application/json',
+              'User-Agent': 'StormCast Pro Weather Application/1.0 (https://github.com/JasonPrice70/stormcast-pro)'
+            }
           })
 
           const result = this.parseConeGeoJSON(response.data)
@@ -424,7 +351,7 @@ class NHCApiService {
         } catch (error) {
           const err = error as any
           if (err.response?.status === 404) {
-            console.log(`Forecast cone file not found for ${stormId} via proxy (this is normal if no cone data is available)`)
+            console.log(`Forecast cone file not found for ${stormId} (this is normal if no cone data is available)`)
             return null
           }
           console.warn(`Forecast cone fetch failed with proxy ${proxy}:`, err.message)
