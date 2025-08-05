@@ -10,6 +10,11 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    sourcemap: true
-  }
+    sourcemap: false, // Disable sourcemaps for Amplify builds
+    rollupOptions: {
+      output: {
+        manualChunks: undefined, // Simplify chunking for cloud builds
+      },
+    },
+  },
 })

@@ -3,17 +3,25 @@ frontend:
   phases:
     preBuild:
       commands:
-        - echo "Node version check..."
-        - which node
-        - which npm
+        - echo "=== AMPLIFY BUILD DIAGNOSTICS ==="
         - node --version
         - npm --version
         - echo "Installing dependencies..."
-        - npm install
+        - npm ci
+        - echo "Checking installed packages..."
+        - npm list vite || echo "Vite not found in npm list"
+        - npm list typescript || echo "TypeScript not found in npm list"
+        - echo "=== DEPENDENCIES INSTALLED ==="
     build:
       commands:
-        - echo "Starting build without TypeScript compilation..."
+        - echo "=== STARTING BUILD ==="
+        - echo "Contents of node_modules/.bin:"
+        - ls -la node_modules/.bin/ | grep -E "(vite|tsc)" || echo "No vite or tsc found in .bin"
+        - echo "Using locally installed Vite..."
         - npm run build:amplify
+        - echo "=== BUILD COMPLETED ==="
+        - echo "Checking build output..."
+        - ls -la dist/ || echo "No dist folder found"
   artifacts:
     baseDirectory: dist
     files:
