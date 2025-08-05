@@ -1,0 +1,166 @@
+.home-page {
+  padding: 0;
+  margin: 0;
+}
+
+.hero {
+  background: linear-gradient(135deg, #1a237e 0%, #5e35b1 100%);
+  color: white;
+  padding: 80px 20px;
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.hero h1 {
+  font-size: 3rem;
+  margin-bottom: 20px;
+  font-weight: 700;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.hero p {
+  font-size: 1.3rem;
+  max-width: 800px;
+  margin: 0 auto;
+  line-height: 1.6;
+  opacity: 0.95;
+}
+
+.features {
+  padding: 40px 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.forecast-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+  gap: 30px;
+  margin-bottom: 60px;
+}
+
+.forecast-card {
+  background: white;
+  border-radius: 12px;
+  padding: 30px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  border: 1px solid #e0e0e0;
+}
+
+.forecast-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+}
+
+.forecast-card h3 {
+  font-size: 1.5rem;
+  margin-bottom: 15px;
+  color: #1a237e;
+  font-weight: 600;
+}
+
+.forecast-card p {
+  color: #666;
+  line-height: 1.6;
+  margin-bottom: 20px;
+  font-size: 1rem;
+}
+
+.forecast-card button {
+  background: #5e35b1;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 6px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  text-decoration: none;
+  display: inline-block;
+}
+
+.forecast-card button:hover {
+  background: #4527a0;
+}
+
+.forecast-card a {
+  text-decoration: none;
+}
+
+.storm-info {
+  background: #f8f9fa;
+  padding: 40px 20px;
+  text-align: center;
+  border-top: 1px solid #e0e0e0;
+}
+
+.storm-info h3 {
+  font-size: 2rem;
+  margin-bottom: 20px;
+  color: #2c3e50;
+  font-weight: 600;
+}
+
+.storm-info p {
+  max-width: 800px;
+  margin: 0 auto 20px;
+  line-height: 1.6;
+  color: #666;
+  font-size: 1.1rem;
+}
+
+.storm-info strong {
+  color: #2c3e50;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .hero h1 {
+    font-size: 2.2rem;
+  }
+  
+  .hero p {
+    font-size: 1.1rem;
+  }
+  
+  .hero {
+    padding: 60px 20px;
+  }
+  
+  .forecast-grid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+  
+  .forecast-card {
+    padding: 20px;
+  }
+  
+  .features {
+    padding: 20px;
+  }
+  
+  .storm-info {
+    padding: 30px 20px;
+  }
+  
+  .storm-info h3 {
+    font-size: 1.6rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .hero h1 {
+    font-size: 1.8rem;
+  }
+  
+  .hero p {
+    font-size: 1rem;
+  }
+  
+  .forecast-card h3 {
+    font-size: 1.3rem;
+  }
+}

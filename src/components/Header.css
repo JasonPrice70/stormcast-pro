@@ -1,0 +1,113 @@
+.header {
+  background: linear-gradient(135deg, rgba(26, 35, 126, 0.5) 0%, rgba(94, 53, 177, 0.5) 100%);
+  color: white;
+  padding: 0;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+
+.header .container {
+  /*max-width: 1200px;*/
+  margin: 0 auto;
+  padding: 0 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.header h1 {
+  font-size: 2rem;
+  margin: 0;
+  font-weight: 700;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.header p {
+  margin: 0 0 0 0;
+  font-size: 0.9rem;
+  opacity: 0.9;
+  font-weight: 300;
+}
+
+.nav {
+  list-style: none;
+  display: flex;
+  gap: 30px;
+  margin: 0;
+  padding: 0;
+}
+
+.nav li {
+  margin: 0;
+}
+
+.nav a {
+  color: white;
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 1rem;
+  padding: 8px 16px;
+  border-radius: 6px;
+  transition: all 0.3s ease;
+  display: block;
+}
+
+.nav a:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  transform: translateY(-1px);
+}
+
+.nav a.active {
+  background-color: rgba(255, 255, 255, 0.2);
+  font-weight: 600;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .header .container {
+    flex-direction: column;
+    text-align: center;
+    gap: 15px;
+  }
+  
+  .header h1 {
+    font-size: 1.8rem;
+  }
+  
+  .header p {
+    font-size: 0.8rem;
+  }
+  
+  .nav {
+    gap: 15px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  
+  .nav a {
+    font-size: 0.9rem;
+    padding: 6px 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .header .container {
+    padding: 0 15px;
+  }
+  
+  .header h1 {
+    font-size: 1.5rem;
+  }
+  
+  .nav {
+    gap: 10px;
+  }
+  
+  .nav a {
+    font-size: 0.8rem;
+    padding: 5px 10px;
+  }
+}
