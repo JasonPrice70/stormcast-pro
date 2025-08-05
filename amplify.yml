@@ -4,6 +4,9 @@ frontend:
     preBuild:
       commands:
         - npm ci
+        - echo "Node version:" && node --version
+        - echo "NPM version:" && npm --version
+        - echo "Available scripts:" && npm run
     build:
       commands:
         - npm run build
@@ -14,3 +17,6 @@ frontend:
   cache:
     paths:
       - node_modules/**/*
+  runtime:
+    nodejs:
+      version: 18
