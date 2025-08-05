@@ -140,8 +140,7 @@ class NHCApiService {
           {
             headers: {
               'Accept': 'application/json, text/plain, */*',
-              'X-Requested-With': 'XMLHttpRequest',
-              'User-Agent': 'StormCast Pro Weather Application/1.0 (https://github.com/JasonPrice70/stormcast-pro)'
+              'X-Requested-With': 'XMLHttpRequest'
             },
             timeout: 12000
           }
@@ -240,8 +239,7 @@ class NHCApiService {
           const response = await axios.get(forecastUrl, {
             timeout: 8000,
             headers: { 
-              'Accept': 'application/json',
-              'User-Agent': 'StormCast Pro Weather Application/1.0 (https://github.com/JasonPrice70/stormcast-pro)'
+              'Accept': 'application/json'
             }
           })
 
@@ -289,8 +287,7 @@ class NHCApiService {
           const response = await axios.get(trackUrl, {
             timeout: 8000,
             headers: { 
-              'Accept': 'application/json',
-              'User-Agent': 'StormCast Pro Weather Application/1.0 (https://github.com/JasonPrice70/stormcast-pro)'
+              'Accept': 'application/json'
             }
           })
 
@@ -338,8 +335,7 @@ class NHCApiService {
           const response = await axios.get(coneUrl, {
             timeout: 8000,
             headers: { 
-              'Accept': 'application/json',
-              'User-Agent': 'StormCast Pro Weather Application/1.0 (https://github.com/JasonPrice70/stormcast-pro)'
+              'Accept': 'application/json'
             }
           })
 
