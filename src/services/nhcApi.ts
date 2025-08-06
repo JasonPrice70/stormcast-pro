@@ -6,13 +6,13 @@ const NHC_BASE_URL = 'https://www.nhc.noaa.gov'
 const ACTIVE_STORMS_URL = `${NHC_BASE_URL}/CurrentStorms.json`
 const GIS_BASE_URL = `${NHC_BASE_URL}/gis`
 
-// CORS proxy alternatives for development (in production, you'd handle this server-side)
+// CORS proxy alternatives for browser environments
 const CORS_PROXIES = [
-  'https://cors-anywhere.herokuapp.com/', // Primary (requires access but most reliable)
-  'https://api.codetabs.com/v1/proxy?quest=', // Simple proxy
-  'https://corsproxy.io/?', // Another alternative
-  'https://api.allorigins.win/get?url=', // Different format - returns data in .contents field
-  // Removed allorigins.win/raw as it has port-specific CORS issues
+  'https://api.allorigins.win/get?url=', // Most reliable - returns data in .contents field
+  'https://api.codetabs.com/v1/proxy?quest=', // Simple and usually available
+  'https://cors-anywhere.herokuapp.com/', // Requires access but reliable when enabled
+  'https://thingproxy.freeboard.io/fetch/', // Alternative proxy service
+  // Removed corsproxy.io as it appears to be down
 ];
 
 // Development detection
@@ -135,20 +135,23 @@ class NHCApiService {
       try {
         console.log(`Attempting to fetch storms with proxy ${i + 1}/${CORS_PROXIES.length}: ${proxy}`);
         
-        const response = await axios.get(
-          `${proxy}${ACTIVE_STORMS_URL}`,
-          {
-            headers: {
-              'Accept': 'application/json, text/plain, */*',
-              'X-Requested-With': 'XMLHttpRequest'
-            },
-            timeout: 12000
-          }
-        )
+        const proxyUrl = `${proxy}${ACTIVE_STORMS_URL}`;
+        console.log(`Full proxy URL: ${proxyUrl}`);
+        
+        const response = await axios.get(proxyUrl, {
+          headers: {
+            'Accept': 'application/json, text/plain, */*',
+            'X-Requested-With': 'XMLHttpRequest'
+          },
+          timeout: 15000 // Increased timeout for slower proxies
+        })
 
-        console.log('Successfully fetched storm data via proxy');
-        console.log('Response status:', response.status);
-        console.log('Response data type:', typeof response.data);
+        console.log(`Proxy ${i + 1} succeeded:`, {
+          status: response.status,
+          statusText: response.statusText,
+          dataType: typeof response.data,
+          hasData: !!response.data
+        });
         
         // Validate response data and handle different proxy formats
         if (response.data && typeof response.data === 'object') {
@@ -186,13 +189,25 @@ class NHCApiService {
         }
       } catch (error: any) {
         lastError = error;
-        console.warn(`Proxy attempt ${i + 1} failed:`, error.message);
-        console.warn('Error details:', {
+        console.warn(`Proxy ${i + 1} (${proxy}) failed:`, {
+          message: error.message,
           status: error.response?.status,
           statusText: error.response?.statusText,
           code: error.code,
-          message: error.message
+          name: error.name,
+          url: `${proxy}${ACTIVE_STORMS_URL}`
         });
+        
+        // Log specific error types for better debugging
+        if (error.code === 'ERR_NETWORK') {
+          console.warn(`Network error for proxy ${i + 1}: This proxy may be down or blocked`);
+        } else if (error.code === 'ECONNABORTED') {
+          console.warn(`Timeout error for proxy ${i + 1}: Proxy is too slow`);
+        } else if (error.response?.status === 403) {
+          console.warn(`Access denied for proxy ${i + 1}: May require special access`);
+        } else if (error.response?.status === 429) {
+          console.warn(`Rate limited for proxy ${i + 1}: Too many requests`);
+        }
         
         // Continue to next proxy for any error
         continue;
