@@ -13,16 +13,8 @@ const getLambdaApiUrl = () => {
     return (window as any).REACT_APP_LAMBDA_API_URL;
   }
   
-  // Check for local proxy server first
-  if (typeof window !== 'undefined') {
-    const hostname = window.location.hostname;
-    if (hostname === 'localhost' || hostname === '127.0.0.1') {
-      // Use local proxy server for development
-      return 'http://localhost:3005/api';
-    }
-  }
-  
   // Production Lambda endpoint - will be updated after deployment
+  // This will be replaced with the actual API Gateway URL once deployed
   return 'https://your-api-gateway-url/dev';
 };
 
@@ -140,23 +132,13 @@ class NHCApiService {
   private async fetchWithLambdaFallback(endpoint: string, params: Record<string, string> = {}): Promise<any> {
     const lambdaUrl = getLambdaApiUrl();
     
-    // First, try Lambda function or local proxy if URL is configured
+    // First, try Lambda function if URL is configured and not null
     if (lambdaUrl && !lambdaUrl.includes('your-api-gateway-url')) {
       try {
-        console.log(`Attempting to fetch via proxy server: ${endpoint}`);
+        console.log(`Attempting to fetch via Lambda: ${endpoint}`);
         
-        let url: string;
-        if (endpoint === 'active-storms') {
-          url = `${lambdaUrl}/active-storms`;
-        } else if (endpoint.startsWith('forecast-track/')) {
-          url = `${lambdaUrl}/forecast-track/${endpoint.split('/')[1]}`;
-        } else if (endpoint.startsWith('historical-track/')) {
-          url = `${lambdaUrl}/historical-track/${endpoint.split('/')[1]}`;
-        } else if (endpoint.startsWith('forecast-cone/')) {
-          url = `${lambdaUrl}/forecast-cone/${endpoint.split('/')[1]}`;
-        } else {
-          url = `${lambdaUrl}/${endpoint}`;
-        }
+        const queryParams = new URLSearchParams(params).toString();
+        const url = `${lambdaUrl}/${endpoint}${queryParams ? `?${queryParams}` : ''}`;
         
         const response = await axios.get(url, {
           timeout: 20000,
@@ -167,17 +149,17 @@ class NHCApiService {
         });
 
         if (response.data && response.data.success) {
-          console.log(`Proxy server request successful for ${endpoint}`);
+          console.log(`Lambda request successful for ${endpoint}`);
           return response.data.data;
         } else {
-          throw new Error('Proxy server response indicates failure');
+          throw new Error('Lambda response indicates failure');
         }
       } catch (error) {
-        console.warn(`Proxy server request failed for ${endpoint}:`, error);
+        console.warn(`Lambda request failed for ${endpoint}:`, error);
         console.log('Falling back to CORS proxies...');
       }
     } else {
-      console.log('Proxy server not configured, using CORS proxies directly');
+      console.log('Lambda API not configured, using CORS proxies directly');
     }
 
     // Fall back to CORS proxies - return null to indicate caller should handle CORS proxy fallback
@@ -327,11 +309,18 @@ class NHCApiService {
    */
   async getStormTrack(stormId: string): Promise<StormForecastPoint[]> {
     try {
-      // NHC provides GeoJSON forecast track data
+      // First, try Lambda/proxy server approach
+      const proxyData = await this.fetchWithLambdaFallback(`forecast-track/${stormId}`);
+      if (proxyData) {
+        console.log(`Successfully fetched forecast track via proxy server for ${stormId}`);
+        return this.parseForecastGeoJSON(proxyData);
+      }
+
+      // Fall back to CORS proxies
+      console.log(`Falling back to CORS proxies for forecast track: ${stormId}`);
       const year = new Date().getFullYear()
       const baseUrl = `${NHC_BASE_URL}/gis/forecast/archive/${year}/${stormId.toUpperCase()}_5day_latest.geojson`
       
-      // Note: Browser environments (including AWS Amplify) need CORS proxies for NHC API access
       const proxiesToTry = this.corsProxy ? [this.corsProxy] : CORS_PROXIES.slice(0, 3)
       
       for (const proxy of proxiesToTry) {
@@ -375,11 +364,18 @@ class NHCApiService {
    */
   async getStormHistoricalTrack(stormId: string): Promise<StormHistoricalPoint[]> {
     try {
-      // NHC provides best track data
+      // First, try Lambda/proxy server approach
+      const proxyData = await this.fetchWithLambdaFallback(`historical-track/${stormId}`);
+      if (proxyData) {
+        console.log(`Successfully fetched historical track via proxy server for ${stormId}`);
+        return this.parseHistoricalGeoJSON(proxyData);
+      }
+
+      // Fall back to CORS proxies
+      console.log(`Falling back to CORS proxies for historical track: ${stormId}`);
       const year = new Date().getFullYear()
       const baseUrl = `${NHC_BASE_URL}/gis/best_track/archive/${year}/${stormId.toUpperCase()}_best_track.geojson`
       
-      // Note: Browser environments (including AWS Amplify) need CORS proxies for NHC API access
       const proxiesToTry = this.corsProxy ? [this.corsProxy] : CORS_PROXIES.slice(0, 3)
       
       for (const proxy of proxiesToTry) {
@@ -423,11 +419,18 @@ class NHCApiService {
    */
   async getStormCone(stormId: string): Promise<any> {
     try {
-      // NHC provides GeoJSON cone data
+      // First, try Lambda/proxy server approach
+      const proxyData = await this.fetchWithLambdaFallback(`forecast-cone/${stormId}`);
+      if (proxyData) {
+        console.log(`Successfully fetched forecast cone via proxy server for ${stormId}`);
+        return this.parseConeGeoJSON(proxyData);
+      }
+
+      // Fall back to CORS proxies
+      console.log(`Falling back to CORS proxies for forecast cone: ${stormId}`);
       const year = new Date().getFullYear()
       const baseUrl = `${NHC_BASE_URL}/gis/forecast/archive/${year}/${stormId.toUpperCase()}_latest_CONE.geojson`
       
-      // Note: Browser environments (including AWS Amplify) need CORS proxies for NHC API access
       const proxiesToTry = this.corsProxy ? [this.corsProxy] : CORS_PROXIES.slice(0, 3)
       
       for (const proxy of proxiesToTry) {
