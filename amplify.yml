@@ -3,8 +3,8 @@ backend:
   phases:
     build:
       commands:
-        - echo "Backend Lambda deployment temporarily disabled due to AWS credentials issue"
-        - echo "Using CORS proxy approach for NHC API access"
+        - '# Deploy Lambda function for NHC API proxy'
+        - amplifyPush --simple
 frontend:
   phases:
     preBuild:

@@ -12,8 +12,18 @@ const getLambdaApiUrl = () => {
   if (typeof window !== 'undefined' && (window as any).REACT_APP_LAMBDA_API_URL) {
     return (window as any).REACT_APP_LAMBDA_API_URL;
   }
-  // Disable Lambda for now until AWS credentials are resolved
-  return null;
+  
+  // Check for local proxy server first
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname;
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      // Use local proxy server for development
+      return 'http://localhost:3005/api';
+    }
+  }
+  
+  // Production Lambda endpoint - will be updated after deployment
+  return 'https://your-api-gateway-url/dev';
 };
 
 // CORS proxy alternatives for browser environments
@@ -130,13 +140,23 @@ class NHCApiService {
   private async fetchWithLambdaFallback(endpoint: string, params: Record<string, string> = {}): Promise<any> {
     const lambdaUrl = getLambdaApiUrl();
     
-    // First, try Lambda function if URL is configured and not null
+    // First, try Lambda function or local proxy if URL is configured
     if (lambdaUrl && !lambdaUrl.includes('your-api-gateway-url')) {
       try {
-        console.log(`Attempting to fetch via Lambda: ${endpoint}`);
+        console.log(`Attempting to fetch via proxy server: ${endpoint}`);
         
-        const queryParams = new URLSearchParams(params).toString();
-        const url = `${lambdaUrl}/${endpoint}${queryParams ? `?${queryParams}` : ''}`;
+        let url: string;
+        if (endpoint === 'active-storms') {
+          url = `${lambdaUrl}/active-storms`;
+        } else if (endpoint.startsWith('forecast-track/')) {
+          url = `${lambdaUrl}/forecast-track/${endpoint.split('/')[1]}`;
+        } else if (endpoint.startsWith('historical-track/')) {
+          url = `${lambdaUrl}/historical-track/${endpoint.split('/')[1]}`;
+        } else if (endpoint.startsWith('forecast-cone/')) {
+          url = `${lambdaUrl}/forecast-cone/${endpoint.split('/')[1]}`;
+        } else {
+          url = `${lambdaUrl}/${endpoint}`;
+        }
         
         const response = await axios.get(url, {
           timeout: 20000,
@@ -147,17 +167,17 @@ class NHCApiService {
         });
 
         if (response.data && response.data.success) {
-          console.log(`Lambda request successful for ${endpoint}`);
+          console.log(`Proxy server request successful for ${endpoint}`);
           return response.data.data;
         } else {
-          throw new Error('Lambda response indicates failure');
+          throw new Error('Proxy server response indicates failure');
         }
       } catch (error) {
-        console.warn(`Lambda request failed for ${endpoint}:`, error);
+        console.warn(`Proxy server request failed for ${endpoint}:`, error);
         console.log('Falling back to CORS proxies...');
       }
     } else {
-      console.log('Lambda API not configured, using CORS proxies directly');
+      console.log('Proxy server not configured, using CORS proxies directly');
     }
 
     // Fall back to CORS proxies - return null to indicate caller should handle CORS proxy fallback
@@ -165,7 +185,7 @@ class NHCApiService {
   }
 
   /**
-   * Fetch active storms from NHC with Lambda first, then fallback proxies
+   * Fetch active storms from NHC with proxy server first, then fallback proxies
    */
   async getActiveStorms(): Promise<ProcessedStorm[]> {
     let lastError: any;
@@ -175,10 +195,28 @@ class NHCApiService {
     console.log(`Starting NHC data fetch (${isDevMode ? 'Development' : 'Production'} mode)...`);
     console.log(`Current hostname: ${typeof window !== 'undefined' ? window.location.hostname : 'server'}`);
 
-    // Note: Even in production (AWS Amplify), we still need CORS proxies because it's a browser environment
-    // Only server-side environments can make direct calls to NHC API
-    
-    // Try CORS proxies for both development and production browser environments
+    // First, try our proxy server (Lambda or local development server)
+    try {
+      const proxyData = await this.fetchWithLambdaFallback('active-storms');
+      if (proxyData) {
+        console.log('Successfully fetched data via proxy server');
+        
+        // Handle the data based on format
+        let stormData = proxyData;
+        if (stormData.activeStorms) {
+          return await this.processStormData(stormData.activeStorms);
+        } else if (Array.isArray(stormData)) {
+          return await this.processStormData(stormData);
+        } else if (stormData && Object.keys(stormData).length === 0) {
+          console.log('No active storms currently');
+          return [];
+        }
+      }
+    } catch (error) {
+      console.warn('Proxy server failed, falling back to CORS proxies:', error);
+    }
+
+    // Fall back to CORS proxies for browser environments
     for (let i = 0; i < CORS_PROXIES.length; i++) {
       const proxy = CORS_PROXIES[i];
       
