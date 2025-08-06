@@ -12,8 +12,8 @@ const getLambdaApiUrl = () => {
   if (typeof window !== 'undefined' && (window as any).REACT_APP_LAMBDA_API_URL) {
     return (window as any).REACT_APP_LAMBDA_API_URL;
   }
-  // Default placeholder - will be updated after Lambda deployment
-  return 'https://your-api-gateway-url/dev';
+  // Disable Lambda for now until AWS credentials are resolved
+  return null;
 };
 
 // CORS proxy alternatives for browser environments
@@ -130,7 +130,7 @@ class NHCApiService {
   private async fetchWithLambdaFallback(endpoint: string, params: Record<string, string> = {}): Promise<any> {
     const lambdaUrl = getLambdaApiUrl();
     
-    // First, try Lambda function if URL is configured
+    // First, try Lambda function if URL is configured and not null
     if (lambdaUrl && !lambdaUrl.includes('your-api-gateway-url')) {
       try {
         console.log(`Attempting to fetch via Lambda: ${endpoint}`);
@@ -157,11 +157,11 @@ class NHCApiService {
         console.log('Falling back to CORS proxies...');
       }
     } else {
-      console.log('Lambda API URL not configured, using CORS proxies');
+      console.log('Lambda API not configured, using CORS proxies directly');
     }
 
-    // Fall back to CORS proxies
-    return null; // Caller will handle CORS proxy fallback
+    // Fall back to CORS proxies - return null to indicate caller should handle CORS proxy fallback
+    return null;
   }
 
   /**
