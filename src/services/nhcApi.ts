@@ -6,6 +6,16 @@ const NHC_BASE_URL = 'https://www.nhc.noaa.gov'
 const ACTIVE_STORMS_URL = `${NHC_BASE_URL}/CurrentStorms.json`
 const GIS_BASE_URL = `${NHC_BASE_URL}/gis`
 
+// Lambda API endpoint (will be configured after deployment)
+const getLambdaApiUrl = () => {
+  // Check if we're in a browser environment with the Lambda API URL configured
+  if (typeof window !== 'undefined' && (window as any).REACT_APP_LAMBDA_API_URL) {
+    return (window as any).REACT_APP_LAMBDA_API_URL;
+  }
+  // Default placeholder - will be updated after Lambda deployment
+  return 'https://your-api-gateway-url/dev';
+};
+
 // CORS proxy alternatives for browser environments
 const CORS_PROXIES = [
   'https://api.allorigins.win/get?url=', // Most reliable - returns data in .contents field
@@ -115,7 +125,47 @@ class NHCApiService {
   }
 
   /**
-   * Fetch active storms from NHC with fallback proxies
+   * Try to fetch data using Lambda function first, then fall back to CORS proxies
+   */
+  private async fetchWithLambdaFallback(endpoint: string, params: Record<string, string> = {}): Promise<any> {
+    const lambdaUrl = getLambdaApiUrl();
+    
+    // First, try Lambda function if URL is configured
+    if (lambdaUrl && !lambdaUrl.includes('your-api-gateway-url')) {
+      try {
+        console.log(`Attempting to fetch via Lambda: ${endpoint}`);
+        
+        const queryParams = new URLSearchParams(params).toString();
+        const url = `${lambdaUrl}/${endpoint}${queryParams ? `?${queryParams}` : ''}`;
+        
+        const response = await axios.get(url, {
+          timeout: 20000,
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (response.data && response.data.success) {
+          console.log(`Lambda request successful for ${endpoint}`);
+          return response.data.data;
+        } else {
+          throw new Error('Lambda response indicates failure');
+        }
+      } catch (error) {
+        console.warn(`Lambda request failed for ${endpoint}:`, error);
+        console.log('Falling back to CORS proxies...');
+      }
+    } else {
+      console.log('Lambda API URL not configured, using CORS proxies');
+    }
+
+    // Fall back to CORS proxies
+    return null; // Caller will handle CORS proxy fallback
+  }
+
+  /**
+   * Fetch active storms from NHC with Lambda first, then fallback proxies
    */
   async getActiveStorms(): Promise<ProcessedStorm[]> {
     let lastError: any;

@@ -1,4 +1,10 @@
 version: 1
+backend:
+  phases:
+    build:
+      commands:
+        - '# Deploy Lambda function for NHC API proxy'
+        - amplifyPush --simple
 frontend:
   phases:
     preBuild:
