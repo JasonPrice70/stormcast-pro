@@ -3,12 +3,13 @@ frontend:
   phases:
     preBuild:
       commands:
+        - rm -rf node_modules package-lock.json
         - npm install
-        - npm list vite || echo "Vite not found locally"
-        - npm list @vitejs/plugin-react || echo "React plugin not found locally"
+        - npm ls vite || echo "Vite status checked"
+        - npm ls @vitejs/plugin-react || echo "React plugin status checked"
     build:
       commands:
-        - ./node_modules/.bin/vite build
+        - npx vite build
   artifacts:
     baseDirectory: dist
     files:
