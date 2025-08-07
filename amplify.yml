@@ -10,12 +10,14 @@ frontend:
         - ls -la
         - echo "Installing dependencies..."
         - npm ci --silent
+        - echo "Installing TypeScript globally for build..."
+        - npm install -g typescript
         - echo "=== DEPENDENCIES INSTALLED ==="
     build:
       commands:
         - echo "=== STARTING BUILD ==="
-        - echo "Building React app with Vite..."
-        - npm run build
+        - echo "Building React app with Vite using safe build script..."
+        - npm run build:safe
         - echo "=== BUILD COMPLETED ==="
         - echo "Checking build output..."
         - ls -la dist/ || echo "No dist folder found"
