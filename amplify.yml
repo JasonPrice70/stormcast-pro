@@ -3,35 +3,12 @@ frontend:
   phases:
     preBuild:
       commands:
-        - echo "=== AMPLIFY BUILD DIAGNOSTICS ==="
-        - node --version
-        - npm --version
-        - echo "Current directory contents:"
-        - ls -la
-        - echo "Installing dependencies..."
         - npm ci
-        - echo "Verifying Vite installation..."
-        - ls -la node_modules/.bin/vite || echo "Vite not found in .bin"
-        - npx vite --version || echo "Vite not accessible via npx"
-        - echo "=== DEPENDENCIES INSTALLED ==="
+        - echo "import { defineConfig } from 'vite'; import react from '@vitejs/plugin-react'; export default defineConfig({ plugins: [react()], build: { outDir: 'dist' } });" > vite.config.minimal.mjs
     build:
       commands:
-        - echo "=== STARTING BUILD ==="
-        - echo "Temporarily moving config files to avoid module resolution issues..."
-        - mv vite.config.ts vite.config.ts.amplify-backup || echo "No vite.config.ts found"
-        - mv vite.config.amplify.js vite.config.amplify.js.backup || echo "No vite.config.amplify.js found"
-        - echo "Building React app with Vite (minimal config)..."
-        - npx vite build --outDir dist --emptyOutDir
-        - echo "Restoring config files..."
-        - mv vite.config.ts.amplify-backup vite.config.ts || echo "No backup to restore"
-        - mv vite.config.amplify.js.backup vite.config.amplify.js || echo "No backup to restore"
-        - echo "=== BUILD COMPLETED ==="
-        - echo "Checking build output..."
-        - ls -la dist/ || echo "No dist folder found"
+        - npx vite build --config vite.config.minimal.mjs
   artifacts:
     baseDirectory: dist
     files:
       - '**/*'
-  cache:
-    paths:
-      - node_modules/**/*
