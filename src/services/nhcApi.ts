@@ -363,8 +363,9 @@ class NHCApiService {
    */
   async getStormHistoricalTrack(stormId: string): Promise<StormHistoricalPoint[]> {
     try {
-      // First, try Lambda/proxy server approach
-      const proxyData = await this.fetchWithLambdaFallback(`historical-track/${stormId}`);
+      // First, try Lambda/proxy server approach with correct query parameters
+      const currentYear = new Date().getFullYear();
+      const proxyData = await this.fetchWithLambdaFallback('historical-track', { stormId, year: currentYear.toString() });
       if (proxyData) {
         console.log(`Successfully fetched historical track via proxy server for ${stormId}`);
         return this.parseHistoricalGeoJSON(proxyData);
@@ -372,8 +373,7 @@ class NHCApiService {
 
       // Fall back to CORS proxies
       console.log(`Falling back to CORS proxies for historical track: ${stormId}`);
-      const year = new Date().getFullYear()
-      const baseUrl = `${NHC_BASE_URL}/gis/best_track/archive/${year}/${stormId.toUpperCase()}_best_track.geojson`
+      const baseUrl = `${NHC_BASE_URL}/gis/best_track/archive/${currentYear}/${stormId.toUpperCase()}_best_track.geojson`
       
       const proxiesToTry = this.corsProxy ? [this.corsProxy] : CORS_PROXIES.slice(0, 3)
       
@@ -418,8 +418,9 @@ class NHCApiService {
    */
   async getStormCone(stormId: string): Promise<any> {
     try {
-      // First, try Lambda/proxy server approach
-      const proxyData = await this.fetchWithLambdaFallback(`forecast-cone/${stormId}`);
+      // First, try Lambda/proxy server approach with correct query parameters
+      const currentYear = new Date().getFullYear();
+      const proxyData = await this.fetchWithLambdaFallback('forecast-cone', { stormId, year: currentYear.toString() });
       if (proxyData) {
         console.log(`Successfully fetched forecast cone via proxy server for ${stormId}`);
         return this.parseConeGeoJSON(proxyData);
@@ -427,8 +428,7 @@ class NHCApiService {
 
       // Fall back to CORS proxies
       console.log(`Falling back to CORS proxies for forecast cone: ${stormId}`);
-      const year = new Date().getFullYear()
-      const baseUrl = `${NHC_BASE_URL}/gis/forecast/archive/${year}/${stormId.toUpperCase()}_latest_CONE.geojson`
+      const baseUrl = `${NHC_BASE_URL}/gis/forecast/archive/${currentYear}/${stormId.toUpperCase()}_latest_CONE.geojson`
       
       const proxiesToTry = this.corsProxy ? [this.corsProxy] : CORS_PROXIES.slice(0, 3)
       
