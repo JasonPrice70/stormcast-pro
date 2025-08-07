@@ -9,13 +9,16 @@ frontend:
         - echo "Current directory contents:"
         - ls -la
         - echo "Installing dependencies..."
-        - npm ci --silent
+        - npm ci
+        - echo "Verifying Vite installation..."
+        - ls -la node_modules/.bin/vite || echo "Vite not found in .bin"
+        - npx vite --version || echo "Vite not accessible via npx"
         - echo "=== DEPENDENCIES INSTALLED ==="
     build:
       commands:
         - echo "=== STARTING BUILD ==="
-        - echo "Building React app with Vite (TypeScript handled by Vite)..."
-        - npm run build:amplify
+        - echo "Building React app with Vite (using npx)..."
+        - npx vite build
         - echo "=== BUILD COMPLETED ==="
         - echo "Checking build output..."
         - ls -la dist/ || echo "No dist folder found"
