@@ -6,16 +6,15 @@ const NHC_BASE_URL = 'https://www.nhc.noaa.gov'
 const ACTIVE_STORMS_URL = `${NHC_BASE_URL}/CurrentStorms.json`
 const GIS_BASE_URL = `${NHC_BASE_URL}/gis`
 
-// Lambda API endpoint (will be configured after deployment)
+// Lambda API endpoint (now configured with API Gateway)
 const getLambdaApiUrl = () => {
   // Check if we're in a browser environment with the Lambda API URL configured
   if (typeof window !== 'undefined' && (window as any).REACT_APP_LAMBDA_API_URL) {
     return (window as any).REACT_APP_LAMBDA_API_URL;
   }
   
-  // Production Lambda endpoint - will be updated after deployment
-  // This will be replaced with the actual API Gateway URL once deployed
-  return 'https://your-api-gateway-url/dev';
+  // Production API Gateway endpoint
+  return 'https://v7z3sx0ee9.execute-api.us-east-1.amazonaws.com/dev';
 };
 
 // CORS proxy alternatives for browser environments

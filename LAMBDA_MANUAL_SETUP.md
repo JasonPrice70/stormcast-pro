@@ -1,14 +1,34 @@
-# Manual AWS Lambda Creation - Step by Step
+# AWS Lambda & API Gateway - DEPLOYMENT SUCCESSFUL! 🎉
 
-## 1. Create Lambda Function in AWS Console
+## ✅ Current Status: FULLY DEPLOYED
 
-1. **Go to AWS Console** → Lambda → Functions
-2. **Click "Create function"**
-3. **Choose "Author from scratch"**
-4. **Function name**: `nhc-cors-proxy`
-5. **Runtime**: Node.js 18.x or later
-6. **Architecture**: x86_64
-7. **Click "Create function"**
+✅ **Lambda Function**: `nhc-cors-proxy` - DEPLOYED  
+✅ **Function ARN**: `arn:aws:lambda:us-east-1:080519831078:function:nhc-cors-proxy`  
+✅ **API Gateway**: `nhc-cors-proxy-api` - DEPLOYED  
+✅ **API Gateway ID**: `v7z3sx0ee9`  
+✅ **API Endpoint**: `https://v7z3sx0ee9.execute-api.us-east-1.amazonaws.com/dev`  
+
+## 🎯 Live API Endpoints
+
+- **Active Storms**: `https://v7z3sx0ee9.execute-api.us-east-1.amazonaws.com/dev/active-storms`
+- **Forecast Track**: `https://v7z3sx0ee9.execute-api.us-east-1.amazonaws.com/dev/forecast-track/{stormId}`
+- **Historical Track**: `https://v7z3sx0ee9.execute-api.us-east-1.amazonaws.com/dev/historical-track/{stormId}`
+- **Forecast Cone**: `https://v7z3sx0ee9.execute-api.us-east-1.amazonaws.com/dev/forecast-cone/{stormId}`
+
+## 🧪 Testing
+
+You can test the API by opening the test page:
+- Local: `http://localhost:5173/test-api.html`
+- Or use curl: `curl "https://v7z3sx0ee9.execute-api.us-east-1.amazonaws.com/dev/active-storms"`
+
+## 🔧 Configuration Status
+
+The application is now configured to use the Lambda API first, with CORS proxy fallback:
+- `src/services/nhcApi.ts` - Updated with correct API Gateway URL
+- Lambda-first architecture implemented across all NHC data methods
+- Comprehensive error handling and fallback strategies maintained
+
+## 🚨 Previous Issues: RESOLVED
 
 ## 2. Lambda Function Code
 
