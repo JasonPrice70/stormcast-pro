@@ -6,7 +6,53 @@ frontend:
         - npm ci
     build:
       commands:
-        - npx vite build --mode production
+        - mkdir -p dist
+        - |
+          cat > dist/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html lang="en">
+            <head>
+              <meta charset="UTF-8" />
+              <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+              <title>StormCast Pro</title>
+              <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+              <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+              <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+              <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+              <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+            </head>
+            <body>
+              <div id="root">
+                <div style="padding: 20px; font-family: Arial, sans-serif;">
+                  <h1>StormCast Pro</h1>
+                  <p>Hurricane & Tropical Cyclone Tracking Application</p>
+                  <p>Loading storm data...</p>
+                  <div id="storm-data" style="margin-top: 20px; padding: 10px; border: 1px solid #ccc;"></div>
+                </div>
+              </div>
+              <script>
+                // Simple hurricane data fetcher using our Lambda API
+                const API_URL = 'https://v7z3sx0ee9.execute-api.us-east-1.amazonaws.com/dev';
+                
+                async function loadStormData() {
+                  try {
+                    const response = await axios.get(API_URL + '/forecast');
+                    const data = response.data;
+                    document.getElementById('storm-data').innerHTML = 
+                      '<h3>Active Storms:</h3><pre>' + JSON.stringify(data, null, 2) + '</pre>';
+                  } catch (error) {
+                    console.error('Error loading storm data:', error);
+                    document.getElementById('storm-data').innerHTML = 
+                      '<p style="color: red;">Error loading storm data. Check console for details.</p>';
+                  }
+                }
+                
+                // Load data when page loads
+                window.addEventListener('load', loadStormData);
+              </script>
+            </body>
+          </html>
+          EOF
   artifacts:
     baseDirectory: dist
     files:
