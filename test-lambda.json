@@ -1,0 +1,9 @@
+{
+  "httpMethod": "GET",
+  "path": "/active-storms",
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "queryStringParameters": null,
+  "body": null
+}

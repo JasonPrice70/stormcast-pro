@@ -102,7 +102,7 @@ exports.handler = async (event) => {
     const response = await axios.get(nhcUrl, {
       timeout: 20000,
       headers: {
-        'User-Agent': 'StormCast Pro Weather Application/1.0 (AWS Lambda Proxy)',
+        'User-Agent': 'StormCast Pro (cyclotrak.com, jasonprice70@gmail.com)',
         'Accept': 'application/json'
       }
     });
