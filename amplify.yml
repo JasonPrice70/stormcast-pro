@@ -3,7 +3,7 @@ frontend:
   phases:
     preBuild:
       commands:
-        - npm ci
+        - npm install
         - npm list vite || echo "Vite not found locally"
         - npm list @vitejs/plugin-react || echo "React plugin not found locally"
     build:
