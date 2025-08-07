@@ -17,8 +17,14 @@ frontend:
     build:
       commands:
         - echo "=== STARTING BUILD ==="
-        - echo "Building React app with Vite (using simplified config)..."
-        - npx vite build --config vite.config.amplify.js
+        - echo "Temporarily moving config files to avoid module resolution issues..."
+        - mv vite.config.ts vite.config.ts.amplify-backup || echo "No vite.config.ts found"
+        - mv vite.config.amplify.js vite.config.amplify.js.backup || echo "No vite.config.amplify.js found"
+        - echo "Building React app with Vite (minimal config)..."
+        - npx vite build --outDir dist --emptyOutDir
+        - echo "Restoring config files..."
+        - mv vite.config.ts.amplify-backup vite.config.ts || echo "No backup to restore"
+        - mv vite.config.amplify.js.backup vite.config.amplify.js || echo "No backup to restore"
         - echo "=== BUILD COMPLETED ==="
         - echo "Checking build output..."
         - ls -la dist/ || echo "No dist folder found"
