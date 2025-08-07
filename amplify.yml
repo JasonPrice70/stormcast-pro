@@ -1,10 +1,4 @@
 version: 1
-backend:
-  phases:
-    build:
-      commands:
-        - '# Deploy Lambda function for NHC API proxy'
-        - amplifyPush --simple
 frontend:
   phases:
     preBuild:
@@ -15,22 +9,13 @@ frontend:
         - echo "Current directory contents:"
         - ls -la
         - echo "Installing dependencies..."
-        - rm -rf node_modules package-lock.json || true
-        - npm install
-        - echo "Verifying node_modules exists:"
-        - ls -la node_modules/ || echo "node_modules directory not created"
-        - echo "Checking .bin directory:"
-        - ls -la node_modules/.bin/ || echo "node_modules/.bin directory not found"
-        - echo "Checking for Vite specifically:"
-        - test -f node_modules/.bin/vite && echo "Vite binary found" || echo "Vite binary NOT found"
+        - npm ci --silent
         - echo "=== DEPENDENCIES INSTALLED ==="
     build:
       commands:
         - echo "=== STARTING BUILD ==="
-        - echo "Final check before build:"
-        - ls -la node_modules/.bin/ | head -10
-        - echo "Running build with npx to ensure Vite is found..."
-        - npx vite build
+        - echo "Building React app with Vite..."
+        - npm run build
         - echo "=== BUILD COMPLETED ==="
         - echo "Checking build output..."
         - ls -la dist/ || echo "No dist folder found"
