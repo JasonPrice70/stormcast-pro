@@ -17,8 +17,8 @@ frontend:
     build:
       commands:
         - echo "=== STARTING BUILD ==="
-        - echo "Building React app with Vite (using npx)..."
-        - npx vite build
+        - echo "Building React app with Vite (using simplified config)..."
+        - npx vite build --config vite.config.amplify.js
         - echo "=== BUILD COMPLETED ==="
         - echo "Checking build output..."
         - ls -la dist/ || echo "No dist folder found"
