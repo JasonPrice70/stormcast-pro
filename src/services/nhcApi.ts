@@ -143,8 +143,7 @@ class NHCApiService {
           timeout: 20000,
           headers: {
             'Accept': 'application/json',
-            'Content-Type': 'application/json',
-            'User-Agent': 'StormCast Pro (cyclotrak.com, jasonprice70@gmail.com)'
+            'Content-Type': 'application/json'
           }
         });
 
@@ -211,8 +210,7 @@ class NHCApiService {
         const response = await axios.get(proxyUrl, {
           headers: {
             'Accept': 'application/json, text/plain, */*',
-            'X-Requested-With': 'XMLHttpRequest',
-            'User-Agent': 'StormCast Pro (cyclotrak.com, jasonprice70@gmail.com)'
+            'X-Requested-With': 'XMLHttpRequest'
           },
           timeout: 15000 // Increased timeout for slower proxies
         })
@@ -387,8 +385,7 @@ class NHCApiService {
           const response = await axios.get(trackUrl, {
             timeout: 8000,
             headers: { 
-              'Accept': 'application/json',
-              'User-Agent': 'StormCast Pro (cyclotrak.com, jasonprice70@gmail.com)'
+              'Accept': 'application/json'
             }
           })
 
@@ -443,8 +440,7 @@ class NHCApiService {
           const response = await axios.get(coneUrl, {
             timeout: 8000,
             headers: { 
-              'Accept': 'application/json',
-              'User-Agent': 'StormCast Pro (cyclotrak.com, jasonprice70@gmail.com)'
+              'Accept': 'application/json'
             }
           })
 
