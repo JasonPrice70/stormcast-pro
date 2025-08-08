@@ -309,10 +309,11 @@ class NHCApiService {
   async getStormTrack(stormId: string): Promise<StormForecastPoint[]> {
     try {
       // First, try Lambda/proxy server approach
-      const proxyData = await this.fetchWithLambdaFallback(`forecast-track/${stormId}`);
+      const currentYear = new Date().getFullYear();
+      const proxyData = await this.fetchWithLambdaFallback('track-kmz', { stormId, year: currentYear.toString() });
       if (proxyData) {
-        console.log(`Successfully fetched forecast track via proxy server for ${stormId}`);
-        return this.parseForecastGeoJSON(proxyData);
+        console.log(`Successfully fetched track data via proxy server for ${stormId}`);
+        return proxyData; // This is already parsed GeoJSON from the Lambda function
       }
 
       // Fall back to CORS proxies
@@ -359,57 +360,23 @@ class NHCApiService {
   }
 
   /**
-   * Get historical track data for a specific storm
+   * Get track data from KMZ file for a specific storm
    */
-  async getStormHistoricalTrack(stormId: string): Promise<StormHistoricalPoint[]> {
+  async getStormTrackKmz(stormId: string): Promise<any> {
     try {
-      // First, try Lambda/proxy server approach with correct query parameters
+      // Use Lambda proxy to fetch and parse KMZ track data
       const currentYear = new Date().getFullYear();
-      const proxyData = await this.fetchWithLambdaFallback('historical-track', { stormId, year: currentYear.toString() });
+      const proxyData = await this.fetchWithLambdaFallback('track-kmz', { stormId, year: currentYear.toString() });
       if (proxyData) {
-        console.log(`Successfully fetched historical track via proxy server for ${stormId}`);
-        return this.parseHistoricalGeoJSON(proxyData);
+        console.log(`Successfully fetched KMZ track data via proxy server for ${stormId}`);
+        return proxyData; // This is already parsed GeoJSON from the Lambda function
       }
 
-      // Fall back to CORS proxies
-      console.log(`Falling back to CORS proxies for historical track: ${stormId}`);
-      const baseUrl = `${NHC_BASE_URL}/gis/best_track/archive/${currentYear}/${stormId.toUpperCase()}_best_track.geojson`
-      
-      const proxiesToTry = this.corsProxy ? [this.corsProxy] : CORS_PROXIES.slice(0, 3)
-      
-      for (const proxy of proxiesToTry) {
-        try {
-          const trackUrl = `${proxy}${baseUrl}`
-          console.log('Fetching historical track from:', trackUrl)
-          
-          const response = await axios.get(trackUrl, {
-            timeout: 8000,
-            headers: { 
-              'Accept': 'application/json'
-            }
-          })
-
-          const result = this.parseHistoricalGeoJSON(response.data)
-          if (result.length > 0) {
-            console.log(`Successfully fetched ${result.length} historical points for ${stormId}`)
-            return result
-          }
-        } catch (error) {
-          const err = error as any
-          if (err.response?.status === 404) {
-            console.log(`Historical track file not found for ${stormId} (this is normal if no historical track is available)`)
-            return []
-          }
-          console.warn(`Historical track fetch failed with proxy ${proxy}:`, err.message)
-          continue
-        }
-      }
-      
-      console.log(`No historical track data available for storm ${stormId}`)
-      return []
+      console.log(`No KMZ track data available for storm ${stormId}`)
+      return null;
     } catch (error) {
-      console.warn('Failed to fetch historical track for', stormId, ':', error)
-      return []
+      console.warn('Failed to fetch KMZ track for', stormId, ':', error)
+      return null;
     }
   }
 
@@ -565,26 +532,17 @@ class NHCApiService {
             try {
               console.log(`Attempting to fetch track data for storm: ${storm.name} (${storm.id || storm.binNumber})`)
               
-              const [forecastData, historicalData, coneData] = await Promise.allSettled([
-                this.getStormTrack(storm.id || storm.binNumber || ''),
-                this.getStormHistoricalTrack(storm.id || storm.binNumber || ''),
+              const [trackData, coneData] = await Promise.allSettled([
+                this.getStormTrackKmz(storm.id || storm.binNumber || ''),
                 this.getStormCone(storm.id || storm.binNumber || '')
               ]);
               
-              // Handle forecast data
-              if (forecastData.status === 'fulfilled') {
-                processedStorm.forecast = forecastData.value;
+              // Handle track data (from KMZ)
+              if (trackData.status === 'fulfilled') {
+                processedStorm.track = trackData.value;
               } else {
-                console.warn(`Forecast data failed for ${storm.name}:`, forecastData.reason?.message);
-                processedStorm.forecast = [];
-              }
-              
-              // Handle historical data
-              if (historicalData.status === 'fulfilled') {
-                processedStorm.historical = historicalData.value;
-              } else {
-                console.warn(`Historical data failed for ${storm.name}:`, historicalData.reason?.message);
-                processedStorm.historical = [];
+                console.warn(`Track data failed for ${storm.name}:`, trackData.reason?.message);
+                processedStorm.track = null;
               }
               
               // Handle cone data

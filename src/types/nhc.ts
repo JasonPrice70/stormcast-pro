@@ -109,6 +109,7 @@ export interface ProcessedStorm {
   lastUpdate: Date
   forecast: StormForecastPoint[]
   historical: StormHistoricalPoint[]
+  track?: any  // KMZ track data as GeoJSON (optional)
   cone?: any  // Forecast cone data (optional)
   advisoryUrl: string
   trackUrl: string

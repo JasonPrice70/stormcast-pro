@@ -124,7 +124,7 @@ export const useStormDetails = (stormId: string | null) => {
 
         // Fetch additional storm data
         const [track, cone] = await Promise.all([
-          nhcApi.getStormTrack(stormId),
+          nhcApi.getStormTrackKmz(stormId),
           nhcApi.getStormCone(stormId)
         ])
 

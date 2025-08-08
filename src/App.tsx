@@ -7,6 +7,7 @@ function App() {
     <div className="App">
       <Routes>
         <Route path="/" element={<SimpleStormTracker />} />
+        <Route path="/tracker" element={<SimpleStormTracker />} />
         <Route path="*" element={<SimpleStormTracker />} />
       </Routes>
     </div>

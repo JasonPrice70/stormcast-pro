@@ -274,10 +274,10 @@ const demoStorms = [
 
 const SimpleStormTracker: React.FC = () => {
   const [useDemo, setUseDemo] = useState(true); // Start with demo data to test
-  const [showHistoricalPaths, setShowHistoricalPaths] = useState(true);
+  const [showTracks, setShowTracks] = useState(true);
   const [showForecastPaths, setShowForecastPaths] = useState(true);
   const [showForecastCones, setShowForecastCones] = useState(true);
-  const [fetchLiveTrackData, setFetchLiveTrackData] = useState(false); // Control live track data fetching
+  const [fetchLiveTrackData, setFetchLiveTrackData] = useState(true); // Enable track data fetching by default
   
   // Use both hooks
   const demoData = useDemoData();
@@ -450,49 +450,57 @@ const SimpleStormTracker: React.FC = () => {
           </Marker>
         ))}
 
-        {/* Render historical storm paths */}
-        {showHistoricalPaths && displayStorms.map((storm) => {
-          if (!storm.historical || storm.historical.length === 0) return null;
-          
-          const historicalPath: [number, number][] = storm.historical.map((point: any) => [point.latitude, point.longitude]);
+        {/* Render storm tracks from KMZ data */}
+        {showTracks && displayStorms.map((storm) => {
+          if (!storm.track || !storm.track.features || storm.track.features.length === 0) return null;
           
           return (
-            <React.Fragment key={`${storm.id}-historical`}>
-              {/* Historical path line */}
-              <Polyline
-                positions={historicalPath}
-                pathOptions={{
-                  color: '#666666',
-                  weight: 3,
-                  opacity: 0.8,
-                  dashArray: '5, 5'
-                }}
-              />
-              
-              {/* Historical position markers */}
-              {storm.historical.map((point: any, index: number) => (
-                <CircleMarker
-                  key={`${storm.id}-hist-${index}`}
-                  center={[point.latitude, point.longitude]}
-                  radius={4}
-                  pathOptions={{
-                    color: '#444444',
-                    fillColor: point.category >= 1 ? '#ff6600' : '#0099ff',
-                    fillOpacity: 0.7,
-                    weight: 1
-                  }}
-                >
-                  <Popup>
-                    <div style={{ fontSize: '0.9rem' }}>
-                      <strong>{storm.name} - Historical Position</strong><br />
-                      <strong>Date:</strong> {new Date(point.dateTime).toLocaleString()}<br />
-                      <strong>Winds:</strong> {point.maxWinds} mph<br />
-                      <strong>Pressure:</strong> {point.pressure} mb<br />
-                      <strong>Category:</strong> {point.category > 0 ? point.category : 'N/A'}
-                    </div>
-                  </Popup>
-                </CircleMarker>
-              ))}
+            <React.Fragment key={`${storm.id}-track`}>
+              {storm.track.features.map((feature: any, featureIndex: number) => {
+                if (feature.geometry.type === 'LineString') {
+                  // Track line
+                  const trackPath: [number, number][] = feature.geometry.coordinates.map((coord: [number, number]) => [coord[1], coord[0]]);
+                  
+                  return (
+                    <Polyline
+                      key={`${storm.id}-track-line-${featureIndex}`}
+                      positions={trackPath}
+                      pathOptions={{
+                        color: '#666666',
+                        weight: 3,
+                        opacity: 0.8,
+                        dashArray: '5, 5'
+                      }}
+                    />
+                  );
+                } else if (feature.geometry.type === 'Point') {
+                  // Track point
+                  const [lon, lat] = feature.geometry.coordinates;
+                  
+                  return (
+                    <CircleMarker
+                      key={`${storm.id}-track-point-${featureIndex}`}
+                      center={[lat, lon]}
+                      radius={4}
+                      pathOptions={{
+                        color: '#444444',
+                        fillColor: '#ff6600',
+                        fillOpacity: 0.7,
+                        weight: 1
+                      }}
+                    >
+                      <Popup>
+                        <div style={{ fontSize: '0.9rem' }}>
+                          <strong>{storm.name} - Track Position</strong><br />
+                          <strong>Name:</strong> {feature.properties.name || 'Position'}<br />
+                          <strong>Description:</strong> {feature.properties.description || 'Track point'}
+                        </div>
+                      </Popup>
+                    </CircleMarker>
+                  );
+                }
+                return null;
+              })}
             </React.Fragment>
           );
         })}
@@ -717,11 +725,11 @@ const SimpleStormTracker: React.FC = () => {
                   <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.8rem', cursor: 'pointer' }}>
                     <input
                       type="checkbox"
-                      checked={showHistoricalPaths}
-                      onChange={(e) => setShowHistoricalPaths(e.target.checked)}
+                      checked={showTracks}
+                      onChange={(e) => setShowTracks(e.target.checked)}
                       style={{ marginRight: '6px' }}
                     />
-                    <span style={{ color: '#666666' }}>━━━━</span> Historical Path
+                    <span style={{ color: '#666666' }}>━━━━</span> Track Path
                   </label>
                   <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.8rem', cursor: 'pointer' }}>
                     <input
