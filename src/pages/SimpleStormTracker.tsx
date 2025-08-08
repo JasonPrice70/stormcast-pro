@@ -53,6 +53,43 @@ const createStormIcon = (category: number, classification: string) => {
   });
 };
 
+// Get color for track point intensity markers
+const getIntensityColor = (stormType: string, styleCategory: string) => {
+  switch (styleCategory) {
+    case 'cat5':
+      return '#8b0000'; // Dark red
+    case 'cat4':
+      return '#ff0000'; // Red
+    case 'cat3':
+      return '#ff6600'; // Orange
+    case 'cat2':
+      return '#ffaa00'; // Yellow-orange
+    case 'cat1':
+      return '#ffdd00'; // Yellow
+    case 'ts':
+      return '#00aaff'; // Blue
+    case 'td':
+      return '#808080'; // Gray
+    case 'ex':
+      return '#666666'; // Dark gray
+    default:
+      return '#cccccc'; // Light gray
+  }
+};
+
+// Get text color for track point intensity markers
+const getIntensityTextColor = (stormType: string, styleCategory: string) => {
+  switch (styleCategory) {
+    case 'cat5':
+    case 'cat4':
+    case 'cat3':
+    case 'ex':
+      return '#ffffff'; // White text for dark backgrounds
+    default:
+      return '#000000'; // Black text for light backgrounds
+  }
+};
+
 // Demo storm data for fallback
 const demoStorms = [
   {
@@ -474,29 +511,60 @@ const SimpleStormTracker: React.FC = () => {
                     />
                   );
                 } else if (feature.geometry.type === 'Point') {
-                  // Track point
+                  // Track point with intensity
                   const [lon, lat] = feature.geometry.coordinates;
+                  const properties = feature.properties || {};
+                  const category = properties.category || '';
+                  
+                  // Create custom icon with intensity text
+                  const intensityIcon = L.divIcon({
+                    html: `<div style="
+                      background-color: ${getIntensityColor(properties.stormType, properties.styleCategory)};
+                      border: 2px solid #333;
+                      border-radius: 50%;
+                      width: 24px;
+                      height: 24px;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                      font-size: 10px;
+                      font-weight: bold;
+                      color: ${getIntensityTextColor(properties.stormType, properties.styleCategory)};
+                      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+                    ">${category}</div>`,
+                    className: 'intensity-marker',
+                    iconSize: [24, 24],
+                    iconAnchor: [12, 12]
+                  });
                   
                   return (
-                    <CircleMarker
+                    <Marker
                       key={`${storm.id}-track-point-${featureIndex}`}
-                      center={[lat, lon]}
-                      radius={4}
-                      pathOptions={{
-                        color: '#444444',
-                        fillColor: '#ff6600',
-                        fillOpacity: 0.7,
-                        weight: 1
-                      }}
+                      position={[lat, lon]}
+                      icon={intensityIcon}
                     >
                       <Popup>
                         <div style={{ fontSize: '0.9rem' }}>
-                          <strong>{storm.name} - Track Position</strong><br />
-                          <strong>Name:</strong> {feature.properties.name || 'Position'}<br />
-                          <strong>Description:</strong> {feature.properties.description || 'Track point'}
+                          <strong>{storm.name} - {properties.datetime || 'Track Position'}</strong><br />
+                          {properties.category && (
+                            <>
+                              <strong>Intensity:</strong> {properties.category}<br />
+                            </>
+                          )}
+                          {properties.intensity && (
+                            <>
+                              <strong>Max Winds:</strong> {properties.intensity} knots ({properties.intensityMPH} mph)<br />
+                            </>
+                          )}
+                          {properties.minSeaLevelPres && (
+                            <>
+                              <strong>Pressure:</strong> {properties.minSeaLevelPres} mb<br />
+                            </>
+                          )}
+                          <strong>Location:</strong> {lat.toFixed(1)}°N, {Math.abs(lon).toFixed(1)}°W
                         </div>
                       </Popup>
-                    </CircleMarker>
+                    </Marker>
                   );
                 }
                 return null;
