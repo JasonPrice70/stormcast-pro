@@ -400,12 +400,26 @@ exports.handler = async (event) => {
         }
         break;
         
+      case 'forecast-track-kmz':
+        const forecastStormId = queryStringParameters?.stormId;
+        if (!forecastStormId) {
+          return {
+            statusCode: 400,
+            headers: corsHeaders,
+            body: JSON.stringify({ error: 'stormId parameter is required for forecast-track-kmz endpoint' })
+          };
+        }
+        // Use the forecast track KMZ format: EP092025_TRACK_latest.kmz
+        nhcUrl = `${NHC_BASE_URL}/storm_graphics/api/${forecastStormId.toUpperCase()}_TRACK_latest.kmz`;
+        isKmzEndpoint = true;
+        break;
+        
       default:
         return {
           statusCode: 400,
           headers: corsHeaders,
           body: JSON.stringify({ 
-            error: 'Invalid endpoint. Supported endpoints: active-storms, track-kmz, forecast-track, historical-track, forecast-cone' 
+            error: 'Invalid endpoint. Supported endpoints: active-storms, track-kmz, forecast-track, historical-track, forecast-cone, forecast-track-kmz' 
           })
         };
     }

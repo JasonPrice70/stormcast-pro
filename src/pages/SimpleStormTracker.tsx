@@ -505,6 +505,61 @@ const SimpleStormTracker: React.FC = () => {
           );
         })}
 
+        {/* Render forecast tracks from KMZ data */}
+        {showTracks && displayStorms.map((storm) => {
+          if (!storm.forecastTrack || !storm.forecastTrack.features || storm.forecastTrack.features.length === 0) return null;
+          
+          return (
+            <React.Fragment key={`${storm.id}-forecast-track`}>
+              {storm.forecastTrack.features.map((feature: any, featureIndex: number) => {
+                if (feature.geometry.type === 'LineString') {
+                  // Forecast track line
+                  const forecastPath: [number, number][] = feature.geometry.coordinates.map((coord: [number, number]) => [coord[1], coord[0]]);
+                  
+                  return (
+                    <Polyline
+                      key={`${storm.id}-forecast-track-line-${featureIndex}`}
+                      positions={forecastPath}
+                      pathOptions={{
+                        color: '#ff3333',
+                        weight: 4,
+                        opacity: 0.9,
+                        dashArray: '10, 5'
+                      }}
+                    />
+                  );
+                } else if (feature.geometry.type === 'Point') {
+                  // Forecast track point
+                  const [lon, lat] = feature.geometry.coordinates;
+                  
+                  return (
+                    <CircleMarker
+                      key={`${storm.id}-forecast-track-point-${featureIndex}`}
+                      center={[lat, lon]}
+                      radius={5}
+                      pathOptions={{
+                        color: '#cc0000',
+                        fillColor: '#ff3333',
+                        fillOpacity: 0.8,
+                        weight: 2
+                      }}
+                    >
+                      <Popup>
+                        <div style={{ fontSize: '0.9rem' }}>
+                          <strong>{storm.name} - Forecast Position</strong><br />
+                          <strong>Name:</strong> {feature.properties.name || 'Forecast Position'}<br />
+                          <strong>Description:</strong> {feature.properties.description || 'Forecast track point'}
+                        </div>
+                      </Popup>
+                    </CircleMarker>
+                  );
+                }
+                return null;
+              })}
+            </React.Fragment>
+          );
+        })}
+
         {/* Render forecast storm paths */}
         {showForecastPaths && displayStorms.map((storm) => {
           if (!storm.forecast || storm.forecast.length === 0) return null;

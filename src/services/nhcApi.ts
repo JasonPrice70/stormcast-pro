@@ -381,6 +381,26 @@ class NHCApiService {
   }
 
   /**
+   * Get forecast track data from KMZ file for a specific storm
+   */
+  async getStormForecastTrackKmz(stormId: string): Promise<any> {
+    try {
+      // Use Lambda proxy to fetch and parse forecast track KMZ data
+      const proxyData = await this.fetchWithLambdaFallback('forecast-track-kmz', { stormId });
+      if (proxyData) {
+        console.log(`Successfully fetched forecast track KMZ data via proxy server for ${stormId}`);
+        return proxyData; // This is already parsed GeoJSON from the Lambda function
+      }
+
+      console.log(`No forecast track KMZ data available for storm ${stormId}`)
+      return null;
+    } catch (error) {
+      console.warn('Failed to fetch forecast track KMZ for', stormId, ':', error)
+      return null;
+    }
+  }
+
+  /**
    * Get storm forecast cone data
    */
   async getStormCone(stormId: string): Promise<any> {
@@ -532,9 +552,10 @@ class NHCApiService {
             try {
               console.log(`Attempting to fetch track data for storm: ${storm.name} (${storm.id || storm.binNumber})`)
               
-              const [trackData, coneData] = await Promise.allSettled([
+              const [trackData, coneData, forecastTrackData] = await Promise.allSettled([
                 this.getStormTrackKmz(storm.id || storm.binNumber || ''),
-                this.getStormCone(storm.id || storm.binNumber || '')
+                this.getStormCone(storm.id || storm.binNumber || ''),
+                this.getStormForecastTrackKmz(storm.id || storm.binNumber || '')
               ]);
               
               // Handle track data (from KMZ)
@@ -553,13 +574,22 @@ class NHCApiService {
                 processedStorm.cone = null;
               }
               
-              console.log(`Storm ${storm.name}: ${processedStorm.forecast.length} forecast points, ${processedStorm.historical.length} historical points, cone: ${processedStorm.cone ? 'available' : 'not available'}`);
+              // Handle forecast track data (from KMZ)
+              if (forecastTrackData.status === 'fulfilled') {
+                processedStorm.forecastTrack = forecastTrackData.value;
+              } else {
+                console.warn(`Forecast track data failed for ${storm.name}:`, forecastTrackData.reason?.message);
+                processedStorm.forecastTrack = null;
+              }
+              
+              console.log(`Storm ${storm.name}: ${processedStorm.forecast.length} forecast points, ${processedStorm.historical.length} historical points, cone: ${processedStorm.cone ? 'available' : 'not available'}, forecastTrack: ${processedStorm.forecastTrack ? 'available' : 'not available'}`);
             } catch (error) {
               console.warn(`Failed to fetch any track data for ${storm.name}:`, error);
               // Set defaults
               processedStorm.forecast = [];
               processedStorm.historical = [];
               processedStorm.cone = null;
+              processedStorm.forecastTrack = null;
             }
           } else {
             console.log(`Skipping track data fetch for ${storm.name} (track data fetching disabled)`);
@@ -567,6 +597,7 @@ class NHCApiService {
             processedStorm.forecast = [];
             processedStorm.historical = [];
             processedStorm.cone = null;
+            processedStorm.forecastTrack = null;
           }
 
           console.log(`Processed storm:`, processedStorm);
