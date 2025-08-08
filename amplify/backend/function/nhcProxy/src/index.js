@@ -322,9 +322,139 @@ async function parseKmzToConeGeoJSON(kmzBuffer) {
 }
 
 /**
- * Extract cone data from KML content
+ * Parse KMZ file and extract storm surge data as GeoJSON
  */
-async function extractConeFromKML(kmlContent) {
+async function parseKmzToSurgeGeoJSON(kmzBuffer) {
+  return new Promise((resolve, reject) => {
+    yauzl.fromBuffer(kmzBuffer, { lazyEntries: true }, (err, zipfile) => {
+      if (err) {
+        console.error('Error opening KMZ file for storm surge:', err);
+        return reject(err);
+      }
+
+      let kmlContent = '';
+      
+      zipfile.readEntry();
+      zipfile.on('entry', (entry) => {
+        if (entry.fileName.toLowerCase().endsWith('.kml')) {
+          zipfile.openReadStream(entry, (err, readStream) => {
+            if (err) {
+              console.error('Error reading KML from storm surge KMZ:', err);
+              return reject(err);
+            }
+
+            const chunks = [];
+            readStream.on('data', (chunk) => chunks.push(chunk));
+            readStream.on('end', () => {
+              kmlContent = Buffer.concat(chunks).toString('utf8');
+              zipfile.readEntry();
+            });
+            readStream.on('error', reject);
+          });
+        } else {
+          zipfile.readEntry();
+        }
+      });
+
+      zipfile.on('end', () => {
+        if (!kmlContent) {
+          return reject(new Error('No KML file found in storm surge KMZ'));
+        }
+
+        // Parse KML and extract storm surge data
+        extractSurgeFromKML(kmlContent)
+          .then(resolve)
+          .catch(reject);
+      });
+
+      zipfile.on('error', reject);
+    });
+  });
+}
+
+/**
+ * Extract storm surge data from KML content
+ */
+async function extractSurgeFromKML(kmlContent) {
+  try {
+    const parser = new xml2js.Parser({ explicitArray: false });
+    const result = await parser.parseStringPromise(kmlContent);
+
+    // Find storm surge polygons in KML
+    const features = [];
+    
+    function findSurgePolygons(obj) {
+      if (!obj) return;
+      
+      if (obj.Placemark) {
+        const placemarks = Array.isArray(obj.Placemark) ? obj.Placemark : [obj.Placemark];
+        
+        placemarks.forEach(placemark => {
+          if (placemark.Polygon && placemark.Polygon.outerBoundaryIs) {
+            // Extract polygon coordinates
+            const outerRing = placemark.Polygon.outerBoundaryIs.LinearRing;
+            if (outerRing && outerRing.coordinates) {
+              const coordString = outerRing.coordinates.trim();
+              const coords = coordString.split(/\s+/).map(coord => {
+                const [lon, lat, alt] = coord.split(',').map(Number);
+                return [lon, lat];
+              });
+
+              // Extract storm surge height from placemark name or description
+              let surgeHeight = 0;
+              const name = placemark.name || '';
+              const description = placemark.description || '';
+              
+              // Try to extract surge height from name (e.g., "3-6 ft", "6-9 ft")
+              const heightMatch = name.match(/(\d+)-(\d+)\s*ft/i) || description.match(/(\d+)-(\d+)\s*ft/i);
+              if (heightMatch) {
+                surgeHeight = parseInt(heightMatch[2]); // Use upper bound
+              }
+
+              features.push({
+                type: 'Feature',
+                properties: {
+                  name: placemark.name || 'Storm Surge Area',
+                  description: placemark.description || '',
+                  SURGE_FT: surgeHeight,
+                  height: surgeHeight
+                },
+                geometry: {
+                  type: 'Polygon',
+                  coordinates: [coords]
+                }
+              });
+            }
+          }
+        });
+      }
+
+      // Recursively search in folders
+      if (obj.Folder) {
+        const folders = Array.isArray(obj.Folder) ? obj.Folder : [obj.Folder];
+        folders.forEach(findSurgePolygons);
+      }
+      
+      if (obj.Document) {
+        findSurgePolygons(obj.Document);
+      }
+    }
+
+    if (result.kml) {
+      findSurgePolygons(result.kml);
+    }
+
+    return {
+      type: 'FeatureCollection',
+      features: features,
+      source: 'kmz'
+    };
+
+  } catch (error) {
+    console.error('Error parsing KML for storm surge:', error);
+    throw error;
+  }
+}
   try {
     const parser = new xml2js.Parser({ explicitArray: false });
     const result = await parser.parseStringPromise(kmlContent);
@@ -388,6 +518,141 @@ async function extractConeFromKML(kmlContent) {
 
   } catch (error) {
     console.error('Error parsing KML for cone:', error);
+    throw error;
+  }
+}
+
+/**
+ * Parse KMZ file and extract storm surge data as GeoJSON
+ */
+async function parseKmzToSurgeGeoJSON(kmzBuffer) {
+  return new Promise((resolve, reject) => {
+    yauzl.fromBuffer(kmzBuffer, { lazyEntries: true }, (err, zipfile) => {
+      if (err) {
+        console.error('Error opening KMZ file for storm surge:', err);
+        return reject(err);
+      }
+
+      let kmlContent = '';
+      
+      zipfile.readEntry();
+      zipfile.on('entry', (entry) => {
+        if (entry.fileName.toLowerCase().endsWith('.kml')) {
+          zipfile.openReadStream(entry, (err, readStream) => {
+            if (err) {
+              console.error('Error reading KML from storm surge KMZ:', err);
+              return reject(err);
+            }
+
+            const chunks = [];
+            readStream.on('data', (chunk) => chunks.push(chunk));
+            readStream.on('end', () => {
+              kmlContent = Buffer.concat(chunks).toString('utf8');
+              zipfile.readEntry();
+            });
+            readStream.on('error', reject);
+          });
+        } else {
+          zipfile.readEntry();
+        }
+      });
+
+      zipfile.on('end', () => {
+        if (!kmlContent) {
+          return reject(new Error('No KML file found in storm surge KMZ'));
+        }
+
+        // Parse KML and extract storm surge data
+        extractSurgeFromKML(kmlContent)
+          .then(resolve)
+          .catch(reject);
+      });
+
+      zipfile.on('error', reject);
+    });
+  });
+}
+
+/**
+ * Extract storm surge data from KML content
+ */
+async function extractSurgeFromKML(kmlContent) {
+  try {
+    const parser = new xml2js.Parser({ explicitArray: false });
+    const result = await parser.parseStringPromise(kmlContent);
+
+    // Find storm surge polygons in KML
+    const features = [];
+    
+    function findSurgePolygons(obj) {
+      if (!obj) return;
+      
+      if (obj.Placemark) {
+        const placemarks = Array.isArray(obj.Placemark) ? obj.Placemark : [obj.Placemark];
+        
+        placemarks.forEach(placemark => {
+          if (placemark.Polygon && placemark.Polygon.outerBoundaryIs) {
+            // Extract polygon coordinates
+            const outerRing = placemark.Polygon.outerBoundaryIs.LinearRing;
+            if (outerRing && outerRing.coordinates) {
+              const coordString = outerRing.coordinates.trim();
+              const coords = coordString.split(/\s+/).map(coord => {
+                const [lon, lat, alt] = coord.split(',').map(Number);
+                return [lon, lat];
+              });
+
+              // Extract storm surge height from placemark name or description
+              let surgeHeight = 0;
+              const name = placemark.name || '';
+              const description = placemark.description || '';
+              
+              // Try to extract surge height from name (e.g., "3-6 ft", "6-9 ft")
+              const heightMatch = name.match(/(\d+)-(\d+)\s*ft/i) || description.match(/(\d+)-(\d+)\s*ft/i);
+              if (heightMatch) {
+                surgeHeight = parseInt(heightMatch[2]); // Use upper bound
+              }
+
+              features.push({
+                type: 'Feature',
+                properties: {
+                  name: placemark.name || 'Storm Surge Area',
+                  description: placemark.description || '',
+                  SURGE_FT: surgeHeight,
+                  height: surgeHeight
+                },
+                geometry: {
+                  type: 'Polygon',
+                  coordinates: [coords]
+                }
+              });
+            }
+          }
+        });
+      }
+
+      // Recursively search in folders
+      if (obj.Folder) {
+        const folders = Array.isArray(obj.Folder) ? obj.Folder : [obj.Folder];
+        folders.forEach(findSurgePolygons);
+      }
+      
+      if (obj.Document) {
+        findSurgePolygons(obj.Document);
+      }
+    }
+
+    if (result.kml) {
+      findSurgePolygons(result.kml);
+    }
+
+    return {
+      type: 'FeatureCollection',
+      features: features,
+      source: 'kmz'
+    };
+
+  } catch (error) {
+    console.error('Error parsing KML for storm surge:', error);
     throw error;
   }
 }
@@ -499,12 +764,41 @@ exports.handler = async (event) => {
         isKmzEndpoint = true;
         break;
         
+      case 'storm-surge':
+        const surgeStormId = queryStringParameters?.stormId;
+        if (!surgeStormId) {
+          return {
+            statusCode: 400,
+            headers: corsHeaders,
+            body: JSON.stringify({ error: 'stormId parameter is required for storm-surge endpoint' })
+          };
+        }
+        
+        // Storm surge is primarily available for Atlantic storms (AL prefix)
+        if (!surgeStormId.toUpperCase().startsWith('AL')) {
+          return {
+            statusCode: 200,
+            headers: corsHeaders,
+            body: JSON.stringify({
+              success: false,
+              message: 'Storm surge data is typically only available for Atlantic storms (AL prefix)',
+              stormId: surgeStormId,
+              timestamp: new Date().toISOString()
+            })
+          };
+        }
+        
+        // Use the storm surge KMZ format
+        nhcUrl = `${NHC_BASE_URL}/storm_graphics/api/${surgeStormId.toUpperCase()}_PeakStormSurge_latest.kmz`;
+        isKmzEndpoint = true;
+        break;
+        
       default:
         return {
           statusCode: 400,
           headers: corsHeaders,
           body: JSON.stringify({ 
-            error: 'Invalid endpoint. Supported endpoints: active-storms, track-kmz, forecast-track, historical-track, forecast-cone, forecast-track-kmz' 
+            error: 'Invalid endpoint. Supported endpoints: active-storms, track-kmz, forecast-track, historical-track, forecast-cone, forecast-track-kmz, storm-surge' 
           })
         };
     }
@@ -539,6 +833,9 @@ exports.handler = async (event) => {
         } else if (endpoint === 'forecast-cone') {
           responseData = await parseKmzToConeGeoJSON(response.data);
           console.log(`Successfully parsed KMZ cone data with ${responseData.features.length} features`);
+        } else if (endpoint === 'storm-surge') {
+          responseData = await parseKmzToSurgeGeoJSON(response.data);
+          console.log(`Successfully parsed KMZ storm surge data with ${responseData.features.length} features`);
         } else {
           throw new Error(`Unknown KMZ endpoint: ${endpoint}`);
         }

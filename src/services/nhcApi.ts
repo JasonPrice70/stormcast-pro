@@ -868,28 +868,20 @@ class NHCApiService {
     }
 
     try {
-      const lambdaUrl = getLambdaApiUrl()
-      console.log(`Fetching storm surge for ${stormId} from Lambda API:`, lambdaUrl)
+      console.log(`Fetching storm surge for ${stormId} using Lambda API...`)
       
-      // Try to fetch storm surge KMZ
-      const surgeUrl = `https://www.nhc.noaa.gov/storm_graphics/api/${stormId}_PeakStormSurge_latest.kmz`
+      // Use Lambda function to fetch storm surge data
+      const proxyData = await this.fetchWithLambdaFallback('storm-surge', { stormId })
       
-      const response = await axios.post(lambdaUrl, {
-        action: 'fetchKMZ',
-        kmzUrl: surgeUrl
-      }, {
-        timeout: 30000
-      })
-
-      if (response.status === 200 && response.data) {
-        console.log('Successfully fetched storm surge data')
-        return response.data
+      if (proxyData) {
+        console.log('Successfully fetched storm surge data via Lambda:', proxyData)
+        return proxyData
       } else {
-        console.log('No storm surge data found for storm:', stormId)
+        console.log('No storm surge data returned from Lambda for storm:', stormId)
         return null
       }
     } catch (error: any) {
-      console.log('Storm surge data not available for storm:', stormId)
+      console.log('Storm surge data not available for storm:', stormId, error.message)
       if (error.response?.status === 404) {
         console.log('Storm surge KMZ file not found - this is normal for storms that don\'t threaten populated coastlines')
       }
