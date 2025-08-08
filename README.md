@@ -1,4 +1,4 @@
-# 🌪️ StormCast Pro
+# 🌪️ CycloTrak
 
 A modern React application for tracking hurricanes and tropical cyclones with real-time data from the National Hurricane Center.
 

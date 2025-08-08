@@ -20,6 +20,6 @@
     "node": ">=16.0.0"
   },
   "keywords": ["cors", "proxy", "nhc", "hurricane", "api"],
-  "author": "StormCast Pro",
+  "author": "CycloTrak",
   "license": "MIT"
 }

@@ -6,7 +6,7 @@ const SimpleHomePage = () => {
     <div className="home-page">
         <SimpleHeader />
       <div className="hero">
-        <h1>Welcome to StormCast Pro</h1>
+        <h1>Welcome to CycloTrak</h1>
         <p>Real-time hurricane and tropical cyclone tracking with official National Hurricane Center data</p>
       </div>
 

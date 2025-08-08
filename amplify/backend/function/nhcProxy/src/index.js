@@ -679,7 +679,7 @@ exports.handler = async (event) => {
     const axiosConfig = {
       timeout: 20000,
       headers: {
-        'User-Agent': 'StormCast Pro (cyclotrak.com, jasonprice70@gmail.com)',
+        'User-Agent': 'CycloTrak (cyclotrak.com, jasonprice70@gmail.com)',
         'Accept': isKmzEndpoint ? 'application/vnd.google-earth.kmz' : 'application/json'
       }
     };

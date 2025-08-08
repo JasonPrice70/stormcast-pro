@@ -530,7 +530,7 @@ const SimpleStormTracker: React.FC = () => {
   const stormSurge = useStormSurge(showStormSurge ? firstStormId : null);
 
   // Determine what data to display with proper fallback
-  const shouldUseDemoData = useDemo || (error && storms.length === 0);
+  const shouldUseDemoData = useDemo || storms.length === 0;
   const displayStorms = shouldUseDemoData ? demoStorms : storms;
   const hasStorms = displayStorms.length > 0;
   const dataSource = shouldUseDemoData ? 'demo' : 'live';
