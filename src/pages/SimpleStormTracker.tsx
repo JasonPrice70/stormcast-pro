@@ -48,8 +48,8 @@ const createStormIcon = (category: number, classification: string) => {
   return L.divIcon({
     html: `<div class="storm-icon" style="background: ${color};">${displayText}</div>`,
     className: '',
-    iconSize: [30, 30],
-    iconAnchor: [15, 15]
+    iconSize: [20, 20],
+    iconAnchor: [10, 10]
   });
 };
 
@@ -728,19 +728,19 @@ const SimpleStormTracker: React.FC = () => {
                       background-color: ${getIntensityColor(properties.stormType, properties.styleCategory)};
                       border: 2px solid #333;
                       border-radius: 50%;
-                      width: 24px;
-                      height: 24px;
+                      width: 16px;
+                      height: 16px;
                       display: flex;
                       align-items: center;
                       justify-content: center;
-                      font-size: 10px;
+                      font-size: 8px;
                       font-weight: bold;
                       color: ${getIntensityTextColor(properties.stormType, properties.styleCategory)};
                       box-shadow: 0 2px 4px rgba(0,0,0,0.3);
                     ">${category}</div>`,
                     className: 'intensity-marker',
-                    iconSize: [24, 24],
-                    iconAnchor: [12, 12]
+                    iconSize: [16, 16],
+                    iconAnchor: [8, 8]
                   });
                   
                   return (
@@ -806,19 +806,19 @@ const SimpleStormTracker: React.FC = () => {
                       background-color: ${getIntensityColor('', category.toLowerCase())};
                       border: 2px solid #333;
                       border-radius: 50%;
-                      width: 18px;
-                      height: 18px;
+                      width: 12px;
+                      height: 12px;
                       display: flex;
                       align-items: center;
                       justify-content: center;
-                      font-size: 9px;
+                      font-size: 7px;
                       font-weight: bold;
                       color: ${getIntensityTextColor('', category.toLowerCase())};
                       box-shadow: 0 2px 4px rgba(0,0,0,0.3);
                     ">${category}</div>`,
                     className: 'historical-intensity-marker',
-                    iconSize: [18, 18],
-                    iconAnchor: [9, 9]
+                    iconSize: [12, 12],
+                    iconAnchor: [6, 6]
                   });
                   
                   return (
@@ -895,19 +895,19 @@ const SimpleStormTracker: React.FC = () => {
                       background-color: ${getForecastIntensityColor(properties.stormType, properties.styleCategory)};
                       border: 2px solid #cc0000;
                       border-radius: 50%;
-                      width: 26px;
-                      height: 26px;
+                      width: 18px;
+                      height: 18px;
                       display: flex;
                       align-items: center;
                       justify-content: center;
-                      font-size: 11px;
+                      font-size: 8px;
                       font-weight: bold;
                       color: ${getIntensityTextColor(properties.stormType, properties.styleCategory)};
                       box-shadow: 0 2px 6px rgba(204,0,0,0.4);
                     ">${category}</div>`,
                     className: 'forecast-intensity-marker',
-                    iconSize: [26, 26],
-                    iconAnchor: [13, 13]
+                    iconSize: [18, 18],
+                    iconAnchor: [9, 9]
                   });
                   
                   return (
@@ -978,19 +978,19 @@ const SimpleStormTracker: React.FC = () => {
                       background-color: ${getForecastIntensityColor('', category.toLowerCase())};
                       border: 2px solid #cc0000;
                       border-radius: 50%;
-                      width: 20px;
-                      height: 20px;
+                      width: 14px;
+                      height: 14px;
                       display: flex;
                       align-items: center;
                       justify-content: center;
-                      font-size: 10px;
+                      font-size: 7px;
                       font-weight: bold;
                       color: ${getIntensityTextColor('', category.toLowerCase())};
                       box-shadow: 0 2px 4px rgba(204,0,0,0.4);
                     ">${category}</div>`,
                     className: 'forecast-intensity-marker',
-                    iconSize: [20, 20],
-                    iconAnchor: [10, 10]
+                    iconSize: [14, 14],
+                    iconAnchor: [7, 7]
                   });
                   
                   return (
@@ -1102,7 +1102,7 @@ const SimpleStormTracker: React.FC = () => {
                       <CircleMarker
                         key={`${storm.id}-uncertainty-${index}`}
                         center={[point.latitude, point.longitude]}
-                        radius={Math.min(15, 8 + index * 2)} // Visual radius for screen
+                        radius={Math.min(10, 5 + index * 1)} // Visual radius for screen
                         pathOptions={{
                           fillColor: 'rgba(255, 170, 0, 0.15)',
                           fillOpacity: 0.2,
