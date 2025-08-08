@@ -405,46 +405,32 @@ class NHCApiService {
    */
   async getStormCone(stormId: string): Promise<any> {
     try {
-      // First, try Lambda/proxy server approach with correct query parameters
+      // First, try Lambda/proxy server approach for KMZ cone data
       const currentYear = new Date().getFullYear();
       const proxyData = await this.fetchWithLambdaFallback('forecast-cone', { stormId, year: currentYear.toString() });
       if (proxyData) {
         console.log(`Successfully fetched forecast cone via proxy server for ${stormId}`);
-        return this.parseConeGeoJSON(proxyData);
+        return proxyData; // Lambda already parses KMZ to GeoJSON
       }
 
-      // Fall back to CORS proxies
-      console.log(`Falling back to CORS proxies for forecast cone: ${stormId}`);
-      const baseUrl = `${NHC_BASE_URL}/gis/forecast/archive/${currentYear}/${stormId.toUpperCase()}_latest_CONE.geojson`
+      // If Lambda fails, try direct access (this likely won't work due to CORS)
+      console.log(`Lambda failed, trying direct access for forecast cone: ${stormId}`);
+      const directUrl = `https://www.nhc.noaa.gov/storm_graphics/api/${stormId.toUpperCase()}_CONE_latest.kmz`
       
-      const proxiesToTry = this.corsProxy ? [this.corsProxy] : CORS_PROXIES.slice(0, 3)
-      
-      for (const proxy of proxiesToTry) {
-        try {
-          const coneUrl = `${proxy}${baseUrl}`
-          console.log('Fetching forecast cone from:', coneUrl)
-          
-          const response = await axios.get(coneUrl, {
-            timeout: 8000,
-            headers: { 
-              'Accept': 'application/json'
-            }
-          })
-
-          const result = this.parseConeGeoJSON(response.data)
-          if (result) {
-            console.log(`Successfully fetched forecast cone for ${stormId}`)
-            return result
+      try {
+        const response = await axios.get(directUrl, {
+          timeout: 8000,
+          responseType: 'arraybuffer',
+          headers: { 
+            'Accept': 'application/vnd.google-earth.kmz'
           }
-        } catch (error) {
-          const err = error as any
-          if (err.response?.status === 404) {
-            console.log(`Forecast cone file not found for ${stormId} (this is normal if no cone data is available)`)
-            return null
-          }
-          console.warn(`Forecast cone fetch failed with proxy ${proxy}:`, err.message)
-          continue
-        }
+        })
+        
+        // This will likely fail due to CORS, but we'll try anyway
+        console.log(`Direct cone access succeeded for ${stormId}`)
+        return null; // We can't parse KMZ on client side without additional libraries
+      } catch (directError) {
+        console.log(`Direct cone access failed for ${stormId} (expected due to CORS):`, directError.message)
       }
       
       console.log(`No forecast cone data available for storm ${stormId}`)

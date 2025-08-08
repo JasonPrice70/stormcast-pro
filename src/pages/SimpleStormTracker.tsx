@@ -56,14 +56,19 @@ const createStormIcon = (category: number, classification: string) => {
 // Get color for track point intensity markers
 const getIntensityColor = (stormType: string, styleCategory: string) => {
   switch (styleCategory) {
+    case '5':
     case 'cat5':
       return '#8b0000'; // Dark red
+    case '4':
     case 'cat4':
       return '#ff0000'; // Red
+    case '3':
     case 'cat3':
       return '#ff6600'; // Orange
+    case '2':
     case 'cat2':
       return '#ffaa00'; // Yellow-orange
+    case '1':
     case 'cat1':
       return '#ffdd00'; // Yellow
     case 'ts':
@@ -72,6 +77,8 @@ const getIntensityColor = (stormType: string, styleCategory: string) => {
       return '#808080'; // Gray
     case 'ex':
       return '#666666'; // Dark gray
+    case 'fc':
+      return '#9966ff'; // Purple for forecast
     default:
       return '#cccccc'; // Light gray
   }
@@ -80,10 +87,14 @@ const getIntensityColor = (stormType: string, styleCategory: string) => {
 // Get text color for track point intensity markers
 const getIntensityTextColor = (stormType: string, styleCategory: string) => {
   switch (styleCategory) {
+    case '5':
     case 'cat5':
+    case '4':
     case 'cat4':
+    case '3':
     case 'cat3':
     case 'ex':
+    case 'fc':
       return '#ffffff'; // White text for dark backgrounds
     default:
       return '#000000'; // Black text for light backgrounds
@@ -93,14 +104,19 @@ const getIntensityTextColor = (stormType: string, styleCategory: string) => {
 // Get color for forecast track point intensity markers (similar to regular track but with red tint)
 const getForecastIntensityColor = (stormType: string, styleCategory: string) => {
   switch (styleCategory) {
+    case '5':
     case 'cat5':
       return '#cc0000'; // Deep red
+    case '4':
     case 'cat4':
       return '#ff3333'; // Red
+    case '3':
     case 'cat3':
       return '#ff6666'; // Light red
+    case '2':
     case 'cat2':
       return '#ff9999'; // Pink-red
+    case '1':
     case 'cat1':
       return '#ffcccc'; // Light pink
     case 'ts':
@@ -109,9 +125,23 @@ const getForecastIntensityColor = (stormType: string, styleCategory: string) => 
       return '#ffdddd'; // Very light pink
     case 'ex':
       return '#990000'; // Dark red
+    case 'fc':
     default:
-      return '#ffeeee'; // Very light pink
+      return '#ffeeff'; // Very light purple for forecast
   }
+};
+
+// Get intensity category from wind speed (in knots or mph)
+const getIntensityCategoryFromWinds = (windSpeed: number, isKnots: boolean = true): string => {
+  const knotSpeed = isKnots ? windSpeed : windSpeed * 0.868976; // Convert mph to knots if needed
+  
+  if (knotSpeed < 34) return 'TD';
+  else if (knotSpeed < 64) return 'TS';
+  else if (knotSpeed < 83) return '1';
+  else if (knotSpeed < 96) return '2';
+  else if (knotSpeed < 113) return '3';
+  else if (knotSpeed < 137) return '4';
+  else return '5';
 };
 
 // Demo storm data for fallback
@@ -474,7 +504,7 @@ const demoStorms = [
 ];
 
 const SimpleStormTracker: React.FC = () => {
-  const [useDemo, setUseDemo] = useState(true); // Start with demo data to test
+  const [useDemo, setUseDemo] = useState(false); // Use live data // Start with live data by default
   const [showTracks, setShowTracks] = useState(true);
   const [showForecastPaths, setShowForecastPaths] = useState(true);
   const [showForecastCones, setShowForecastCones] = useState(true);
@@ -484,7 +514,7 @@ const SimpleStormTracker: React.FC = () => {
   const demoData = useDemoData();
   const liveData = useNHCData({ 
     autoRefresh: false, // Disable auto-refresh - only call once per page load
-    fetchOnMount: false, // Don't fetch on mount - only when user clicks "Live Data"
+    fetchOnMount: true, // Fetch on mount since we start with live data by default
     useProxy: true, // Enable CORS proxy for development
     fetchTrackData: fetchLiveTrackData // Control track data fetching
   });
@@ -651,33 +681,33 @@ const SimpleStormTracker: React.FC = () => {
           </Marker>
         ))}
 
-        {/* Render storm tracks from KMZ data */}
+        {/* Render storm tracks from KMZ data or historical data */}
         {showTracks && displayStorms.map((storm) => {
-          if (!storm.track || !storm.track.features || storm.track.features.length === 0) return null;
-          
-          return (
-            <React.Fragment key={`${storm.id}-track`}>
-              {storm.track.features.map((feature: any, featureIndex: number) => {
-                if (feature.geometry.type === 'LineString') {
-                  // Track line
-                  const trackPath: [number, number][] = feature.geometry.coordinates.map((coord: [number, number]) => [coord[1], coord[0]]);
-                  
-                  return (
-                    <Polyline
-                      key={`${storm.id}-track-line-${featureIndex}`}
-                      positions={trackPath}
-                      pathOptions={{
-                        color: '#666666',
-                        weight: 3,
-                        opacity: 0.8,
-                        dashArray: '5, 5'
-                      }}
-                    />
-                  );
-                } else if (feature.geometry.type === 'Point') {
-                  // Track point with intensity
-                  const [lon, lat] = feature.geometry.coordinates;
-                  const properties = feature.properties || {};
+          // First try to use official track data from KMZ
+          if (storm.track && storm.track.features && storm.track.features.length > 0) {
+            return (
+              <React.Fragment key={`${storm.id}-track`}>
+                {storm.track.features.map((feature: any, featureIndex: number) => {
+                  if (feature.geometry.type === 'LineString') {
+                    // Track line
+                    const trackPath: [number, number][] = feature.geometry.coordinates.map((coord: [number, number]) => [coord[1], coord[0]]);
+                    
+                    return (
+                      <Polyline
+                        key={`${storm.id}-track-line-${featureIndex}`}
+                        positions={trackPath}
+                        pathOptions={{
+                          color: '#666666',
+                          weight: 3,
+                          opacity: 0.8,
+                          dashArray: '5, 5'
+                        }}
+                      />
+                    );
+                  } else if (feature.geometry.type === 'Point') {
+                    // Track point with intensity
+                    const [lon, lat] = feature.geometry.coordinates;
+                    const properties = feature.properties || {};
                   const category = properties.category || '';
                   
                   // Create custom icon with intensity text
@@ -735,11 +765,79 @@ const SimpleStormTracker: React.FC = () => {
               })}
             </React.Fragment>
           );
+          }
+          
+          // If no official track data, use historical data as fallback
+          if (storm.historical && storm.historical.length > 0) {
+            const historicalPath = storm.historical.map(point => [point.latitude, point.longitude] as [number, number]);
+            
+            return (
+              <React.Fragment key={`${storm.id}-historical-track`}>
+                {/* Historical track line */}
+                <Polyline
+                  positions={[[storm.position[0], storm.position[1]], ...historicalPath.reverse()]}
+                  pathOptions={{
+                    color: '#888888',
+                    weight: 2,
+                    opacity: 0.7,
+                    dashArray: '8, 4'
+                  }}
+                />
+                {/* Historical track points */}
+                {storm.historical.map((point, index) => {
+                  // Determine intensity category for historical point
+                  const category = getIntensityCategoryFromWinds(point.maxWinds, false); // maxWinds is in mph
+                  
+                  // Create historical intensity icon
+                  const historicalIcon = L.divIcon({
+                    html: `<div style="
+                      background-color: ${getIntensityColor('', category.toLowerCase())};
+                      border: 2px solid #333;
+                      border-radius: 50%;
+                      width: 18px;
+                      height: 18px;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                      font-size: 9px;
+                      font-weight: bold;
+                      color: ${getIntensityTextColor('', category.toLowerCase())};
+                      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+                    ">${category}</div>`,
+                    className: 'historical-intensity-marker',
+                    iconSize: [18, 18],
+                    iconAnchor: [9, 9]
+                  });
+                  
+                  return (
+                    <Marker
+                      key={`${storm.id}-historical-${index}`}
+                      position={[point.latitude, point.longitude]}
+                      icon={historicalIcon}
+                    >
+                      <Popup>
+                        <div style={{ fontSize: '0.9rem' }}>
+                          <strong>{storm.name} - Historical Position</strong><br />
+                          <strong>Time:</strong> {new Date(point.dateTime).toLocaleString()}<br />
+                          <strong>Intensity:</strong> {category}<br />
+                          <strong>Max Winds:</strong> {point.maxWinds} mph<br />
+                          <strong>Pressure:</strong> {point.pressure} mb
+                        </div>
+                      </Popup>
+                    </Marker>
+                  );
+                })}
+              </React.Fragment>
+            );
+          }
+          
+          return null;
         })}
 
-        {/* Render forecast tracks from KMZ data */}
+        {/* Render forecast tracks from KMZ data or forecast data */}
         {showTracks && displayStorms.map((storm) => {
-          if (!storm.forecastTrack || !storm.forecastTrack.features || storm.forecastTrack.features.length === 0) return null;
+          // First try to use official forecast track data from KMZ
+          if (storm.forecastTrack && storm.forecastTrack.features && storm.forecastTrack.features.length > 0) {
           
           return (
             <React.Fragment key={`${storm.id}-forecast-track`}>
@@ -764,7 +862,20 @@ const SimpleStormTracker: React.FC = () => {
                   // Forecast track point with intensity
                   const [lon, lat] = feature.geometry.coordinates;
                   const properties = feature.properties || {};
-                  const category = properties.category || '';
+                  let category = properties.category || '';
+                  
+                  // Enhanced category determination for forecast points
+                  if (!category || category.includes('Point')) {
+                    // Fallback: determine category from intensity if available
+                    if (properties.intensity) {
+                      category = getIntensityCategoryFromWinds(parseInt(properties.intensity), true);
+                    } else if (properties.intensityMPH) {
+                      category = getIntensityCategoryFromWinds(parseInt(properties.intensityMPH), false);
+                    } else {
+                      // Default forecast category
+                      category = 'FC';
+                    }
+                  }
                   
                   // Create custom forecast intensity icon with red styling
                   const forecastIntensityIcon = L.divIcon({
@@ -795,7 +906,7 @@ const SimpleStormTracker: React.FC = () => {
                     >
                       <Popup>
                         <div style={{ fontSize: '0.9rem' }}>
-                          <strong>{storm.name} - {properties.datetime || 'Forecast Position'}</strong><br />
+                          <strong>{storm.name} - Forecast Position</strong><br />
                           {properties.category && (
                             <>
                               <strong>Forecast Intensity:</strong> {properties.category}<br />
@@ -811,6 +922,11 @@ const SimpleStormTracker: React.FC = () => {
                               <strong>Forecast Pressure:</strong> {properties.minSeaLevelPres} mb<br />
                             </>
                           )}
+                          {properties.datetime && !properties.datetime.includes('Point') && (
+                            <>
+                              <strong>Forecast Time:</strong> {properties.datetime}<br />
+                            </>
+                          )}
                           <strong>Location:</strong> {lat.toFixed(1)}°N, {Math.abs(lon).toFixed(1)}°W
                         </div>
                       </Popup>
@@ -821,13 +937,96 @@ const SimpleStormTracker: React.FC = () => {
               })}
             </React.Fragment>
           );
+        }
+          
+        // If no official forecast track data, use forecast data as fallback
+          if (storm.forecast && storm.forecast.length > 0) {
+            const forecastPath = storm.forecast.map(point => [point.latitude, point.longitude] as [number, number]);
+            
+            return (
+              <React.Fragment key={`${storm.id}-forecast-track-simple`}>
+                {/* Simple forecast track line */}
+                <Polyline
+                  positions={[[storm.position[0], storm.position[1]], ...forecastPath]}
+                  pathOptions={{
+                    color: '#ff6600',
+                    weight: 3,
+                    opacity: 0.9,
+                    dashArray: '8, 4'
+                  }}
+                />
+                {/* Forecast track points */}
+                {storm.forecast.map((point, index) => {
+                  // Determine intensity category for forecast point
+                  const category = getIntensityCategoryFromWinds(point.maxWinds, false); // maxWinds is in mph
+                  
+                  // Create forecast intensity icon
+                  const forecastIcon = L.divIcon({
+                    html: `<div style="
+                      background-color: ${getForecastIntensityColor('', category.toLowerCase())};
+                      border: 2px solid #cc0000;
+                      border-radius: 50%;
+                      width: 20px;
+                      height: 20px;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                      font-size: 10px;
+                      font-weight: bold;
+                      color: ${getIntensityTextColor('', category.toLowerCase())};
+                      box-shadow: 0 2px 4px rgba(204,0,0,0.4);
+                    ">${category}</div>`,
+                    className: 'forecast-intensity-marker',
+                    iconSize: [20, 20],
+                    iconAnchor: [10, 10]
+                  });
+                  
+                  return (
+                    <Marker
+                      key={`${storm.id}-forecast-point-${index}`}
+                      position={[point.latitude, point.longitude]}
+                      icon={forecastIcon}
+                    >
+                      <Popup>
+                        <div style={{ fontSize: '0.9rem' }}>
+                          <strong>{storm.name} - Forecast Position</strong><br />
+                          <strong>Time:</strong> {new Date(point.dateTime).toLocaleString()}<br />
+                          <strong>Forecast Hour:</strong> +{point.forecastHour}h<br />
+                          <strong>Forecast Intensity:</strong> {category}<br />
+                          <strong>Max Winds:</strong> {point.maxWinds} mph<br />
+                          <strong>Pressure:</strong> {point.pressure} mb
+                        </div>
+                      </Popup>
+                    </Marker>
+                  );
+                })}
+              </React.Fragment>
+            );
+          }
+          
+          return null;
         })}
 
         {/* Render forecast storm paths */}
         {showForecastPaths && displayStorms.map((storm) => {
-          if (!storm.forecast || storm.forecast.length === 0) return null;
+          // Check for forecast data from either demo forecast or forecastTrack
+          const forecastPoints = storm.forecast && storm.forecast.length > 0 ? 
+            storm.forecast : 
+            (storm.forecastTrack && storm.forecastTrack.features ? 
+              storm.forecastTrack.features.filter((f: any) => f.geometry.type === 'Point') : []);
+              
+          if (forecastPoints.length === 0) return null;
           
-          const forecastPath: [number, number][] = storm.forecast.map((point: any) => [point.latitude, point.longitude]);
+          const forecastPath: [number, number][] = forecastPoints.map((point: any) => {
+            if (point.latitude && point.longitude) {
+              // Demo format
+              return [point.latitude, point.longitude] as [number, number];
+            } else if (point.geometry && point.geometry.coordinates) {
+              // KMZ format
+              return [point.geometry.coordinates[1], point.geometry.coordinates[0]] as [number, number];
+            }
+            return null;
+          }).filter(Boolean) as [number, number][];
           
           return (
             <React.Fragment key={`${storm.id}-forecast`}>
@@ -843,81 +1042,166 @@ const SimpleStormTracker: React.FC = () => {
               />
               
               {/* Forecast position markers */}
-              {storm.forecast.map((point: any, index: number) => (
-                <CircleMarker
-                  key={`${storm.id}-forecast-${index}`}
-                  center={[point.latitude, point.longitude]}
-                  radius={6}
-                  pathOptions={{
-                    color: '#cc0000',
-                    fillColor: '#ff3333',
-                    fillOpacity: 0.8,
-                    weight: 2
-                  }}
-                >
-                  <Popup>
-                    <div style={{ fontSize: '0.9rem' }}>
-                      <strong>{storm.name} - Forecast Position</strong><br />
-                      <strong>Time:</strong> {new Date(point.dateTime).toLocaleString()}<br />
-                      <strong>Forecast Hour:</strong> +{point.forecastHour}h<br />
-                      <strong>Max Winds:</strong> {point.maxWinds} mph<br />
-                      <strong>Gusts:</strong> {point.gusts} mph<br />
-                      <strong>Pressure:</strong> {point.pressure} mb
-                    </div>
-                  </Popup>
-                </CircleMarker>
-              ))}
+              {/* Use the same forecastPoints array from above */}
+              {forecastPoints.map((point: any, index: number) => {
+                let maxWinds: number;
+                let latitude: number;
+                let longitude: number;
+                let dateTime: string;
+                
+                // Handle different data formats
+                if (point.maxWinds) {
+                  // Demo format
+                  maxWinds = point.maxWinds;
+                  latitude = point.latitude;
+                  longitude = point.longitude;
+                  dateTime = point.dateTime;
+                } else if (point.properties && point.geometry) {
+                  // KMZ format
+                  maxWinds = point.properties.intensityMPH || point.properties.intensity || 0;
+                  latitude = point.geometry.coordinates[1];
+                  longitude = point.geometry.coordinates[0];
+                  dateTime = point.properties.datetime || new Date().toISOString();
+                } else {
+                  console.warn('Unknown forecast point format:', point);
+                  return null;
+                }
+                
+                // Determine intensity category for forecast point
+                const category = getIntensityCategoryFromWinds(maxWinds, false); // maxWinds is in mph
+                
+                // Create forecast intensity icon
+                const forecastIcon = L.divIcon({
+                  html: `<div style="
+                    background-color: ${getForecastIntensityColor('', category.toLowerCase())};
+                    border: 1px solid rgba(0,0,0,0.3);
+                    border-radius: 50%;
+                    width: 20px;
+                    height: 20px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 10px;
+                    font-weight: bold;
+                    color: ${getIntensityTextColor('', category.toLowerCase())};
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+                  ">${category}</div>`,
+                  className: 'forecast-intensity-marker',
+                  iconSize: [20, 20],
+                  iconAnchor: [10, 10]
+                });
+                
+                return (
+                  <Marker
+                    key={`${storm.id}-forecast-${index}`}
+                    position={[latitude, longitude]}
+                    icon={forecastIcon}
+                  >
+                    <Popup>
+                      <div style={{ fontSize: '0.9rem' }}>
+                        <strong>{storm.name} - Forecast Position</strong><br />
+                        <strong>Time:</strong> {new Date(dateTime).toLocaleString()}<br />
+                        <strong>Forecast Hour:</strong> +{point.forecastHour || 'N/A'}h<br />
+                        <strong>Forecast Intensity:</strong> {category}<br />
+                        <strong>Max Winds:</strong> {maxWinds} mph<br />
+                        <strong>Gusts:</strong> {point.gusts || 'N/A'} mph<br />
+                        <strong>Pressure:</strong> {point.pressure || point.properties?.minSeaLevelPres || 'N/A'} mb
+                      </div>
+                    </Popup>
+                  </Marker>
+                );
+              }).filter(Boolean)}  {/* Filter out null values */}
             </React.Fragment>
           );
         })}
 
         {/* Render forecast cones */}
         {showForecastCones && displayStorms.map((storm) => {
-          if (!storm.cone || !storm.cone.coordinates) return null;
+          console.log(`Checking cone for ${storm.name}:`, { 
+            hasCone: !!storm.cone, 
+            coneType: storm.cone?.type, 
+            hasCoordinates: !!storm.cone?.coordinates,
+            coordinatesLength: storm.cone?.coordinates?.length 
+          });
           
-          try {
-            // Convert cone coordinates to Leaflet format
-            let coneCoordinates: [number, number][] = [];
-            
-            if (storm.cone.type === 'Polygon') {
-              // Single polygon
-              coneCoordinates = storm.cone.coordinates[0].map((coord: number[]) => [coord[1], coord[0]] as [number, number]);
-            } else if (storm.cone.type === 'MultiPolygon') {
-              // Multiple polygons - use the first one
-              coneCoordinates = storm.cone.coordinates[0][0].map((coord: number[]) => [coord[1], coord[0]] as [number, number]);
+          // First try to use official cone data
+          if (storm.cone && storm.cone.coordinates) {
+            try {
+              // Convert cone coordinates to Leaflet format
+              let coneCoordinates: [number, number][] = [];
+              
+              if (storm.cone.type === 'Polygon') {
+                // Single polygon
+                coneCoordinates = storm.cone.coordinates[0].map((coord: number[]) => [coord[1], coord[0]] as [number, number]);
+                console.log(`Polygon cone for ${storm.name}:`, coneCoordinates.slice(0, 3));
+              } else if (storm.cone.type === 'MultiPolygon') {
+                // Multiple polygons - use the first one
+                coneCoordinates = storm.cone.coordinates[0][0].map((coord: number[]) => [coord[1], coord[0]] as [number, number]);
+                console.log(`MultiPolygon cone for ${storm.name}:`, coneCoordinates.slice(0, 3));
+              }
+              
+              if (coneCoordinates.length > 0) {
+                console.log(`Rendering cone for ${storm.name} with ${coneCoordinates.length} points`);
+                return (
+                  <Polygon
+                    key={`${storm.id}-cone`}
+                    positions={coneCoordinates}
+                    pathOptions={{
+                      color: '#ffaa00',
+                      weight: 2,
+                      opacity: 0.8,
+                      fillColor: '#ffaa00',
+                      fillOpacity: 0.15
+                    }}
+                  />
+                );
+              }
+            } catch (error) {
+              console.warn(`Error rendering cone for ${storm.name}:`, error);
             }
-            
-            if (coneCoordinates.length === 0) return null;
-            
-            return (
-              <Polygon
-                key={`${storm.id}-cone`}
-                positions={coneCoordinates}
-                pathOptions={{
-                  color: '#ffaa00',
-                  weight: 2,
-                  opacity: 0.8,
-                  fillColor: '#ffaa00',
-                  fillOpacity: 0.2
-                }}
-              >
-                <Popup>
-                  <div style={{ fontSize: '0.9rem' }}>
-                    <strong>{storm.name} - Forecast Cone</strong><br />
-                    <strong>Advisory:</strong> {storm.cone.properties?.advisoryNumber || 'N/A'}<br />
-                    <strong>Valid Time:</strong> {storm.cone.properties?.validTime ? new Date(storm.cone.properties.validTime).toLocaleString() : 'N/A'}<br />
-                    <div style={{ fontSize: '0.8rem', marginTop: '5px', fontStyle: 'italic' }}>
-                      The cone represents the probable path of the storm center (66% confidence).
-                      The entire storm may extend well beyond this area.
-                    </div>
-                  </div>
-                </Popup>
-              </Polygon>
-            );
-          } catch (error) {
-            console.warn('Error rendering cone for storm', storm.name, ':', error);
-            return null;
           }
+          
+          // If no official cone, generate a simple forecast track with uncertainty
+          if (storm.forecast && storm.forecast.length > 0) {
+            const forecastPositions = storm.forecast.map(point => [point.latitude, point.longitude] as [number, number]);
+            
+            if (forecastPositions.length >= 2) {
+              return (
+                <React.Fragment key={`${storm.id}-generated-cone`}>
+                  {/* Draw forecast track as dashed line */}
+                  <Polyline
+                    positions={[[storm.position[0], storm.position[1]], ...forecastPositions]}
+                    pathOptions={{
+                      color: '#ffaa00',
+                      weight: 3,
+                      opacity: 0.8,
+                      dashArray: '10, 5'
+                    }}
+                  />
+                  {/* Draw uncertainty circles at forecast points */}
+                  {storm.forecast.map((point, index) => {
+                    const radius = 50000 + (index * 20000); // Increasing uncertainty with time
+                    return (
+                      <CircleMarker
+                        key={`${storm.id}-uncertainty-${index}`}
+                        center={[point.latitude, point.longitude]}
+                        radius={Math.min(15, 8 + index * 2)} // Visual radius for screen
+                        pathOptions={{
+                          fillColor: 'rgba(255, 170, 0, 0.15)',
+                          fillOpacity: 0.2,
+                          color: '#ffaa00',
+                          weight: 1,
+                          opacity: 0.6
+                        }}
+                      />
+                    );
+                  })}
+                </React.Fragment>
+              );
+            }
+          }
+          
+          return null;
         })}
       </MapContainer>
       </div>
