@@ -4,7 +4,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import './SimpleStormTracker.css';
 import { useDemoData } from '../hooks/useDemoData';
-import { useNHCData } from '../hooks/useNHCData';
+import { useNHCData, useStormSurge } from '../hooks/useNHCData';
 import SimpleHeader from '../components/SimpleHeader';
 
 // Fix for default markers in React Leaflet
@@ -504,10 +504,10 @@ const demoStorms = [
 ];
 
 const SimpleStormTracker: React.FC = () => {
-  const [useDemo, setUseDemo] = useState(false); // Use live data // Start with live data by default
+  const [useDemo, setUseDemo] = useState(false); // Use live data to check cone fetching // Start with live data by default
   const [showTracks, setShowTracks] = useState(true);
-  const [showForecastPaths, setShowForecastPaths] = useState(true);
   const [showForecastCones, setShowForecastCones] = useState(true);
+  const [showStormSurge, setShowStormSurge] = useState(false);
   const [fetchLiveTrackData, setFetchLiveTrackData] = useState(true); // Enable track data fetching by default
   
   // Use both hooks
@@ -523,6 +523,12 @@ const SimpleStormTracker: React.FC = () => {
   const currentData = useDemo ? demoData : liveData;
   const { storms, loading, error, lastUpdated, refresh } = currentData;
 
+  // Get the first storm ID for storm surge data
+  const firstStormId = storms.length > 0 ? storms[0].id : null;
+  
+  // Use storm surge hook for the first storm
+  const stormSurge = useStormSurge(showStormSurge ? firstStormId : null);
+
   // Determine what data to display with proper fallback
   const shouldUseDemoData = useDemo || (error && storms.length === 0);
   const displayStorms = shouldUseDemoData ? demoStorms : storms;
@@ -535,7 +541,9 @@ const SimpleStormTracker: React.FC = () => {
       setUseDemo(false);
       
       // Fetch live data - this will only happen once per page load when user clicks
+      console.log('Fetching live storm data...');
       await liveData.refresh();
+      console.log('Live data fetched, storms:', liveData.storms?.map(s => ({ id: s.id, name: s.name, cone: !!s.cone })));
     } catch (err) {
       console.error('Failed to switch to live data:', err);
       // Fall back to demo data if live data fails
@@ -1007,137 +1015,42 @@ const SimpleStormTracker: React.FC = () => {
           return null;
         })}
 
-        {/* Render forecast storm paths */}
-        {showForecastPaths && displayStorms.map((storm) => {
-          // Check for forecast data from either demo forecast or forecastTrack
-          const forecastPoints = storm.forecast && storm.forecast.length > 0 ? 
-            storm.forecast : 
-            (storm.forecastTrack && storm.forecastTrack.features ? 
-              storm.forecastTrack.features.filter((f: any) => f.geometry.type === 'Point') : []);
-              
-          if (forecastPoints.length === 0) return null;
-          
-          const forecastPath: [number, number][] = forecastPoints.map((point: any) => {
-            if (point.latitude && point.longitude) {
-              // Demo format
-              return [point.latitude, point.longitude] as [number, number];
-            } else if (point.geometry && point.geometry.coordinates) {
-              // KMZ format
-              return [point.geometry.coordinates[1], point.geometry.coordinates[0]] as [number, number];
-            }
-            return null;
-          }).filter(Boolean) as [number, number][];
-          
-          return (
-            <React.Fragment key={`${storm.id}-forecast`}>
-              {/* Forecast path line */}
-              <Polyline
-                positions={forecastPath}
-                pathOptions={{
-                  color: '#ff3333',
-                  weight: 4,
-                  opacity: 0.9,
-                  dashArray: '10, 5'
-                }}
-              />
-              
-              {/* Forecast position markers */}
-              {/* Use the same forecastPoints array from above */}
-              {forecastPoints.map((point: any, index: number) => {
-                let maxWinds: number;
-                let latitude: number;
-                let longitude: number;
-                let dateTime: string;
-                
-                // Handle different data formats
-                if (point.maxWinds) {
-                  // Demo format
-                  maxWinds = point.maxWinds;
-                  latitude = point.latitude;
-                  longitude = point.longitude;
-                  dateTime = point.dateTime;
-                } else if (point.properties && point.geometry) {
-                  // KMZ format
-                  maxWinds = point.properties.intensityMPH || point.properties.intensity || 0;
-                  latitude = point.geometry.coordinates[1];
-                  longitude = point.geometry.coordinates[0];
-                  dateTime = point.properties.datetime || new Date().toISOString();
-                } else {
-                  console.warn('Unknown forecast point format:', point);
-                  return null;
-                }
-                
-                // Determine intensity category for forecast point
-                const category = getIntensityCategoryFromWinds(maxWinds, false); // maxWinds is in mph
-                
-                // Create forecast intensity icon
-                const forecastIcon = L.divIcon({
-                  html: `<div style="
-                    background-color: ${getForecastIntensityColor('', category.toLowerCase())};
-                    border: 1px solid rgba(0,0,0,0.3);
-                    border-radius: 50%;
-                    width: 20px;
-                    height: 20px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    font-size: 10px;
-                    font-weight: bold;
-                    color: ${getIntensityTextColor('', category.toLowerCase())};
-                    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-                  ">${category}</div>`,
-                  className: 'forecast-intensity-marker',
-                  iconSize: [20, 20],
-                  iconAnchor: [10, 10]
-                });
-                
-                return (
-                  <Marker
-                    key={`${storm.id}-forecast-${index}`}
-                    position={[latitude, longitude]}
-                    icon={forecastIcon}
-                  >
-                    <Popup>
-                      <div style={{ fontSize: '0.9rem' }}>
-                        <strong>{storm.name} - Forecast Position</strong><br />
-                        <strong>Time:</strong> {new Date(dateTime).toLocaleString()}<br />
-                        <strong>Forecast Hour:</strong> +{point.forecastHour || 'N/A'}h<br />
-                        <strong>Forecast Intensity:</strong> {category}<br />
-                        <strong>Max Winds:</strong> {maxWinds} mph<br />
-                        <strong>Gusts:</strong> {point.gusts || 'N/A'} mph<br />
-                        <strong>Pressure:</strong> {point.pressure || point.properties?.minSeaLevelPres || 'N/A'} mb
-                      </div>
-                    </Popup>
-                  </Marker>
-                );
-              }).filter(Boolean)}  {/* Filter out null values */}
-            </React.Fragment>
-          );
-        })}
-
         {/* Render forecast cones */}
         {showForecastCones && displayStorms.map((storm) => {
           console.log(`Checking cone for ${storm.name}:`, { 
             hasCone: !!storm.cone, 
             coneType: storm.cone?.type, 
             hasCoordinates: !!storm.cone?.coordinates,
-            coordinatesLength: storm.cone?.coordinates?.length 
+            coordinatesLength: storm.cone?.coordinates?.length,
+            stormId: storm.id,
+            coneData: storm.cone
           });
           
           // First try to use official cone data
-          if (storm.cone && storm.cone.coordinates) {
+          if (storm.cone) {
             try {
-              // Convert cone coordinates to Leaflet format
               let coneCoordinates: [number, number][] = [];
               
-              if (storm.cone.type === 'Polygon') {
-                // Single polygon
-                coneCoordinates = storm.cone.coordinates[0].map((coord: number[]) => [coord[1], coord[0]] as [number, number]);
-                console.log(`Polygon cone for ${storm.name}:`, coneCoordinates.slice(0, 3));
-              } else if (storm.cone.type === 'MultiPolygon') {
-                // Multiple polygons - use the first one
-                coneCoordinates = storm.cone.coordinates[0][0].map((coord: number[]) => [coord[1], coord[0]] as [number, number]);
-                console.log(`MultiPolygon cone for ${storm.name}:`, coneCoordinates.slice(0, 3));
+              // Handle FeatureCollection format from KMZ (live data)
+              if (storm.cone.type === 'FeatureCollection' && storm.cone.features && storm.cone.features.length > 0) {
+                const coneFeature = storm.cone.features[0]; // Use first feature
+                if (coneFeature.geometry && coneFeature.geometry.type === 'Polygon') {
+                  // Convert from [lon, lat] to [lat, lon] format
+                  coneCoordinates = coneFeature.geometry.coordinates[0].map((coord: number[]) => [coord[1], coord[0]] as [number, number]);
+                  console.log(`FeatureCollection cone for ${storm.name}:`, coneCoordinates.slice(0, 3));
+                }
+              }
+              // Handle direct polygon format from demo data
+              else if (storm.cone.coordinates) {
+                if (storm.cone.type === 'Polygon') {
+                  // Single polygon
+                  coneCoordinates = storm.cone.coordinates[0].map((coord: number[]) => [coord[1], coord[0]] as [number, number]);
+                  console.log(`Polygon cone for ${storm.name}:`, coneCoordinates.slice(0, 3));
+                } else if (storm.cone.type === 'MultiPolygon') {
+                  // Multiple polygons - use the first one
+                  coneCoordinates = storm.cone.coordinates[0][0].map((coord: number[]) => [coord[1], coord[0]] as [number, number]);
+                  console.log(`MultiPolygon cone for ${storm.name}:`, coneCoordinates.slice(0, 3));
+                }
               }
               
               if (coneCoordinates.length > 0) {
@@ -1203,6 +1116,60 @@ const SimpleStormTracker: React.FC = () => {
           
           return null;
         })}
+
+        {/* Storm Surge Layer */}
+        {showStormSurge && stormSurge.surgeData && stormSurge.surgeData.features && stormSurge.surgeData.features.map((feature: any, index: number) => {
+          if (feature.geometry && feature.geometry.type === 'Polygon') {
+            const coordinates = feature.geometry.coordinates[0].map((coord: number[]) => [coord[1], coord[0]] as [number, number]);
+            
+            // Get surge height from properties for color coding
+            let surgeColor = '#ff4444'; // Default red
+            let surgeOpacity = 0.3;
+            
+            if (feature.properties) {
+              const height = feature.properties.SURGE_FT || feature.properties.height || 0;
+              if (height >= 15) {
+                surgeColor = '#800000'; // Dark red for 15+ feet
+                surgeOpacity = 0.5;
+              } else if (height >= 10) {
+                surgeColor = '#ff0000'; // Red for 10-15 feet
+                surgeOpacity = 0.4;
+              } else if (height >= 6) {
+                surgeColor = '#ff4400'; // Orange-red for 6-10 feet
+                surgeOpacity = 0.35;
+              } else if (height >= 3) {
+                surgeColor = '#ff8800'; // Orange for 3-6 feet
+                surgeOpacity = 0.3;
+              } else {
+                surgeColor = '#ffaa00'; // Yellow for 0-3 feet
+                surgeOpacity = 0.25;
+              }
+            }
+            
+            return (
+              <Polygon
+                key={`surge-${index}`}
+                positions={coordinates}
+                pathOptions={{
+                  color: surgeColor,
+                  weight: 1,
+                  opacity: 0.8,
+                  fillColor: surgeColor,
+                  fillOpacity: surgeOpacity
+                }}
+              >
+                <Popup>
+                  <div>
+                    <strong>Storm Surge</strong><br />
+                    Height: {feature.properties?.SURGE_FT || feature.properties?.height || 'Unknown'} ft
+                  </div>
+                </Popup>
+              </Polygon>
+            );
+          }
+          return null;
+        })}
+
       </MapContainer>
       </div>
 
@@ -1336,20 +1303,25 @@ const SimpleStormTracker: React.FC = () => {
                   <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.8rem', cursor: 'pointer' }}>
                     <input
                       type="checkbox"
-                      checked={showForecastPaths}
-                      onChange={(e) => setShowForecastPaths(e.target.checked)}
-                      style={{ marginRight: '6px' }}
-                    />
-                    <span style={{ color: '#ff3333' }}>━━━━</span> Forecast Path
-                  </label>
-                  <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.8rem', cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
                       checked={showForecastCones}
                       onChange={(e) => setShowForecastCones(e.target.checked)}
                       style={{ marginRight: '6px' }}
                     />
                     <span style={{ color: '#ffaa00' }}>▲▲▲</span> Forecast Cone
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.8rem', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={showStormSurge}
+                      onChange={(e) => setShowStormSurge(e.target.checked)}
+                      style={{ marginRight: '6px' }}
+                    />
+                    <span style={{ color: '#ff4444' }}>〰〰〰</span> Storm Surge
+                    {stormSurge.available === false && (
+                      <span style={{ fontSize: '0.7rem', color: '#888', marginLeft: '5px' }}>
+                        (N/A for EP storms)
+                      </span>
+                    )}
                   </label>
                 </div>
               </div>
@@ -1375,6 +1347,28 @@ const SimpleStormTracker: React.FC = () => {
                       'Using basic storm positions only (prevents CORS errors)'
                     }
                   </div>
+                  
+                  {/* Storm Surge Status */}
+                  {showStormSurge && (
+                    <div style={{ marginTop: '8px', padding: '6px', backgroundColor: '#f5f5f5', borderRadius: '4px' }}>
+                      <div style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#d32f2f' }}>
+                        Storm Surge Status
+                      </div>
+                      <div style={{ fontSize: '0.7rem', color: '#666', marginTop: '2px' }}>
+                        {stormSurge.loading ? (
+                          'Loading surge data...'
+                        ) : stormSurge.available === false ? (
+                          'No surge data (Eastern Pacific storms typically don\'t have surge products)'
+                        ) : stormSurge.surgeData ? (
+                          `Showing surge data with ${stormSurge.surgeData.features?.length || 0} areas`
+                        ) : stormSurge.error ? (
+                          `Error: ${stormSurge.error}`
+                        ) : (
+                          'Checking availability...'
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
               
@@ -1385,30 +1379,6 @@ const SimpleStormTracker: React.FC = () => {
                 >
                   Refresh
                 </button>
-                <button 
-                  onClick={testConnectivity}
-                  className="control-panel-button"
-                  style={{backgroundColor: '#6c757d'}}
-                  title="Test API connectivity and debug issues"
-                >
-                  🔧 Debug
-                </button>
-                {dataSource === 'demo' && (
-                  <button 
-                    onClick={handleLiveDataClick}
-                    className="control-panel-button control-panel-button--demo"
-                  >
-                    Live Data
-                  </button>
-                )}
-                {dataSource === 'live' && (
-                  <button 
-                    onClick={() => setUseDemo(true)}
-                    className="control-panel-button control-panel-button--demo"
-                  >
-                    Demo Data
-                  </button>
-                )}
               </div>
               {/* Helpful tip for demo mode */}
               {dataSource === 'demo' && (

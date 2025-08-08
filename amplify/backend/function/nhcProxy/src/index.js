@@ -110,9 +110,10 @@ async function extractTrackFromKML(kmlContent) {
             const [lon, lat] = coordString.split(',').map(Number);
 
             // Extract intensity information
+            const description = placemark.description || '';
             const properties = {
-              name: placemark.name || 'Position',
-              description: placemark.description || '',
+              name: placemark.name || 'Forecast Position',
+              description: description,
               datetime: placemark.dtg || placemark.name || '',
               stormType: placemark.stormType || '',
               intensity: placemark.intensity ? parseInt(placemark.intensity) : null,
@@ -122,13 +123,65 @@ async function extractTrackFromKML(kmlContent) {
               basin: placemark.basin || ''
             };
 
+            // Parse wind speed and other data from description if available
+            if (description) {
+              // Extract wind speed in knots
+              const windMatch = description.match(/Maximum Wind:\s*(\d+)\s*knots/);
+              if (windMatch) {
+                properties.intensity = parseInt(windMatch[1]);
+              }
+              
+              // Extract wind speed in mph
+              const windMphMatch = description.match(/Maximum Wind:\s*\d+\s*knots\s*\((\d+)\s*mph\)/);
+              if (windMphMatch) {
+                properties.intensityMPH = parseInt(windMphMatch[1]);
+              }
+              
+              // Extract pressure
+              const pressureMatch = description.match(/Minimum Pressure:\s*(\d+)\s*mb/);
+              if (pressureMatch) {
+                properties.minSeaLevelPres = parseInt(pressureMatch[1]);
+              }
+              
+              // Extract valid time/forecast hour
+              const timeMatch = description.match(/Valid at:\s*([^<]+)/);
+              if (timeMatch) {
+                properties.datetime = timeMatch[1].trim();
+              }
+              
+              // Extract forecast hour
+              const forecastMatch = description.match(/(\d+)\s*hr\s*Forecast/);
+              if (forecastMatch) {
+                properties.forecastHour = parseInt(forecastMatch[1]);
+              }
+            }
+
             // Determine intensity category and display text
             if (placemark.styleUrl) {
               const style = placemark.styleUrl.replace('#', '');
               properties.styleCategory = style;
               
-              // Map style to display category
+              // Map style to display category based on NHC KMZ style patterns
               switch (style) {
+                case 'initial_point':
+                  properties.category = 'NOW';
+                  break;
+                case 'xd_point':
+                case 'd_point':
+                  properties.category = 'TD';
+                  break;
+                case 'xs_point':
+                case 's_point':
+                  properties.category = 'TS';
+                  break;
+                case 'xh_point':
+                case 'h_point':
+                  properties.category = '1-2';
+                  break;
+                case 'xm_point':
+                case 'm_point':
+                  properties.category = '3-5';
+                  break;
                 case 'td':
                   properties.category = 'TD';
                   break;
@@ -155,6 +208,26 @@ async function extractTrackFromKML(kmlContent) {
                   break;
                 default:
                   properties.category = style.toUpperCase();
+              }
+            }
+            
+            // Refine intensity category based on actual wind speed if available
+            if (properties.intensity) {
+              const windKnots = properties.intensity;
+              if (windKnots < 34) {
+                properties.category = 'TD';
+              } else if (windKnots < 64) {
+                properties.category = 'TS';
+              } else if (windKnots < 83) {
+                properties.category = '1';
+              } else if (windKnots < 96) {
+                properties.category = '2';
+              } else if (windKnots < 113) {
+                properties.category = '3';
+              } else if (windKnots < 137) {
+                properties.category = '4';
+              } else {
+                properties.category = '5';
               }
             }
 
@@ -406,44 +479,10 @@ exports.handler = async (event) => {
           };
         }
         
-        // First get active storms to find the correct cone URL
-        try {
-          const activeStormsResponse = await axios.get(`${NHC_BASE_URL}/CurrentStorms.json`, {
-            timeout: REQUEST_TIMEOUT,
-            headers: { 'User-Agent': 'StormCast-Pro/1.0' }
-          });
-          
-          const storm = activeStormsResponse.data.activeStorms?.find(s => 
-            s.id?.toLowerCase() === coneStormId.toLowerCase()
-          );
-          
-          if (storm && storm.trackCone && storm.trackCone.kmzFile) {
-            nhcUrl = storm.trackCone.kmzFile;
-            isKmzEndpoint = true;
-          } else {
-            return {
-              statusCode: 404,
-              headers: corsHeaders,
-              body: JSON.stringify({ 
-                success: false, 
-                error: 'Storm not found or no cone data available',
-                stormId: coneStormId,
-                availableStorms: activeStormsResponse.data.activeStorms?.map(s => s.id) 
-              })
-            };
-          }
-        } catch (activeStormsError) {
-          console.error('Error fetching active storms for cone:', activeStormsError);
-          return {
-            statusCode: 500,
-            headers: corsHeaders,
-            body: JSON.stringify({ 
-              success: false, 
-              error: 'Failed to fetch active storms data',
-              details: activeStormsError.message 
-            })
-          };
-        }
+        // Use the storm graphics API cone URL format
+        nhcUrl = `https://www.nhc.noaa.gov/storm_graphics/api/${coneStormId.toUpperCase()}_CONE_latest.kmz`;
+        isKmzEndpoint = true;
+        console.log(`Using cone URL: ${nhcUrl}`);
         break;
         
       case 'forecast-track-kmz':

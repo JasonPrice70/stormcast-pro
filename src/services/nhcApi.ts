@@ -403,13 +403,34 @@ class NHCApiService {
   /**
    * Get storm forecast cone data
    */
-  async getStormCone(stormId: string): Promise<any> {
+  async getStormCone(stormId: string, coneUrl?: string): Promise<any> {
     try {
-      // First, try Lambda/proxy server approach for KMZ cone data
+      console.log(`Fetching cone data for storm: ${stormId}`, coneUrl ? `using specific URL: ${coneUrl}` : 'using constructed URL');
+      
+      // If we have a specific cone URL, try to fetch it directly via Lambda
+      if (coneUrl && coneUrl.includes('CONE')) {
+        console.log(`Using specific cone URL: ${coneUrl}`);
+        try {
+          // For now, we'll still use the old Lambda endpoint but with the storm ID
+          // In the future, we could enhance the Lambda to accept direct URLs
+          const currentYear = new Date().getFullYear();
+          const proxyData = await this.fetchWithLambdaFallback('forecast-cone', { stormId, year: currentYear.toString() });
+          if (proxyData) {
+            console.log(`Successfully fetched forecast cone via proxy server for ${stormId}:`, proxyData);
+            return proxyData; // Lambda already parses KMZ to GeoJSON
+          }
+        } catch (urlError) {
+          console.warn(`Failed to fetch cone from specific URL, falling back to constructed URL:`, urlError);
+        }
+      }
+      
+      // Fall back to constructed URL approach
       const currentYear = new Date().getFullYear();
+      console.log(`Calling Lambda with stormId: ${stormId}, year: ${currentYear}`);
+      
       const proxyData = await this.fetchWithLambdaFallback('forecast-cone', { stormId, year: currentYear.toString() });
       if (proxyData) {
-        console.log(`Successfully fetched forecast cone via proxy server for ${stormId}`);
+        console.log(`Successfully fetched forecast cone via proxy server for ${stormId}:`, proxyData);
         return proxyData; // Lambda already parses KMZ to GeoJSON
       }
 
@@ -530,7 +551,7 @@ class NHCApiService {
             historical: [],
             advisoryUrl: storm.publicAdvisory?.url || '',
             trackUrl: storm.track?.url || '',
-            coneUrl: storm.cone?.url || ''
+            coneUrl: (storm as any).trackCone?.kmzFile || ''
           };
 
           // Fetch forecast, historical, and cone data (but don't fail if they're unavailable)
@@ -540,7 +561,7 @@ class NHCApiService {
               
               const [trackData, coneData, forecastTrackData] = await Promise.allSettled([
                 this.getStormTrackKmz(storm.id || storm.binNumber || ''),
-                this.getStormCone(storm.id || storm.binNumber || ''),
+                this.getStormCone(storm.id || storm.binNumber || '', (storm as any).trackCone?.kmzFile),
                 this.getStormForecastTrackKmz(storm.id || storm.binNumber || '')
               ]);
               
@@ -554,9 +575,10 @@ class NHCApiService {
               
               // Handle cone data
               if (coneData.status === 'fulfilled') {
+                console.log(`Cone data fetched successfully for ${storm.name} (${storm.id}):`, coneData.value);
                 processedStorm.cone = coneData.value;
               } else {
-                console.warn(`Cone data failed for ${storm.name}:`, coneData.reason?.message);
+                console.warn(`Cone data failed for ${storm.name} (${storm.id}):`, coneData.reason?.message);
                 processedStorm.cone = null;
               }
               
@@ -831,6 +853,47 @@ class NHCApiService {
     } catch (error) {
       console.error('Error fetching advisories:', error)
       return []
+    }
+  }
+
+  /**
+   * Fetch storm surge data from NHC API (KMZ/GeoJSON)
+   * Storm surge data is primarily available for Atlantic storms that threaten populated areas
+   */
+  async getStormSurge(stormId: string, useProxy = true): Promise<any | null> {
+    // Storm surge is primarily available for Atlantic storms (AL prefix)
+    if (!stormId.toUpperCase().startsWith('AL')) {
+      console.log('Storm surge data is typically only available for Atlantic storms (AL prefix)')
+      return null
+    }
+
+    try {
+      const lambdaUrl = getLambdaApiUrl()
+      console.log(`Fetching storm surge for ${stormId} from Lambda API:`, lambdaUrl)
+      
+      // Try to fetch storm surge KMZ
+      const surgeUrl = `https://www.nhc.noaa.gov/storm_graphics/api/${stormId}_PeakStormSurge_latest.kmz`
+      
+      const response = await axios.post(lambdaUrl, {
+        action: 'fetchKMZ',
+        kmzUrl: surgeUrl
+      }, {
+        timeout: 30000
+      })
+
+      if (response.status === 200 && response.data) {
+        console.log('Successfully fetched storm surge data')
+        return response.data
+      } else {
+        console.log('No storm surge data found for storm:', stormId)
+        return null
+      }
+    } catch (error: any) {
+      console.log('Storm surge data not available for storm:', stormId)
+      if (error.response?.status === 404) {
+        console.log('Storm surge KMZ file not found - this is normal for storms that don\'t threaten populated coastlines')
+      }
+      return null
     }
   }
 

@@ -103,6 +103,57 @@ export const useNHCData = (options: UseNHCDataOptions = {}): UseNHCDataReturn =>
   }
 }
 
+// Hook for getting a specific storm's storm surge data
+export const useStormSurge = (stormId: string | null) => {
+  const [surgeData, setSurgeData] = useState<any>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [available, setAvailable] = useState<boolean | null>(null)
+
+  const nhcApi = new NHCApiService()
+
+  const fetchStormSurge = useCallback(async () => {
+    if (!stormId) {
+      setSurgeData(null)
+      setAvailable(null)
+      return
+    }
+
+    try {
+      setLoading(true)
+      setError(null)
+
+      const surge = await nhcApi.getStormSurge(stormId, true)
+      
+      if (surge) {
+        setSurgeData(surge)
+        setAvailable(true)
+      } else {
+        setSurgeData(null)
+        setAvailable(false)
+      }
+    } catch (err) {
+      console.error('Error fetching storm surge data:', err)
+      setError(err instanceof Error ? err.message : 'Failed to fetch storm surge data')
+      setAvailable(false)
+    } finally {
+      setLoading(false)
+    }
+  }, [stormId, nhcApi])
+
+  useEffect(() => {
+    fetchStormSurge()
+  }, [fetchStormSurge])
+
+  return {
+    surgeData,
+    loading,
+    error,
+    available,
+    refresh: fetchStormSurge
+  }
+}
+
 // Hook for getting a specific storm's detailed data
 export const useStormDetails = (stormId: string | null) => {
   const [stormDetails, setStormDetails] = useState<any>(null)
