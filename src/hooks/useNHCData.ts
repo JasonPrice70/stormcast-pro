@@ -110,8 +110,6 @@ export const useStormSurge = (stormId: string | null) => {
   const [error, setError] = useState<string | null>(null)
   const [available, setAvailable] = useState<boolean | null>(null)
 
-  const nhcApi = new NHCApiService()
-
   const fetchStormSurge = useCallback(async () => {
     if (!stormId) {
       setSurgeData(null)
@@ -123,6 +121,7 @@ export const useStormSurge = (stormId: string | null) => {
       setLoading(true)
       setError(null)
 
+      const nhcApi = new NHCApiService()
       const surge = await nhcApi.getStormSurge(stormId, true)
       
       if (surge) {
@@ -139,7 +138,7 @@ export const useStormSurge = (stormId: string | null) => {
     } finally {
       setLoading(false)
     }
-  }, [stormId, nhcApi])
+  }, [stormId])
 
   useEffect(() => {
     fetchStormSurge()
@@ -161,8 +160,6 @@ export const useWindSpeedProbability = (enabled: boolean = false) => {
   const [error, setError] = useState<string | null>(null)
   const [available, setAvailable] = useState<boolean | null>(null)
 
-  const nhcApi = new NHCApiService()
-
   const fetchWindSpeedProbability = useCallback(async () => {
     if (!enabled) {
       setProbabilityData(null)
@@ -174,6 +171,7 @@ export const useWindSpeedProbability = (enabled: boolean = false) => {
       setLoading(true)
       setError(null)
 
+      const nhcApi = new NHCApiService()
       const probData = await nhcApi.getWindSpeedProbability()
       
       if (probData && probData.features && probData.features.length > 0) {
@@ -190,7 +188,7 @@ export const useWindSpeedProbability = (enabled: boolean = false) => {
     } finally {
       setLoading(false)
     }
-  }, [enabled, nhcApi])
+  }, [enabled])
 
   useEffect(() => {
     fetchWindSpeedProbability()
@@ -211,8 +209,6 @@ export const useStormDetails = (stormId: string | null) => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const nhcApi = new NHCApiService()
-
   useEffect(() => {
     if (!stormId) {
       setStormDetails(null)
@@ -224,6 +220,7 @@ export const useStormDetails = (stormId: string | null) => {
         setLoading(true)
         setError(null)
 
+        const nhcApi = new NHCApiService()
         // Fetch additional storm data
         const [track, cone] = await Promise.all([
           nhcApi.getStormTrackKmz(stormId),
@@ -244,7 +241,7 @@ export const useStormDetails = (stormId: string | null) => {
     }
 
     fetchStormDetails()
-  }, [stormId, nhcApi])
+  }, [stormId])
 
   return {
     stormDetails,

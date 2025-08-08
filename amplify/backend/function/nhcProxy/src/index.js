@@ -595,55 +595,41 @@ async function extractWindProbFromKML(kmlContent) {
     function findWindProbPolygons(obj) {
       if (!obj) return;
 
-      // Look for placemarks with polygon data
+      // Look for placemarks with polygon data in folders
+      if (obj.Folder && obj.Folder.Placemark) {
+        const placemarks = Array.isArray(obj.Folder.Placemark) ? obj.Folder.Placemark : [obj.Folder.Placemark];
+        
+        placemarks.forEach(placemark => {
+          // Handle MultiGeometry containing multiple polygons
+          if (placemark.MultiGeometry && placemark.MultiGeometry.Polygon) {
+            const polygons = Array.isArray(placemark.MultiGeometry.Polygon) ? 
+              placemark.MultiGeometry.Polygon : [placemark.MultiGeometry.Polygon];
+            
+            polygons.forEach((polygon, polyIndex) => {
+              processPolygon(polygon, placemark, polyIndex);
+            });
+          } 
+          // Handle single polygon
+          else if (placemark.Polygon) {
+            processPolygon(placemark.Polygon, placemark, 0);
+          }
+        });
+      }
+      
+      // Also look for direct placemarks
       if (obj.Placemark) {
         const placemarks = Array.isArray(obj.Placemark) ? obj.Placemark : [obj.Placemark];
         
         placemarks.forEach(placemark => {
-          if (placemark.Polygon && placemark.Polygon.outerBoundaryIs && 
-              placemark.Polygon.outerBoundaryIs.LinearRing && 
-              placemark.Polygon.outerBoundaryIs.LinearRing.coordinates) {
+          if (placemark.MultiGeometry && placemark.MultiGeometry.Polygon) {
+            const polygons = Array.isArray(placemark.MultiGeometry.Polygon) ? 
+              placemark.MultiGeometry.Polygon : [placemark.MultiGeometry.Polygon];
             
-            const coordinatesText = placemark.Polygon.outerBoundaryIs.LinearRing.coordinates;
-            if (typeof coordinatesText === 'string') {
-              const coords = coordinatesText.trim().split(/\s+/).map(coord => {
-                const [lon, lat] = coord.split(',').map(Number);
-                return [lon, lat];
-              });
-
-              // Extract probability percentage from name or description
-              let probability = null;
-              const name = placemark.name || '';
-              const description = placemark.description || '';
-              
-              // Look for probability percentage in name (e.g., "10%", "20%", etc.)
-              const probMatch = name.match(/(\d+)%/) || description.match(/(\d+)%/);
-              if (probMatch) {
-                probability = parseInt(probMatch[1]);
-              }
-
-              // Get style information for color coding
-              let styleId = null;
-              if (placemark.styleUrl) {
-                styleId = placemark.styleUrl.replace('#', '');
-              }
-
-              features.push({
-                type: 'Feature',
-                properties: {
-                  name: name,
-                  description: description,
-                  probability: probability,
-                  styleId: styleId,
-                  windSpeed: '34kt', // This KMZ is specifically for 34kt winds
-                  type: 'wind_probability'
-                },
-                geometry: {
-                  type: 'Polygon',
-                  coordinates: [coords]
-                }
-              });
-            }
+            polygons.forEach((polygon, polyIndex) => {
+              processPolygon(polygon, placemark, polyIndex);
+            });
+          } else if (placemark.Polygon) {
+            processPolygon(placemark.Polygon, placemark, 0);
           }
         });
       }
@@ -656,6 +642,70 @@ async function extractWindProbFromKML(kmlContent) {
       
       if (obj.Document) {
         findWindProbPolygons(obj.Document);
+      }
+    }
+    
+    function processPolygon(polygon, placemark, polygonIndex) {
+      if (polygon.outerBoundaryIs && 
+          polygon.outerBoundaryIs.LinearRing && 
+          polygon.outerBoundaryIs.LinearRing.coordinates) {
+        
+        const coordinatesText = polygon.outerBoundaryIs.LinearRing.coordinates;
+        if (typeof coordinatesText === 'string') {
+          const coords = coordinatesText.trim().split(/\s+/).map(coord => {
+            const [lon, lat] = coord.split(',').map(Number);
+            return [lon, lat];
+          });
+
+          // Extract probability percentage from name
+          let probability = 0;
+          const name = placemark.name || '';
+          const description = placemark.description || '';
+          
+          // Handle different probability formats from NHC
+          if (name.includes('<5%') || name.includes('&lt;5%')) {
+            probability = 2.5; // Use middle of range
+          } else if (name.includes('>90%') || name.includes('&gt;90%')) {
+            probability = 95; // Use representative value
+          } else {
+            // Handle ranges like "80-90", "34-50", etc.
+            const rangeMatch = name.match(/(\d+)-(\d+)/);
+            if (rangeMatch) {
+              const min = parseFloat(rangeMatch[1]);
+              const max = parseFloat(rangeMatch[2]);
+              probability = (min + max) / 2; // Use middle of range
+            } else {
+              // Try to extract single percentage
+              const probMatch = name.match(/(\d+(?:\.\d+)?)\s*%?/);
+              if (probMatch) {
+                probability = parseFloat(probMatch[1]);
+              }
+            }
+          }
+
+          // Get style information for color coding
+          let styleId = null;
+          if (placemark.styleUrl) {
+            styleId = placemark.styleUrl.replace('#', '');
+          }
+
+          features.push({
+            type: 'Feature',
+            properties: {
+              name: name,
+              description: description,
+              probability: probability,
+              styleId: styleId,
+              windSpeed: '34kt', // This KMZ is specifically for 34kt winds
+              type: 'wind_probability',
+              polygonIndex: polygonIndex
+            },
+            geometry: {
+              type: 'Polygon',
+              coordinates: [coords]
+            }
+          });
+        }
       }
     }
 

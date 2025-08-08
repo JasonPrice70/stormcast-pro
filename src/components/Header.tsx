@@ -7,7 +7,7 @@ const Header = () => {
   return (
     <header className="header">
       <div className="container">
-        <h1>🌪️ StormCast Pro</h1>
+        <h1>🌪️ CycloTrak</h1>
         <p>Professional Hurricane & Tropical Cyclone Tracking</p>
         <nav>
           <ul className="nav">
