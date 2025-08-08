@@ -90,6 +90,30 @@ const getIntensityTextColor = (stormType: string, styleCategory: string) => {
   }
 };
 
+// Get color for forecast track point intensity markers (similar to regular track but with red tint)
+const getForecastIntensityColor = (stormType: string, styleCategory: string) => {
+  switch (styleCategory) {
+    case 'cat5':
+      return '#cc0000'; // Deep red
+    case 'cat4':
+      return '#ff3333'; // Red
+    case 'cat3':
+      return '#ff6666'; // Light red
+    case 'cat2':
+      return '#ff9999'; // Pink-red
+    case 'cat1':
+      return '#ffcccc'; // Light pink
+    case 'ts':
+      return '#ffaaaa'; // Light pink-red
+    case 'td':
+      return '#ffdddd'; // Very light pink
+    case 'ex':
+      return '#990000'; // Dark red
+    default:
+      return '#ffeeee'; // Very light pink
+  }
+};
+
 // Demo storm data for fallback
 const demoStorms = [
   {
@@ -204,6 +228,146 @@ const demoStorms = [
         advisoryNumber: '15A',
         validTime: '2025-08-05T06:00:00Z'
       }
+    },
+    track: {
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          geometry: {
+            type: 'Point',
+            coordinates: [-81.0, 24.5]
+          },
+          properties: {
+            category: 'TD',
+            stormType: 'TD',
+            styleCategory: 'td',
+            intensity: 30,
+            intensityMPH: 35,
+            minSeaLevelPres: 1005,
+            datetime: '2025-08-02T06:00:00Z'
+          }
+        },
+        {
+          type: 'Feature',
+          geometry: {
+            type: 'Point',
+            coordinates: [-82.1, 25.2]
+          },
+          properties: {
+            category: 'TS',
+            stormType: 'TS',
+            styleCategory: 'ts',
+            intensity: 45,
+            intensityMPH: 50,
+            minSeaLevelPres: 1000,
+            datetime: '2025-08-02T18:00:00Z'
+          }
+        },
+        {
+          type: 'Feature',
+          geometry: {
+            type: 'Point',
+            coordinates: [-83.5, 26.8]
+          },
+          properties: {
+            category: '1',
+            stormType: 'HU',
+            styleCategory: 'cat1',
+            intensity: 80,
+            intensityMPH: 90,
+            minSeaLevelPres: 985,
+            datetime: '2025-08-03T06:00:00Z'
+          }
+        },
+        {
+          type: 'Feature',
+          geometry: {
+            type: 'Point',
+            coordinates: [-84.2, 27.8]
+          },
+          properties: {
+            category: '3',
+            stormType: 'HU',
+            styleCategory: 'cat3',
+            intensity: 110,
+            intensityMPH: 125,
+            minSeaLevelPres: 965,
+            datetime: '2025-08-04T06:00:00Z'
+          }
+        }
+      ],
+      source: 'demo'
+    },
+    forecastTrack: {
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          geometry: {
+            type: 'Point',
+            coordinates: [-85.5, 29.0]
+          },
+          properties: {
+            category: '4',
+            stormType: 'HU',
+            styleCategory: 'cat4',
+            intensity: 125,
+            intensityMPH: 145,
+            minSeaLevelPres: 955,
+            datetime: '2025-08-05T06:00:00Z (Forecast)'
+          }
+        },
+        {
+          type: 'Feature',
+          geometry: {
+            type: 'Point',
+            coordinates: [-86.8, 30.2]
+          },
+          properties: {
+            category: '5',
+            stormType: 'HU',
+            styleCategory: 'cat5',
+            intensity: 140,
+            intensityMPH: 160,
+            minSeaLevelPres: 940,
+            datetime: '2025-08-05T18:00:00Z (Forecast)'
+          }
+        },
+        {
+          type: 'Feature',
+          geometry: {
+            type: 'Point',
+            coordinates: [-88.0, 31.5]
+          },
+          properties: {
+            category: '3',
+            stormType: 'HU',
+            styleCategory: 'cat3',
+            intensity: 105,
+            intensityMPH: 120,
+            minSeaLevelPres: 970,
+            datetime: '2025-08-06T06:00:00Z (Forecast)'
+          }
+        },
+        {
+          type: 'Feature',
+          geometry: {
+            type: 'Point',
+            coordinates: [-89.2, 33.0]
+          },
+          properties: {
+            category: 'TS',
+            stormType: 'TS',
+            styleCategory: 'ts',
+            intensity: 55,
+            intensityMPH: 65,
+            minSeaLevelPres: 990,
+            datetime: '2025-08-06T18:00:00Z (Forecast)'
+          }
+        }
+      ],
+      source: 'demo'
     },
     advisoryUrl: 'https://www.nhc.noaa.gov/',
     trackUrl: '#',
@@ -597,29 +761,60 @@ const SimpleStormTracker: React.FC = () => {
                     />
                   );
                 } else if (feature.geometry.type === 'Point') {
-                  // Forecast track point
+                  // Forecast track point with intensity
                   const [lon, lat] = feature.geometry.coordinates;
+                  const properties = feature.properties || {};
+                  const category = properties.category || '';
+                  
+                  // Create custom forecast intensity icon with red styling
+                  const forecastIntensityIcon = L.divIcon({
+                    html: `<div style="
+                      background-color: ${getForecastIntensityColor(properties.stormType, properties.styleCategory)};
+                      border: 2px solid #cc0000;
+                      border-radius: 50%;
+                      width: 26px;
+                      height: 26px;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                      font-size: 11px;
+                      font-weight: bold;
+                      color: ${getIntensityTextColor(properties.stormType, properties.styleCategory)};
+                      box-shadow: 0 2px 6px rgba(204,0,0,0.4);
+                    ">${category}</div>`,
+                    className: 'forecast-intensity-marker',
+                    iconSize: [26, 26],
+                    iconAnchor: [13, 13]
+                  });
                   
                   return (
-                    <CircleMarker
+                    <Marker
                       key={`${storm.id}-forecast-track-point-${featureIndex}`}
-                      center={[lat, lon]}
-                      radius={5}
-                      pathOptions={{
-                        color: '#cc0000',
-                        fillColor: '#ff3333',
-                        fillOpacity: 0.8,
-                        weight: 2
-                      }}
+                      position={[lat, lon]}
+                      icon={forecastIntensityIcon}
                     >
                       <Popup>
                         <div style={{ fontSize: '0.9rem' }}>
-                          <strong>{storm.name} - Forecast Position</strong><br />
-                          <strong>Name:</strong> {feature.properties.name || 'Forecast Position'}<br />
-                          <strong>Description:</strong> {feature.properties.description || 'Forecast track point'}
+                          <strong>{storm.name} - {properties.datetime || 'Forecast Position'}</strong><br />
+                          {properties.category && (
+                            <>
+                              <strong>Forecast Intensity:</strong> {properties.category}<br />
+                            </>
+                          )}
+                          {properties.intensity && (
+                            <>
+                              <strong>Forecast Max Winds:</strong> {properties.intensity} knots ({properties.intensityMPH} mph)<br />
+                            </>
+                          )}
+                          {properties.minSeaLevelPres && (
+                            <>
+                              <strong>Forecast Pressure:</strong> {properties.minSeaLevelPres} mb<br />
+                            </>
+                          )}
+                          <strong>Location:</strong> {lat.toFixed(1)}°N, {Math.abs(lon).toFixed(1)}°W
                         </div>
                       </Popup>
-                    </CircleMarker>
+                    </Marker>
                   );
                 }
                 return null;

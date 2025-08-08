@@ -1,0 +1,9 @@
+{
+  "httpMethod": "GET",
+  "pathParameters": {
+    "proxy": "track-kmz"
+  },
+  "queryStringParameters": {
+    "stormId": "EP092025"
+  }
+}
