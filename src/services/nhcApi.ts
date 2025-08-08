@@ -451,7 +451,7 @@ class NHCApiService {
         console.log(`Direct cone access succeeded for ${stormId}`)
         return null; // We can't parse KMZ on client side without additional libraries
       } catch (directError) {
-        console.log(`Direct cone access failed for ${stormId} (expected due to CORS):`, directError.message)
+        console.log(`Direct cone access failed for ${stormId} (expected due to CORS):`, (directError as Error).message)
       }
       
       console.log(`No forecast cone data available for storm ${stormId}`)
