@@ -4,7 +4,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import './SimpleStormTracker.css';
 import { useDemoData } from '../hooks/useDemoData';
-import { useNHCData, useStormSurge } from '../hooks/useNHCData';
+import { useNHCData, useStormSurge, useWindSpeedProbability } from '../hooks/useNHCData';
 import SimpleHeader from '../components/SimpleHeader';
 
 // Fix for default markers in React Leaflet
@@ -508,6 +508,7 @@ const SimpleStormTracker: React.FC = () => {
   const [showTracks, setShowTracks] = useState(true);
   const [showForecastCones, setShowForecastCones] = useState(true);
   const [showStormSurge, setShowStormSurge] = useState(false);
+  const [showWindSpeedProb, setShowWindSpeedProb] = useState(false);
   const [fetchLiveTrackData, setFetchLiveTrackData] = useState(true); // Enable track data fetching by default
   
   // Use both hooks
@@ -528,6 +529,9 @@ const SimpleStormTracker: React.FC = () => {
   
   // Use storm surge hook for the first storm
   const stormSurge = useStormSurge(showStormSurge ? firstStormId : null);
+  
+  // Use wind speed probability hook when enabled
+  const windSpeedProb = useWindSpeedProbability(showWindSpeedProb);
 
   // Determine what data to display with proper fallback
   const shouldUseDemoData = useDemo || storms.length === 0;
@@ -1170,6 +1174,66 @@ const SimpleStormTracker: React.FC = () => {
           return null;
         })}
 
+        {/* Wind Speed Probability Layer (34kt winds) */}
+        {showWindSpeedProb && windSpeedProb.probabilityData && windSpeedProb.probabilityData.features && windSpeedProb.probabilityData.features.map((feature: any, index: number) => {
+          if (feature.geometry && feature.geometry.type === 'Polygon') {
+            const coordinates = feature.geometry.coordinates[0].map((coord: number[]) => [coord[1], coord[0]] as [number, number]);
+            
+            // Get probability percentage for color coding
+            let probColor = '#0066cc'; // Default blue
+            let probOpacity = 0.2;
+            
+            if (feature.properties) {
+              const probability = feature.properties.probability || 0;
+              if (probability >= 90) {
+                probColor = '#4d0000'; // Very dark red for 90%+
+                probOpacity = 0.6;
+              } else if (probability >= 70) {
+                probColor = '#800000'; // Dark red for 70-90%
+                probOpacity = 0.5;
+              } else if (probability >= 50) {
+                probColor = '#cc0000'; // Red for 50-70%
+                probOpacity = 0.4;
+              } else if (probability >= 30) {
+                probColor = '#ff6600'; // Orange for 30-50%
+                probOpacity = 0.35;
+              } else if (probability >= 20) {
+                probColor = '#ffaa00'; // Yellow for 20-30%
+                probOpacity = 0.3;
+              } else if (probability >= 10) {
+                probColor = '#00aa00'; // Green for 10-20%
+                probOpacity = 0.25;
+              } else {
+                probColor = '#0066cc'; // Blue for <10%
+                probOpacity = 0.2;
+              }
+            }
+            
+            return (
+              <Polygon
+                key={`windprob-${index}`}
+                positions={coordinates}
+                pathOptions={{
+                  color: probColor,
+                  weight: 1,
+                  opacity: 0.7,
+                  fillColor: probColor,
+                  fillOpacity: probOpacity
+                }}
+              >
+                <Popup>
+                  <div>
+                    <strong>34+ Knot Wind Probability</strong><br />
+                    Probability: {feature.properties?.probability || 'Unknown'}%<br />
+                    <small>Chance of tropical storm force winds (34+ kt / 39+ mph)</small>
+                  </div>
+                </Popup>
+              </Polygon>
+            );
+          }
+          return null;
+        })}
+
       </MapContainer>
       </div>
 
@@ -1323,6 +1387,20 @@ const SimpleStormTracker: React.FC = () => {
                       </span>
                     )}
                   </label>
+                  <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.8rem', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={showWindSpeedProb}
+                      onChange={(e) => setShowWindSpeedProb(e.target.checked)}
+                      style={{ marginRight: '6px' }}
+                    />
+                    <span style={{ color: '#0066cc' }}>⬢⬢⬢</span> 34kt Wind Probability
+                    {windSpeedProb.available === false && (
+                      <span style={{ fontSize: '0.7rem', color: '#888', marginLeft: '5px' }}>
+                        (No data available)
+                      </span>
+                    )}
+                  </label>
                 </div>
               </div>
               
@@ -1363,6 +1441,27 @@ const SimpleStormTracker: React.FC = () => {
                           `Showing surge data with ${stormSurge.surgeData.features?.length || 0} areas`
                         ) : stormSurge.error ? (
                           `Error: ${stormSurge.error}`
+                        ) : (
+                          'Checking availability...'
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {showWindSpeedProb && (
+                    <div style={{ marginTop: '8px', padding: '6px', backgroundColor: '#f5f5f5', borderRadius: '4px' }}>
+                      <div style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#1976d2' }}>
+                        Wind Probability Status
+                      </div>
+                      <div style={{ fontSize: '0.7rem', color: '#666', marginTop: '2px' }}>
+                        {windSpeedProb.loading ? (
+                          'Loading wind probability data...'
+                        ) : windSpeedProb.available === false ? (
+                          'No wind probability data available (typically only available during active storm threats)'
+                        ) : windSpeedProb.probabilityData ? (
+                          `Showing ${windSpeedProb.probabilityData.features?.length || 0} probability zones for 34+ knot winds`
+                        ) : windSpeedProb.error ? (
+                          `Error: ${windSpeedProb.error}`
                         ) : (
                           'Checking availability...'
                         )}

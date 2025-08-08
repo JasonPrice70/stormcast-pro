@@ -154,6 +154,57 @@ export const useStormSurge = (stormId: string | null) => {
   }
 }
 
+// Hook for getting wind speed probability data (34kt winds)
+export const useWindSpeedProbability = (enabled: boolean = false) => {
+  const [probabilityData, setProbabilityData] = useState<any>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [available, setAvailable] = useState<boolean | null>(null)
+
+  const nhcApi = new NHCApiService()
+
+  const fetchWindSpeedProbability = useCallback(async () => {
+    if (!enabled) {
+      setProbabilityData(null)
+      setAvailable(null)
+      return
+    }
+
+    try {
+      setLoading(true)
+      setError(null)
+
+      const probData = await nhcApi.getWindSpeedProbability()
+      
+      if (probData && probData.features && probData.features.length > 0) {
+        setProbabilityData(probData)
+        setAvailable(true)
+      } else {
+        setProbabilityData(null)
+        setAvailable(false)
+      }
+    } catch (err) {
+      console.error('Error fetching wind speed probability data:', err)
+      setError(err instanceof Error ? err.message : 'Failed to fetch wind speed probability data')
+      setAvailable(false)
+    } finally {
+      setLoading(false)
+    }
+  }, [enabled, nhcApi])
+
+  useEffect(() => {
+    fetchWindSpeedProbability()
+  }, [fetchWindSpeedProbability])
+
+  return {
+    probabilityData,
+    loading,
+    error,
+    available,
+    refresh: fetchWindSpeedProbability
+  }
+}
+
 // Hook for getting a specific storm's detailed data
 export const useStormDetails = (stormId: string | null) => {
   const [stormDetails, setStormDetails] = useState<any>(null)

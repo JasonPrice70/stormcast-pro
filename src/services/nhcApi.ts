@@ -890,6 +890,33 @@ class NHCApiService {
   }
 
   /**
+   * Fetch 34-knot wind speed probability data from NHC API (KMZ/GeoJSON)
+   * This shows the probability of experiencing 34+ knot winds over the next 120 hours
+   */
+  async getWindSpeedProbability(): Promise<any | null> {
+    try {
+      console.log('Fetching 34kt wind speed probability data using Lambda API...')
+      
+      // Use Lambda function to fetch wind speed probability data
+      const proxyData = await this.fetchWithLambdaFallback('wind-speed-probability', {})
+      
+      if (proxyData) {
+        console.log('Successfully fetched wind speed probability data via Lambda:', proxyData)
+        return proxyData
+      } else {
+        console.log('No wind speed probability data returned from Lambda')
+        return null
+      }
+    } catch (error: any) {
+      console.log('Wind speed probability data not available:', error.message)
+      if (error.response?.status === 404) {
+        console.log('Wind speed probability KMZ file not found')
+      }
+      return null
+    }
+  }
+
+  /**
    * Check if storms are currently active
    */
   async hasActiveStorms(): Promise<boolean> {

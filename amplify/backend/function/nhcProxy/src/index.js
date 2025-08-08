@@ -528,6 +528,154 @@ async function extractSurgeFromKML(kmlContent) {
 }
 
 /**
+ * Parse KMZ file and extract wind speed probability data as GeoJSON
+ */
+async function parseKmzToWindProbGeoJSON(kmzBuffer) {
+  return new Promise((resolve, reject) => {
+    yauzl.fromBuffer(kmzBuffer, { lazyEntries: true }, (err, zipfile) => {
+      if (err) {
+        console.error('Error opening KMZ file for wind probability:', err);
+        return reject(err);
+      }
+
+      let kmlContent = '';
+      
+      zipfile.readEntry();
+      zipfile.on('entry', (entry) => {
+        if (entry.fileName.toLowerCase().endsWith('.kml')) {
+          zipfile.openReadStream(entry, (err, readStream) => {
+            if (err) {
+              console.error('Error reading KML from wind probability KMZ:', err);
+              return reject(err);
+            }
+
+            const chunks = [];
+            readStream.on('data', (chunk) => chunks.push(chunk));
+            readStream.on('end', () => {
+              kmlContent = Buffer.concat(chunks).toString('utf8');
+              zipfile.readEntry();
+            });
+            readStream.on('error', reject);
+          });
+        } else {
+          zipfile.readEntry();
+        }
+      });
+
+      zipfile.on('end', () => {
+        if (!kmlContent) {
+          return reject(new Error('No KML file found in wind probability KMZ'));
+        }
+
+        // Parse KML and extract wind probability data
+        extractWindProbFromKML(kmlContent)
+          .then(resolve)
+          .catch(reject);
+      });
+
+      zipfile.on('error', reject);
+    });
+  });
+}
+
+/**
+ * Extract wind speed probability data from KML content
+ */
+async function extractWindProbFromKML(kmlContent) {
+  try {
+    const parser = new xml2js.Parser({ 
+      explicitArray: false, 
+      ignoreAttrs: false,
+      mergeAttrs: true 
+    });
+    const result = await parser.parseStringPromise(kmlContent);
+    
+    const features = [];
+
+    function findWindProbPolygons(obj) {
+      if (!obj) return;
+
+      // Look for placemarks with polygon data
+      if (obj.Placemark) {
+        const placemarks = Array.isArray(obj.Placemark) ? obj.Placemark : [obj.Placemark];
+        
+        placemarks.forEach(placemark => {
+          if (placemark.Polygon && placemark.Polygon.outerBoundaryIs && 
+              placemark.Polygon.outerBoundaryIs.LinearRing && 
+              placemark.Polygon.outerBoundaryIs.LinearRing.coordinates) {
+            
+            const coordinatesText = placemark.Polygon.outerBoundaryIs.LinearRing.coordinates;
+            if (typeof coordinatesText === 'string') {
+              const coords = coordinatesText.trim().split(/\s+/).map(coord => {
+                const [lon, lat] = coord.split(',').map(Number);
+                return [lon, lat];
+              });
+
+              // Extract probability percentage from name or description
+              let probability = null;
+              const name = placemark.name || '';
+              const description = placemark.description || '';
+              
+              // Look for probability percentage in name (e.g., "10%", "20%", etc.)
+              const probMatch = name.match(/(\d+)%/) || description.match(/(\d+)%/);
+              if (probMatch) {
+                probability = parseInt(probMatch[1]);
+              }
+
+              // Get style information for color coding
+              let styleId = null;
+              if (placemark.styleUrl) {
+                styleId = placemark.styleUrl.replace('#', '');
+              }
+
+              features.push({
+                type: 'Feature',
+                properties: {
+                  name: name,
+                  description: description,
+                  probability: probability,
+                  styleId: styleId,
+                  windSpeed: '34kt', // This KMZ is specifically for 34kt winds
+                  type: 'wind_probability'
+                },
+                geometry: {
+                  type: 'Polygon',
+                  coordinates: [coords]
+                }
+              });
+            }
+          }
+        });
+      }
+
+      // Recursively search in folders
+      if (obj.Folder) {
+        const folders = Array.isArray(obj.Folder) ? obj.Folder : [obj.Folder];
+        folders.forEach(findWindProbPolygons);
+      }
+      
+      if (obj.Document) {
+        findWindProbPolygons(obj.Document);
+      }
+    }
+
+    if (result.kml) {
+      findWindProbPolygons(result.kml);
+    }
+
+    return {
+      type: 'FeatureCollection',
+      features: features,
+      source: 'kmz'
+    };
+
+  } catch (error) {
+    console.error('Error parsing KML for wind probability:', error);
+    throw error;
+  }
+}
+
+/**
  * Lambda handler for NHC API proxy
  */
 exports.handler = async (event) => {
@@ -663,12 +811,18 @@ exports.handler = async (event) => {
         isKmzEndpoint = true;
         break;
         
+      case 'wind-speed-probability':
+        // Use the latest 34kt wind speed probability KMZ
+        nhcUrl = 'https://www.nhc.noaa.gov/gis/forecast/archive/latest_wsp34knt120hr_5km.kmz';
+        isKmzEndpoint = true;
+        break;
+        
       default:
         return {
           statusCode: 400,
           headers: corsHeaders,
           body: JSON.stringify({ 
-            error: 'Invalid endpoint. Supported endpoints: active-storms, track-kmz, forecast-track, historical-track, forecast-cone, forecast-track-kmz, storm-surge' 
+            error: 'Invalid endpoint. Supported endpoints: active-storms, track-kmz, forecast-track, historical-track, forecast-cone, forecast-track-kmz, storm-surge, wind-speed-probability' 
           })
         };
     }
@@ -706,6 +860,9 @@ exports.handler = async (event) => {
         } else if (endpoint === 'storm-surge') {
           responseData = await parseKmzToSurgeGeoJSON(response.data);
           console.log(`Successfully parsed KMZ storm surge data with ${responseData.features.length} features`);
+        } else if (endpoint === 'wind-speed-probability') {
+          responseData = await parseKmzToWindProbGeoJSON(response.data);
+          console.log(`Successfully parsed KMZ wind probability data with ${responseData.features.length} features`);
         } else {
           throw new Error(`Unknown KMZ endpoint: ${endpoint}`);
         }
