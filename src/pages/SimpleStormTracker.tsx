@@ -510,6 +510,7 @@ const SimpleStormTracker: React.FC = () => {
   const [showStormSurge, setShowStormSurge] = useState(false);
   const [showWindSpeedProb, setShowWindSpeedProb] = useState(false);
   const [fetchLiveTrackData, setFetchLiveTrackData] = useState(true); // Enable track data fetching by default
+  const [selectedStormId, setSelectedStormId] = useState<string | null>(null); // New state for selected storm
   
   // Use both hooks
   const demoData = useDemoData();
@@ -524,20 +525,31 @@ const SimpleStormTracker: React.FC = () => {
   const currentData = useDemo ? demoData : liveData;
   const { storms, loading, error, lastUpdated, refresh } = currentData;
 
-  // Get the first storm ID for storm surge data
-  const firstStormId = storms.length > 0 ? storms[0].id : null;
-  
-  // Use storm surge hook for the first storm
-  const stormSurge = useStormSurge(showStormSurge ? firstStormId : null);
-  
-  // Use wind speed probability hook when enabled
-  const windSpeedProb = useWindSpeedProbability(showWindSpeedProb);
-
   // Determine what data to display with proper fallback
   const shouldUseDemoData = useDemo || storms.length === 0;
   const displayStorms = shouldUseDemoData ? demoStorms : storms;
   const hasStorms = displayStorms.length > 0;
   const dataSource = shouldUseDemoData ? 'demo' : 'live';
+
+  // Auto-select first storm only if storms list changes and we had a selected storm that no longer exists
+  React.useEffect(() => {
+    if (selectedStormId && displayStorms.length > 0) {
+      const stormExists = displayStorms.find(s => s.id === selectedStormId);
+      if (!stormExists) {
+        setSelectedStormId(null); // Reset to show all storms
+      }
+    }
+  }, [displayStorms, selectedStormId]);
+
+  // Get selected storm data
+  const selectedStorm = selectedStormId ? displayStorms.find(s => s.id === selectedStormId) : null;
+  const stormsToDisplay = selectedStormId ? (selectedStorm ? [selectedStorm] : []) : displayStorms;
+  
+  // Use storm surge hook for the selected storm
+  const stormSurge = useStormSurge(showStormSurge && selectedStormId ? selectedStormId : null);
+  
+  // Use wind speed probability hook when enabled
+  const windSpeedProb = useWindSpeedProbability(showWindSpeedProb);
 
   // Handle live data button click with error handling
   const handleLiveDataClick = async () => {
@@ -642,7 +654,7 @@ const SimpleStormTracker: React.FC = () => {
         />
 
         {/* Render storm markers */}
-        {displayStorms.map((storm) => (
+        {stormsToDisplay.map((storm) => (
           <Marker
             key={storm.id}
             position={storm.position}
@@ -694,7 +706,7 @@ const SimpleStormTracker: React.FC = () => {
         ))}
 
         {/* Render storm tracks from KMZ data or historical data */}
-        {showTracks && displayStorms.map((storm) => {
+        {showTracks && stormsToDisplay.map((storm) => {
           // First try to use official track data from KMZ
           if (storm.track && storm.track.features && storm.track.features.length > 0) {
             return (
@@ -847,7 +859,7 @@ const SimpleStormTracker: React.FC = () => {
         })}
 
         {/* Render forecast tracks from KMZ data or forecast data */}
-        {showTracks && displayStorms.map((storm) => {
+        {showTracks && stormsToDisplay.map((storm) => {
           // First try to use official forecast track data from KMZ
           if (storm.forecastTrack && storm.forecastTrack.features && storm.forecastTrack.features.length > 0) {
           
@@ -1020,7 +1032,7 @@ const SimpleStormTracker: React.FC = () => {
         })}
 
         {/* Render forecast cones */}
-        {showForecastCones && displayStorms.map((storm) => {
+        {showForecastCones && stormsToDisplay.map((storm) => {
           console.log(`Checking cone for ${storm.name}:`, { 
             hasCone: !!storm.cone, 
             coneType: storm.cone?.type, 
@@ -1342,6 +1354,39 @@ const SimpleStormTracker: React.FC = () => {
                 <span className="control-panel-updated">
                   Updated: {lastUpdated.toLocaleTimeString()}
                 </span>
+              )}
+              
+              {/* Storm Selector Dropdown */}
+              {displayStorms.length > 0 && (
+                <div style={{ marginTop: '10px', padding: '8px 0', borderTop: '1px solid #e0e0e0' }}>
+                  <div style={{ fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '5px', color: '#1a237e' }}>
+                    Select Storm
+                  </div>
+                  <select 
+                    value={selectedStormId || ''}
+                    onChange={(e) => setSelectedStormId(e.target.value || null)}
+                    style={{
+                      width: '100%',
+                      padding: '6px 8px',
+                      fontSize: '0.8rem',
+                      borderRadius: '4px',
+                      border: '1px solid #ccc',
+                      backgroundColor: 'white'
+                    }}
+                  >
+                    <option value="">All Storms</option>
+                    {displayStorms.map(storm => (
+                      <option key={storm.id} value={storm.id}>
+                        {storm.name} ({storm.classification})
+                      </option>
+                    ))}
+                  </select>
+                  {selectedStorm && (
+                    <div style={{ fontSize: '0.7rem', color: '#666', marginTop: '3px' }}>
+                      Showing: {selectedStorm.name} - {selectedStorm.maxWinds} mph winds
+                    </div>
+                  )}
+                </div>
               )}
               
               {/* Path Visibility Controls */}
