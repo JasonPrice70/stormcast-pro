@@ -170,6 +170,35 @@
   font-size: 0.9rem;
 }
 
+.control-panel-button--primary {
+  background: #1976d2;
+  color: white;
+  font-weight: 600;
+}
+
+.control-panel-button--primary:hover {
+  background: #1565c0;
+}
+
+.load-data-section {
+  text-align: center;
+  padding: 10px;
+}
+
+.data-source-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+}
+
+.data-source-buttons .control-panel-button {
+  margin: 0;
+  padding: 12px 20px;
+  font-size: 1rem;
+  min-width: 200px;
+}
+
 .no-storms-message {
   text-align: center;
   padding: 10px;
