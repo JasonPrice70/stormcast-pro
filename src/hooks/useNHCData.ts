@@ -249,3 +249,67 @@ export const useStormDetails = (stormId: string | null) => {
     error
   }
 }
+
+// Hook for getting spaghetti model ensemble tracks
+export const useSpaghettiModels = (enabled: boolean = false, stormId?: string) => {
+  const [spaghettiData, setSpaghettiData] = useState<any>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [available, setAvailable] = useState<boolean | null>(null)
+
+  const fetchSpaghettiModels = useCallback(async () => {
+    if (!enabled) {
+      setSpaghettiData(null)
+      setAvailable(null)
+      return
+    }
+
+    try {
+      setLoading(true)
+      setError(null)
+
+      const nhcApi = new NHCApiService()
+      const spaghettiModels = await nhcApi.getSpaghettiModels(stormId)
+      
+      console.log('Spaghetti models response:', spaghettiModels)
+      
+      if (spaghettiModels && spaghettiModels.models && spaghettiModels.models.length > 0) {
+        // Validate model data before setting
+        const validModels = spaghettiModels.models.filter((model: any) => 
+          model && model.track && Array.isArray(model.track) && model.track.length > 0
+        )
+        
+        if (validModels.length > 0) {
+          setSpaghettiData({ ...spaghettiModels, models: validModels })
+          setAvailable(true)
+          console.log(`Successfully loaded ${validModels.length} valid spaghetti models`)
+        } else {
+          setSpaghettiData(null)
+          setAvailable(false)
+          console.warn('No valid model tracks found')
+        }
+      } else {
+        setSpaghettiData(null)
+        setAvailable(false)
+      }
+    } catch (err) {
+      console.error('Error fetching spaghetti model data:', err)
+      setError(err instanceof Error ? err.message : 'Failed to fetch spaghetti models')
+      setAvailable(false)
+    } finally {
+      setLoading(false)
+    }
+  }, [enabled, stormId])
+
+  useEffect(() => {
+    fetchSpaghettiModels()
+  }, [fetchSpaghettiModels])
+
+  return {
+    spaghettiData,
+    loading,
+    error,
+    available,
+    refresh: fetchSpaghettiModels
+  }
+}

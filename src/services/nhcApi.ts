@@ -929,6 +929,138 @@ class NHCApiService {
   }
 
   /**
+   * Fetch spaghetti model tracks for ensemble forecasting
+   * This simulates multiple forecast models (GFS, ECMWF, HWRF, etc.)
+   * In a real implementation, this would fetch from actual ensemble model APIs
+   */
+  async getSpaghettiModels(stormId?: string): Promise<any | null> {
+    try {
+      console.log('Generating spaghetti model tracks...')
+      
+      // For now, we'll generate synthetic spaghetti tracks based on the current storm data
+      // In a production environment, this would fetch from actual ensemble model APIs
+      const storms = await this.getActiveStorms()
+      
+      if (storms.length === 0) {
+        console.log('No active storms for spaghetti model generation')
+        return null
+      }
+
+      const targetStorm = stormId ? storms.find(s => s.id === stormId) : storms[0]
+      if (!targetStorm) {
+        console.log('Target storm not found for spaghetti models')
+        return null
+      }
+
+      // Generate multiple model tracks with variations
+      const models = ['GFS', 'ECMWF', 'HWRF', 'NAM', 'CMC', 'UKMET', 'NOGAPS']
+      const spaghettiTracks = models.map((modelName, index) => {
+        const baseTrack = this.generateModelTrack(targetStorm, modelName, index)
+        return {
+          modelName,
+          confidence: Math.random() * 0.3 + 0.7, // 70-100% confidence
+          track: baseTrack,
+          color: this.getModelColor(modelName),
+          opacity: 0.6 + (Math.random() * 0.2) // 0.6-0.8 opacity
+        }
+      })
+
+      console.log(`Generated ${spaghettiTracks.length} spaghetti model tracks for ${targetStorm.name}`)
+      return {
+        stormId: targetStorm.id,
+        stormName: targetStorm.name,
+        models: spaghettiTracks,
+        generatedAt: new Date().toISOString()
+      }
+    } catch (error: any) {
+      console.log('Spaghetti models not available:', error.message)
+      return null
+    }
+  }
+
+  /**
+   * Generate a synthetic model track with variations
+   */
+  private generateModelTrack(storm: any, modelName: string, variation: number) {
+    const basePosition = storm.position
+    
+    // Validate base position
+    if (!basePosition || !Array.isArray(basePosition) || basePosition.length < 2) {
+      console.warn(`Invalid base position for storm in ${modelName}:`, basePosition)
+      return []
+    }
+    
+    // Validate coordinates
+    const lat = parseFloat(basePosition[0])
+    const lon = parseFloat(basePosition[1])
+    if (isNaN(lat) || isNaN(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+      console.warn(`Invalid coordinates for ${modelName}: lat=${lat}, lon=${lon}`)
+      return []
+    }
+    
+    const forecastHours = [12, 24, 36, 48, 72, 96, 120]
+    
+    // Model-specific biases and variations
+    const modelVariations: Record<string, { latBias: number, lonBias: number, speedBias: number }> = {
+      'GFS': { latBias: 0.1, lonBias: -0.2, speedBias: 1.1 },
+      'ECMWF': { latBias: -0.1, lonBias: 0.1, speedBias: 0.9 },
+      'HWRF': { latBias: 0.2, lonBias: -0.1, speedBias: 1.0 },
+      'NAM': { latBias: -0.2, lonBias: 0.2, speedBias: 1.2 },
+      'CMC': { latBias: 0.0, lonBias: -0.3, speedBias: 0.8 },
+      'UKMET': { latBias: 0.1, lonBias: 0.1, speedBias: 0.95 },
+      'NOGAPS': { latBias: -0.1, lonBias: -0.1, speedBias: 1.05 }
+    }
+
+    const modelVar = modelVariations[modelName] || { latBias: 0, lonBias: 0, speedBias: 1.0 }
+    
+    const track = forecastHours.map((hour, index) => {
+      // Base movement (typically northwest for Atlantic storms)
+      const baseLatMovement = 0.8 * (hour / 12) * modelVar.speedBias
+      const baseLonMovement = -1.2 * (hour / 12) * modelVar.speedBias
+      
+      // Add model bias and some randomness
+      const latMovement = baseLatMovement + modelVar.latBias + (Math.random() - 0.5) * 0.5
+      const lonMovement = baseLonMovement + modelVar.lonBias + (Math.random() - 0.5) * 0.8
+      
+      // Add some curvature for realistic tracks
+      const curvature = Math.sin(index * 0.5) * 0.3
+      
+      const finalLat = basePosition[0] + latMovement + curvature
+      const finalLon = basePosition[1] + lonMovement
+      
+      // Ensure coordinates stay within valid bounds
+      const validLat = Math.max(-90, Math.min(90, finalLat))
+      const validLon = Math.max(-180, Math.min(180, finalLon))
+      
+      return {
+        lat: parseFloat(validLat.toFixed(4)),
+        lon: parseFloat(validLon.toFixed(4)),
+        forecastHour: hour,
+        intensity: Math.max(30, storm.maxWinds + (Math.random() - 0.5) * 20), // Vary intensity
+        dateTime: new Date(Date.now() + hour * 60 * 60 * 1000).toISOString()
+      }
+    })
+
+    return track
+  }
+
+  /**
+   * Get color for different forecast models
+   */
+  private getModelColor(modelName: string): string {
+    const modelColors: Record<string, string> = {
+      'GFS': '#ff4444',      // Red
+      'ECMWF': '#4444ff',    // Blue  
+      'HWRF': '#44ff44',     // Green
+      'NAM': '#ffaa00',      // Orange
+      'CMC': '#ff44ff',      // Magenta
+      'UKMET': '#00ffff',    // Cyan
+      'NOGAPS': '#8844ff'    // Purple
+    }
+    return modelColors[modelName] || '#666666'
+  }
+
+  /**
    * Test function to debug API connectivity
    */
   async testConnectivity(): Promise<string> {
