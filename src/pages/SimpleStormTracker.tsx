@@ -14,6 +14,46 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
+// Format forecast time for labels (e.g., "6 PM MON")
+const formatForecastTime = (datetimeString: string) => {
+  if (!datetimeString || datetimeString.includes('Point')) {
+    return '';
+  }
+  // Example input: "5:00 AM AST August 12, 2025"
+  // Extract hour, AM/PM, and day abbreviation
+  const timeMatch = datetimeString.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+  const dayMatch = datetimeString.match(/([A-Za-z]+)\s(\d{1,2}),\s*(\d{4})$/);
+  let hour = '';
+  let ampm = '';
+  let dayAbbr = '';
+  if (timeMatch) {
+    hour = timeMatch[1];
+    ampm = timeMatch[3].toUpperCase();
+  }
+  if (dayMatch) {
+    // Get the day of week from the full date
+    const monthDayYear = dayMatch[0];
+    // Try to parse the full date
+    const datePartMatch = datetimeString.match(/([A-Za-z]+)\s(\d{1,2}),\s*(\d{4})$/);
+    if (datePartMatch) {
+      const month = datePartMatch[1];
+      const day = datePartMatch[2];
+      const year = datePartMatch[3];
+      // Create a date object
+      const dateObj = new Date(`${month} ${day}, ${year}`);
+      if (!isNaN(dateObj.getTime())) {
+        dayAbbr = dateObj.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
+      }
+    }
+  }
+  // If we have hour, ampm, and dayAbbr, format as "5 AM TUE"
+  if (hour && ampm && dayAbbr) {
+    return `${hour} ${ampm} ${dayAbbr}`;
+  }
+  // Fallback: just show the original string
+  return datetimeString;
+};
+
 // Create storm icons based on category and type
 const createStormIcon = (category: any, classification: string) => {
   const isHurricane = classification.toLowerCase().includes('hurricane') || classification === 'HU';
@@ -462,18 +502,17 @@ const SimpleStormTracker: React.FC = () => {
             <React.Fragment key={`${storm.id}-forecast-track`}>
               {storm.forecastTrack.features.map((feature: any, featureIndex: number) => {
                 if (feature.geometry.type === 'LineString') {
-                  // Forecast track line
+                  // Forecast track line (thin black dashed)
                   const forecastPath: [number, number][] = feature.geometry.coordinates.map((coord: [number, number]) => [coord[1], coord[0]]);
-                  
                   return (
                     <Polyline
                       key={`${storm.id}-forecast-track-line-${featureIndex}`}
                       positions={forecastPath}
                       pathOptions={{
-                        color: '#ff3333',
-                        weight: 4,
+                        color: '#222',
+                        weight: 2,
                         opacity: 0.9,
-                        dashArray: '10, 5'
+                        dashArray: '8, 4'
                       }}
                     />
                   );
@@ -518,39 +557,72 @@ const SimpleStormTracker: React.FC = () => {
                   });
                   
                   return (
-                    <Marker
-                      key={`${storm.id}-forecast-track-point-${featureIndex}`}
-                      position={[lat, lon]}
-                      icon={forecastIntensityIcon}
-                      zIndexOffset={200}
-                    >
-                      <Popup>
-                        <div style={{ fontSize: '0.9rem' }}>
-                          <strong>{storm.name} - Forecast Position</strong><br />
-                          {properties.category && (
-                            <>
-                              <strong>Forecast Intensity:</strong> {properties.category}<br />
-                            </>
-                          )}
-                          {properties.intensity && (
-                            <>
-                              <strong>Forecast Max Winds:</strong> {properties.intensity} knots ({properties.intensityMPH} mph)<br />
-                            </>
-                          )}
-                          {properties.minSeaLevelPres && (
-                            <>
-                              <strong>Forecast Pressure:</strong> {properties.minSeaLevelPres} mb<br />
-                            </>
-                          )}
-                          {properties.datetime && !properties.datetime.includes('Point') && (
-                            <>
-                              <strong>Forecast Time:</strong> {properties.datetime}<br />
-                            </>
-                          )}
-                          <strong>Location:</strong> {lat.toFixed(1)}°N, {Math.abs(lon).toFixed(1)}°W
-                        </div>
-                      </Popup>
-                    </Marker>
+                    <React.Fragment key={`${storm.id}-forecast-track-fragment-${featureIndex}`}>
+                      <Marker
+                        key={`${storm.id}-forecast-track-point-${featureIndex}`}
+                        position={[lat, lon]}
+                        icon={forecastIntensityIcon}
+                        zIndexOffset={200}
+                      >
+                        <Popup>
+                          <div style={{ fontSize: '0.9rem' }}>
+                            <strong>{storm.name} - Forecast Position</strong><br />
+                            {properties.category && (
+                              <>
+                                <strong>Forecast Intensity:</strong> {properties.category}<br />
+                              </>
+                            )}
+                            {properties.intensity && (
+                              <>
+                                <strong>Forecast Max Winds:</strong> {properties.intensity} knots ({properties.intensityMPH} mph)<br />
+                              </>
+                            )}
+                            {properties.minSeaLevelPres && (
+                              <>
+                                <strong>Forecast Pressure:</strong> {properties.minSeaLevelPres} mb<br />
+                              </>
+                            )}
+                            {properties.datetime && !properties.datetime.includes('Point') && (
+                              <>
+                                <strong>Forecast Time:</strong> {properties.datetime}<br />
+                              </>
+                            )}
+                            <strong>Location:</strong> {lat.toFixed(1)}°N, {Math.abs(lon).toFixed(1)}°W
+                          </div>
+                        </Popup>
+                      </Marker>
+                      {/* Time label for forecast point */}
+                      {(() => {
+                        console.log('Forecast Point datetime:', properties.datetime, 'Formatted:', formatForecastTime(properties.datetime));
+                        return formatForecastTime(properties.datetime);
+                      })() && (
+                        <Marker
+                          key={`${storm.id}-forecast-time-label-${featureIndex}`}
+                          position={[lat, lon]}
+                          icon={L.divIcon({
+                            html: `<div style="
+                              padding: 2px 8px;
+                              font-size: 13px;
+                              font-weight: bold;
+                              color: #222;
+                              white-space: nowrap;
+                              text-align: center;
+                              min-width: 60px;
+                              min-height: 20px;
+                              display: flex;
+                              align-items: center;
+                              justify-content: center;
+                              margin-left: 7px;
+                              transform: rotate(-45deg);
+                            ">${formatForecastTime(properties.datetime)}</div>`,
+                            className: 'forecast-time-label',
+                            iconSize: [60, 20],
+                            iconAnchor: [0, 60]
+                          })}
+                          zIndexOffset={150}
+                        />
+                      )}
+                    </React.Fragment>
                   );
                 }
                 return null;
