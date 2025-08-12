@@ -15,41 +15,58 @@ L.Icon.Default.mergeOptions({
 });
 
 // Create storm icons based on category and type
-const createStormIcon = (category: number, classification: string) => {
-  let color = '#808080'; // Default gray
-  let displayText = 'S';
+const createStormIcon = (category: any, classification: string) => {
+  const isHurricane = classification.toLowerCase().includes('hurricane') || classification === 'HU';
+  const isTropicalStorm = classification.toLowerCase().includes('tropical storm') || classification === 'TS';
+  
+  // Debug logging to see what's happening with the classification
+  console.log('createStormIcon called with:', { category, classification, isHurricane, isTropicalStorm });
+  
+  if (isHurricane) {
+    // Custom Hurricane SVG icon
+    const hurricaneIcon = `
+      <svg width="48" height="48" viewBox="0 0 455.13 639.78" style="filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.5));">
+        <path fill="#ed1c24" d="M404.75,422.16C344.9,540.18,188.17,639.96.11,639.78c-5.6-.02,200.47-113.65,132.59-152.82C40.8,433.89,6.14,314.27,52.78,218.95,108.63,104.8,263.52-5.63,454.97.22c6.5.2-194.96,116.53-130.14,153.95,91.89,53.05,127.92,173.36,79.92,267.99Z"/>
+      </svg>
+    `;
+    return L.divIcon({
+      html: hurricaneIcon,
+      className: '',
+      iconSize: [48, 48],
+      iconAnchor: [24, 24]
+    });
+  } else if (isTropicalStorm) {
+    // Custom Tropical Storm SVG icon
+    const tropicalStormIcon = `
+      <svg width="48" height="48" viewBox="0 0 455.13 639.77" style="filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.5));">
+        <path fill="#ed1c24" d="M404.75,422.16c48-94.64,11.98-214.94-79.92-268C260.02,116.74,461.48.41,454.98.22,263.52-5.63,108.63,104.79,52.78,218.95c-46.64,95.32-11.99,214.94,79.92,268.01C200.59,526.14-5.5,639.76.11,639.77c188.06.18,344.79-99.59,404.64-217.61ZM176.68,410.53c-49.67-28.68-66.69-92.18-38.01-141.86,28.68-49.67,92.18-66.69,141.86-38.01,49.68,28.68,66.69,92.18,38.01,141.85-28.68,49.68-92.17,66.69-141.86,38.01Z"/>
+      </svg>
+    `;
+    return L.divIcon({
+      html: tropicalStormIcon,
+      className: '',
+      iconSize: [48, 48],
+      iconAnchor: [24, 24]
+    });
+  } else {
+    // Fallback to original design for other storm types
+    let color = '#808080'; // Default gray
+    let displayText = 'S';
 
-  if (classification.toLowerCase().includes('hurricane')) {
-    if (category >= 5) {
-      color = '#8b0000'; // Category 5 - Dark red
-      displayText = '5';
-    } else if (category >= 4) {
-      color = '#ff0000'; // Category 4 - Red
-      displayText = '4';
-    } else if (category >= 3) {
-      color = '#ff6600'; // Category 3 - Orange
-      displayText = '3';
-    } else if (category >= 2) {
-      color = '#ffaa00'; // Category 2 - Yellow-orange
-      displayText = '2';
-    } else if (category >= 1) {
-      color = '#ffdd00'; // Category 1 - Yellow
-      displayText = '1';
+    if (classification.toLowerCase().includes('depression')) {
+      color = '#808080'; // Gray
+      displayText = 'TD';
+    } else {
+      displayText = 'S';
     }
-  } else if (classification.toLowerCase().includes('tropical storm')) {
-    color = '#00aaff'; // Blue
-    displayText = 'TS';
-  } else if (classification.toLowerCase().includes('depression')) {
-    color = '#808080'; // Gray
-    displayText = 'TD';
-  }
 
-  return L.divIcon({
-    html: `<div class="storm-icon" style="background: ${color};">${displayText}</div>`,
-    className: '',
-    iconSize: [20, 20],
-    iconAnchor: [10, 10]
-  });
+    return L.divIcon({
+      html: `<div class="storm-icon" style="background: ${color};">${displayText}</div>`,
+      className: '',
+      iconSize: [20, 20],
+      iconAnchor: [10, 10]
+    });
+  }
 };
 
 // Get color for track point intensity markers
@@ -226,13 +243,19 @@ const SimpleStormTracker: React.FC = () => {
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
         />
 
+        {/* Debug: Log storms to display */}
+        {console.log('StormTracker DEBUG - stormsToDisplay:', stormsToDisplay.map(s => ({ name: s.name, category: s.category, classification: s.classification, position: s.position })))}
+
         {/* Render storm markers */}
-        {stormsToDisplay.map((storm) => (
-          <Marker
-            key={storm.id}
-            position={storm.position}
-            icon={createStormIcon(storm.category, storm.classification)}
-          >
+        {stormsToDisplay.map((storm) => {
+          console.log('Rendering storm marker for:', storm.name, 'Category:', storm.category, 'Classification:', storm.classification);
+          return (
+            <Marker
+              key={storm.id}
+              position={storm.position}
+              icon={createStormIcon(storm.category, storm.classification)}
+              zIndexOffset={1000}
+            >
             <Popup closeOnClick={false} autoClose={false}>
               <div className="storm-popup">
                 <div className="storm-popup-header">
@@ -273,7 +296,8 @@ const SimpleStormTracker: React.FC = () => {
               </div>
             </Popup>
           </Marker>
-        ))}
+          );
+        })}
 
         {/* Render storm tracks from KMZ data or historical data */}
         {showTracks && stormsToDisplay.map((storm) => {
@@ -330,6 +354,7 @@ const SimpleStormTracker: React.FC = () => {
                       key={`${storm.id}-track-point-${featureIndex}`}
                       position={[lat, lon]}
                       icon={intensityIcon}
+                      zIndexOffset={100}
                     >
                       <Popup>
                         <div style={{ fontSize: '0.9rem' }}>
@@ -408,6 +433,7 @@ const SimpleStormTracker: React.FC = () => {
                       key={`${storm.id}-historical-${index}`}
                       position={[point.latitude, point.longitude]}
                       icon={historicalIcon}
+                      zIndexOffset={50}
                     >
                       <Popup>
                         <div style={{ fontSize: '0.9rem' }}>
@@ -496,6 +522,7 @@ const SimpleStormTracker: React.FC = () => {
                       key={`${storm.id}-forecast-track-point-${featureIndex}`}
                       position={[lat, lon]}
                       icon={forecastIntensityIcon}
+                      zIndexOffset={200}
                     >
                       <Popup>
                         <div style={{ fontSize: '0.9rem' }}>
@@ -579,6 +606,7 @@ const SimpleStormTracker: React.FC = () => {
                       key={`${storm.id}-forecast-point-${index}`}
                       position={[point.latitude, point.longitude]}
                       icon={forecastIcon}
+                      zIndexOffset={150}
                     >
                       <Popup>
                         <div style={{ fontSize: '0.9rem' }}>
@@ -645,10 +673,10 @@ const SimpleStormTracker: React.FC = () => {
                     key={`${storm.id}-cone`}
                     positions={coneCoordinates}
                     pathOptions={{
-                      color: '#ffaa00',
+                      color: '#2196F3',
                       weight: 2,
                       opacity: 0.8,
-                      fillColor: '#ffaa00',
+                      fillColor: '#2196F3',
                       fillOpacity: 0.15
                     }}
                   />
@@ -670,7 +698,7 @@ const SimpleStormTracker: React.FC = () => {
                   <Polyline
                     positions={[[storm.position[0], storm.position[1]], ...forecastPositions]}
                     pathOptions={{
-                      color: '#ffaa00',
+                      color: '#2196F3',
                       weight: 3,
                       opacity: 0.8,
                       dashArray: '10, 5'
@@ -685,9 +713,9 @@ const SimpleStormTracker: React.FC = () => {
                         center={[point.latitude, point.longitude]}
                         radius={Math.min(10, 5 + index * 1)} // Visual radius for screen
                         pathOptions={{
-                          fillColor: 'rgba(255, 170, 0, 0.15)',
+                          fillColor: 'rgba(33, 150, 243, 0.15)',
                           fillOpacity: 0.2,
-                          color: '#ffaa00',
+                          color: '#2196F3',
                           weight: 1,
                           opacity: 0.6
                         }}
@@ -894,7 +922,7 @@ const SimpleStormTracker: React.FC = () => {
               <div style={{
                 width: '16px',
                 height: '12px',
-                backgroundColor: '#ffaa00',
+                backgroundColor: '#2196F3',
                 border: '1px solid #333',
                 borderRadius: '2px'
               }}></div>
@@ -1097,7 +1125,7 @@ const SimpleStormTracker: React.FC = () => {
                       onChange={(e) => setShowForecastCones(e.target.checked)}
                       style={{ marginRight: '6px' }}
                     />
-                    <span style={{ color: '#ffaa00' }}>▲▲▲</span> Forecast Cone
+                    <span style={{ color: '#2196F3' }}>▲▲▲</span> Forecast Cone
                   </label>
                   <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.8rem', cursor: 'pointer' }}>
                     <input
@@ -1220,7 +1248,7 @@ const SimpleStormTracker: React.FC = () => {
                       </div>
                     </div>
                   )}
-                </div>
+              </div>
               
               <div className="control-panel-buttons">
                 <button 

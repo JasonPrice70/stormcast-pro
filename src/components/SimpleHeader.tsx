@@ -11,7 +11,7 @@ const SimpleHeader = () => {
           <h1>🌪️ CycloTrak</h1>
           <p>Professional Hurricane & Tropical Cyclone Tracking</p>
         </div>
-        <nav>
+{/*}        <nav>
           <ul className="nav">
             <li>
               <Link 
@@ -46,7 +46,7 @@ const SimpleHeader = () => {
               </Link>
             </li>
           </ul>
-        </nav>
+        </nav>*/}
       </div>
     </header>
   )
