@@ -890,27 +890,36 @@ class NHCApiService {
   }
 
   /**
-   * Fetch 34-knot wind speed probability data from NHC API (KMZ/GeoJSON)
-   * This shows the probability of experiencing 34+ knot winds over the next 120 hours
+   * Fetch wind speed probability data from NHC API (KMZ/GeoJSON)
+   * This shows the probability of experiencing winds of specified speed over the next 120 hours
+   * @param windSpeed - Wind speed threshold: '34kt', '50kt', or '64kt'
    */
-  async getWindSpeedProbability(): Promise<any | null> {
+  async getWindSpeedProbability(windSpeed: '34kt' | '50kt' | '64kt' = '34kt'): Promise<any | null> {
     try {
-      console.log('Fetching 34kt wind speed probability data using Lambda API...')
+      console.log(`Fetching ${windSpeed} wind speed probability data using Lambda API...`)
+      
+      // Determine the endpoint based on wind speed
+      let endpoint = 'wind-speed-probability';
+      if (windSpeed === '50kt') {
+        endpoint = 'wind-speed-probability-50kt';
+      } else if (windSpeed === '64kt') {
+        endpoint = 'wind-speed-probability-64kt';
+      }
       
       // Use Lambda function to fetch wind speed probability data
-      const proxyData = await this.fetchWithLambdaFallback('wind-speed-probability', {})
+      const proxyData = await this.fetchWithLambdaFallback(endpoint, {})
       
       if (proxyData) {
-        console.log('Successfully fetched wind speed probability data via Lambda:', proxyData)
+        console.log(`Successfully fetched ${windSpeed} wind speed probability data via Lambda:`, proxyData)
         return proxyData
       } else {
-        console.log('No wind speed probability data returned from Lambda')
+        console.log(`No ${windSpeed} wind speed probability data returned from Lambda`)
         return null
       }
     } catch (error: any) {
-      console.log('Wind speed probability data not available:', error.message)
+      console.log(`${windSpeed} wind speed probability data not available:`, error.message)
       if (error.response?.status === 404) {
-        console.log('Wind speed probability KMZ file not found')
+        console.log(`${windSpeed} wind speed probability KMZ file not found`)
       }
       return null
     }

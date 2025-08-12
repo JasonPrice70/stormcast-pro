@@ -148,6 +148,7 @@ const SimpleStormTracker: React.FC = () => {
   const [showForecastCones, setShowForecastCones] = useState(true);
   const [showStormSurge, setShowStormSurge] = useState(false);
   const [showWindSpeedProb, setShowWindSpeedProb] = useState(false);
+  const [windSpeedProbType, setWindSpeedProbType] = useState<'34kt' | '50kt' | '64kt'>('34kt');
   const [showSpaghettiModels, setShowSpaghettiModels] = useState(false);
   const [fetchLiveTrackData, setFetchLiveTrackData] = useState(true); // Enable track data fetching by default
   const [selectedStormId, setSelectedStormId] = useState<string | null>(null); // New state for selected storm
@@ -187,7 +188,7 @@ const SimpleStormTracker: React.FC = () => {
   const stormSurge = useStormSurge(showStormSurge && selectedStormId ? selectedStormId : null);
   
   // Use wind speed probability hook when enabled and no specific storm is selected
-  const windSpeedProb = useWindSpeedProbability(showWindSpeedProb && !selectedStormId);
+  const windSpeedProb = useWindSpeedProbability(showWindSpeedProb && !selectedStormId, windSpeedProbType);
 
   // Use spaghetti models hook when enabled and a storm is selected
   const spaghettiModels = useSpaghettiModels(showSpaghettiModels && selectedStormId !== null, selectedStormId || undefined);
@@ -353,7 +354,7 @@ const SimpleStormTracker: React.FC = () => {
                       </Popup>
                     </Marker>
                   );
-                }
+                  }
                 return null;
               })}
             </React.Fragment>
@@ -431,8 +432,7 @@ const SimpleStormTracker: React.FC = () => {
         {showTracks && stormsToDisplay.map((storm) => {
           // First try to use official forecast track data from KMZ
           if (storm.forecastTrack && storm.forecastTrack.features && storm.forecastTrack.features.length > 0) {
-          
-          return (
+            return (
             <React.Fragment key={`${storm.id}-forecast-track`}>
               {storm.forecastTrack.features.map((feature: any, featureIndex: number) => {
                 if (feature.geometry.type === 'LineString') {
@@ -1130,7 +1130,7 @@ const SimpleStormTracker: React.FC = () => {
                       disabled={selectedStormId !== null}
                       style={{ marginRight: '6px' }}
                     />
-                    <span style={{ color: '#0066cc' }}>⬢⬢⬢</span> 34kt Wind Probability
+                    <span style={{ color: '#0066cc' }}>⬢⬢⬢</span> {windSpeedProbType} Wind Probability
                     {selectedStormId ? (
                       <span style={{ fontSize: '0.7rem', color: '#888', marginLeft: '5px' }}>
                         (Only available when viewing all storms)
@@ -1141,6 +1141,28 @@ const SimpleStormTracker: React.FC = () => {
                       </span>
                     ) : null}
                   </label>
+                  
+                  {/* Wind Speed Options - only show when wind speed probability is enabled */}
+                  {showWindSpeedProb && !selectedStormId && (
+                    <div style={{ marginLeft: '20px', marginTop: '5px' }}>
+                      <div style={{ fontSize: '0.75rem', color: '#666', marginBottom: '3px' }}>Wind Speed Options:</div>
+                      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                        {(['34kt', '50kt', '64kt'] as const).map((speed) => (
+                          <label key={speed} style={{ display: 'flex', alignItems: 'center', fontSize: '0.7rem', cursor: 'pointer' }}>
+                            <input
+                              type="radio"
+                              name="windSpeedType"
+                              value={speed}
+                              checked={windSpeedProbType === speed}
+                              onChange={(e) => setWindSpeedProbType(e.target.value as '34kt' | '50kt' | '64kt')}
+                              style={{ marginRight: '4px', transform: 'scale(0.8)' }}
+                            />
+                            {speed}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.8rem', cursor: selectedStormId === null ? 'not-allowed' : 'pointer', opacity: selectedStormId === null ? 0.6 : 1 }}>
                     <input
                       type="checkbox"

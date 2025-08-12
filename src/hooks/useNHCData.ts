@@ -153,8 +153,8 @@ export const useStormSurge = (stormId: string | null) => {
   }
 }
 
-// Hook for getting wind speed probability data (34kt winds)
-export const useWindSpeedProbability = (enabled: boolean = false) => {
+// Hook for getting wind speed probability data
+export const useWindSpeedProbability = (enabled: boolean = false, windSpeed: '34kt' | '50kt' | '64kt' = '34kt') => {
   const [probabilityData, setProbabilityData] = useState<any>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -172,7 +172,7 @@ export const useWindSpeedProbability = (enabled: boolean = false) => {
       setError(null)
 
       const nhcApi = new NHCApiService()
-      const probData = await nhcApi.getWindSpeedProbability()
+      const probData = await nhcApi.getWindSpeedProbability(windSpeed)
       
       if (probData && probData.features && probData.features.length > 0) {
         setProbabilityData(probData)
@@ -182,13 +182,13 @@ export const useWindSpeedProbability = (enabled: boolean = false) => {
         setAvailable(false)
       }
     } catch (err) {
-      console.error('Error fetching wind speed probability data:', err)
-      setError(err instanceof Error ? err.message : 'Failed to fetch wind speed probability data')
+      console.error(`Error fetching ${windSpeed} wind speed probability data:`, err)
+      setError(err instanceof Error ? err.message : `Failed to fetch ${windSpeed} wind speed probability data`)
       setAvailable(false)
     } finally {
       setLoading(false)
     }
-  }, [enabled])
+  }, [enabled, windSpeed])
 
   useEffect(() => {
     fetchWindSpeedProbability()

@@ -530,7 +530,7 @@ async function extractSurgeFromKML(kmlContent) {
 /**
  * Parse KMZ file and extract wind speed probability data as GeoJSON
  */
-async function parseKmzToWindProbGeoJSON(kmzBuffer) {
+async function parseKmzToWindProbGeoJSON(kmzBuffer, windSpeed = '34kt') {
   return new Promise((resolve, reject) => {
     yauzl.fromBuffer(kmzBuffer, { lazyEntries: true }, (err, zipfile) => {
       if (err) {
@@ -568,7 +568,7 @@ async function parseKmzToWindProbGeoJSON(kmzBuffer) {
         }
 
         // Parse KML and extract wind probability data
-        extractWindProbFromKML(kmlContent)
+        extractWindProbFromKML(kmlContent, windSpeed)
           .then(resolve)
           .catch(reject);
       });
@@ -581,7 +581,7 @@ async function parseKmzToWindProbGeoJSON(kmzBuffer) {
 /**
  * Extract wind speed probability data from KML content
  */
-async function extractWindProbFromKML(kmlContent) {
+async function extractWindProbFromKML(kmlContent, windSpeed = '34kt') {
   try {
     const parser = new xml2js.Parser({ 
       explicitArray: false, 
@@ -696,7 +696,7 @@ async function extractWindProbFromKML(kmlContent) {
               description: description,
               probability: probability,
               styleId: styleId,
-              windSpeed: '34kt', // This KMZ is specifically for 34kt winds
+              windSpeed: windSpeed, // Dynamic wind speed based on endpoint
               type: 'wind_probability',
               polygonIndex: polygonIndex
             },
@@ -867,12 +867,24 @@ exports.handler = async (event) => {
         isKmzEndpoint = true;
         break;
         
+      case 'wind-speed-probability-50kt':
+        // Use the latest 50kt wind speed probability KMZ
+        nhcUrl = 'https://www.nhc.noaa.gov/gis/forecast/archive/latest_wsp50knt120hr_5km.kmz';
+        isKmzEndpoint = true;
+        break;
+        
+      case 'wind-speed-probability-64kt':
+        // Use the latest 64kt wind speed probability KMZ
+        nhcUrl = 'https://www.nhc.noaa.gov/gis/forecast/archive/latest_wsp64knt120hr_5km.kmz';
+        isKmzEndpoint = true;
+        break;
+        
       default:
         return {
           statusCode: 400,
           headers: corsHeaders,
           body: JSON.stringify({ 
-            error: 'Invalid endpoint. Supported endpoints: active-storms, track-kmz, forecast-track, historical-track, forecast-cone, forecast-track-kmz, storm-surge, wind-speed-probability' 
+            error: 'Invalid endpoint. Supported endpoints: active-storms, track-kmz, forecast-track, historical-track, forecast-cone, forecast-track-kmz, storm-surge, wind-speed-probability, wind-speed-probability-50kt, wind-speed-probability-64kt' 
           })
         };
     }
@@ -911,8 +923,14 @@ exports.handler = async (event) => {
           responseData = await parseKmzToSurgeGeoJSON(response.data);
           console.log(`Successfully parsed KMZ storm surge data with ${responseData.features.length} features`);
         } else if (endpoint === 'wind-speed-probability') {
-          responseData = await parseKmzToWindProbGeoJSON(response.data);
+          responseData = await parseKmzToWindProbGeoJSON(response.data, '34kt');
           console.log(`Successfully parsed KMZ wind probability data with ${responseData.features.length} features`);
+        } else if (endpoint === 'wind-speed-probability-50kt') {
+          responseData = await parseKmzToWindProbGeoJSON(response.data, '50kt');
+          console.log(`Successfully parsed KMZ 50kt wind probability data with ${responseData.features.length} features`);
+        } else if (endpoint === 'wind-speed-probability-64kt') {
+          responseData = await parseKmzToWindProbGeoJSON(response.data, '64kt');
+          console.log(`Successfully parsed KMZ 64kt wind probability data with ${responseData.features.length} features`);
         } else {
           throw new Error(`Unknown KMZ endpoint: ${endpoint}`);
         }
