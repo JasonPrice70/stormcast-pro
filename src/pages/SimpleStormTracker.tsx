@@ -1157,8 +1157,8 @@ const SimpleStormTracker: React.FC = () => {
                 </div>
               </div>
               
-              {/* Live Track Data Control */}
-              <div style={{ marginTop: '10px', padding: '8px 0', borderTop: '1px solid #e0e0e0' }}>
+              {/* Live Track Data Control - Hidden */}
+              <div style={{ display: 'none', marginTop: '10px', padding: '8px 0', borderTop: '1px solid #e0e0e0' }}>
                 <div style={{ fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '5px', color: '#1a237e' }}>
                   Track Data Options
                 </div>
