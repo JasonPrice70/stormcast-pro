@@ -3,7 +3,7 @@ import { MapContainer, TileLayer, Marker, Popup, Polyline, CircleMarker, Polygon
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import './SimpleStormTracker.css';
-import { useNHCData, useStormSurge, useWindSpeedProbability, useSpaghettiModels } from '../hooks/useNHCData';
+import { useNHCData, useStormSurge, useWindSpeedProbability } from '../hooks/useNHCData';
 import SimpleHeader from '../components/SimpleHeader';
 
 // Fix for default markers in React Leaflet
@@ -149,7 +149,7 @@ const SimpleStormTracker: React.FC = () => {
   const [showStormSurge, setShowStormSurge] = useState(false);
   const [showWindSpeedProb, setShowWindSpeedProb] = useState(false);
   const [windSpeedProbType, setWindSpeedProbType] = useState<'34kt' | '50kt' | '64kt'>('34kt');
-  const [showSpaghettiModels, setShowSpaghettiModels] = useState(false);
+
   const [fetchLiveTrackData, setFetchLiveTrackData] = useState(true); // Enable track data fetching by default
   const [selectedStormId, setSelectedStormId] = useState<string | null>(null); // New state for selected storm
   
@@ -190,8 +190,8 @@ const SimpleStormTracker: React.FC = () => {
   // Use wind speed probability hook when enabled and no specific storm is selected
   const windSpeedProb = useWindSpeedProbability(showWindSpeedProb && !selectedStormId, windSpeedProbType);
 
-  // Use spaghetti models hook when enabled and a storm is selected
-  const spaghettiModels = useSpaghettiModels(showSpaghettiModels && selectedStormId !== null, selectedStormId || undefined);
+  // Use NOAA NOMADS spaghetti models hook when enabled and a storm is selected
+
 
   // Helper function to open CORS proxy access page
   const openCorsAccess = () => {
@@ -805,9 +805,13 @@ const SimpleStormTracker: React.FC = () => {
               >
                 <Popup>
                   <div>
-                    <strong>34+ Knot Wind Probability</strong><br />
+                    <strong>{windSpeedProbType} Wind Probability</strong><br />
                     Probability: {feature.properties?.probability || 'Unknown'}%<br />
-                    <small>Chance of tropical storm force winds (34+ kt / 39+ mph)</small>
+                    <small>
+                      {windSpeedProbType === '34kt' && 'Chance of tropical storm force winds (34+ kt / 39+ mph)'}
+                      {windSpeedProbType === '50kt' && 'Chance of strong tropical storm winds (50+ kt / 58+ mph)'}
+                      {windSpeedProbType === '64kt' && 'Chance of hurricane force winds (64+ kt / 74+ mph)'}
+                    </small>
                   </div>
                 </Popup>
               </Polygon>
@@ -816,135 +820,122 @@ const SimpleStormTracker: React.FC = () => {
           return null;
         })}
 
-        {/* Spaghetti Models Layer */}
-        {showSpaghettiModels && selectedStormId && spaghettiModels.spaghettiData && !spaghettiModels.loading && 
-          spaghettiModels.spaghettiData.models && spaghettiModels.spaghettiData.models.length > 0 && (
-            <>
-              {spaghettiModels.spaghettiData.models.map((model: any, index: number) => {
-                // Validate and filter track points to ensure they have valid coordinates
-                const validTrackPoints = model.track?.filter((point: any) => 
-                  point && 
-                  typeof point.lat === 'number' && 
-                  typeof point.lon === 'number' && 
-                  !isNaN(point.lat) && 
-                  !isNaN(point.lon) &&
-                  point.lat >= -90 && point.lat <= 90 &&
-                  point.lon >= -180 && point.lon <= 180
-                ) || [];
-
-                // Only render if we have at least 2 valid points
-                if (validTrackPoints.length < 2) {
-                  return null;
-                }
-
-                return (
-                  <Polyline
-                    key={`${model.modelName || model.model || `model${index}`}-${selectedStormId}-${index}`}
-                    positions={validTrackPoints.map((point: any) => [point.lat, point.lon])}
-                    color={model.color}
-                    weight={2}
-                    opacity={0.7}
-                  >
-                    <Popup>
-                      <div>
-                        <strong>{model.modelName || model.model || 'Forecast Model'} Model Track</strong><br/>
-                        Points: {validTrackPoints.length}<br/>
-                        Forecast confidence: {Math.round(model.confidence * 100)}%<br/>
-                        <small>Ensemble forecast model prediction</small>
-                      </div>
-                    </Popup>
-                  </Polyline>
-                );
-              })}
-            </>
-          )
-        }
-
       </MapContainer>
       
-      {/* Spaghetti Models Legend */}
-      {showSpaghettiModels && selectedStormId && spaghettiModels.spaghettiData && 
-        spaghettiModels.spaghettiData.models && spaghettiModels.spaghettiData.models.length > 0 && (
-          <div style={{
-            position: 'absolute',
-            bottom: '20px',
-            left: '20px',
-            backgroundColor: 'rgba(255, 255, 255, 0.95)',
-            padding: '12px',
-            borderRadius: '8px',
-            boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
-            border: '1px solid #ddd',
-            fontSize: '0.8rem',
-            zIndex: 1000,
-            maxWidth: '350px',
-            minWidth: '300px'
+      {/* Wind Speed Probability Legend */}
+      {showWindSpeedProb && !selectedStormId && windSpeedProb.probabilityData && (
+        <div style={{
+          position: 'absolute',
+          bottom: '20px',
+          left: '20px',
+          backgroundColor: 'rgba(255, 255, 255, 0.95)',
+          padding: '10px',
+          borderRadius: '6px',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+          border: '1px solid #ddd',
+          fontSize: '0.75rem',
+          zIndex: 1000,
+          minWidth: '200px'
+        }}>
+          <div style={{ 
+            fontWeight: 'bold', 
+            marginBottom: '6px', 
+            color: '#333',
+            borderBottom: '1px solid #eee',
+            paddingBottom: '3px',
+            fontSize: '0.8rem'
           }}>
-            <div style={{ 
-              fontWeight: 'bold', 
-              marginBottom: '8px', 
-              color: '#333',
-              borderBottom: '1px solid #eee',
-              paddingBottom: '4px'
-            }}>
-              🌪️ Forecast Models
+            🌪️ {windSpeedProbType} Wind Probability
+          </div>
+          
+          {/* Probability scale */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div style={{
+                width: '16px',
+                height: '12px',
+                backgroundColor: '#4d0000',
+                border: '1px solid #333',
+                borderRadius: '2px'
+              }}></div>
+              <span>90%+ (Very High)</span>
             </div>
-            {spaghettiModels.spaghettiData.models.map((model: any, index: number) => {
-              // Debug log to see what data we have
-              console.log('Legend model data:', { 
-                model: model.model, 
-                modelName: model.modelName, 
-                confidence: model.confidence, 
-                color: model.color, 
-                fullModel: model 
-              });
-              
-              // Get full model name - check both 'model' and 'modelName' properties
-              const modelNames: Record<string, string> = {
-                'GFS': 'GFS (Global Forecast System)',
-                'ECMWF': 'ECMWF (European Centre)', 
-                'HWRF': 'HWRF (Hurricane Weather Research)',
-                'NAM': 'NAM (North American Mesoscale)',
-                'CMC': 'CMC (Canadian Meteorological Centre)',
-                'UKMET': 'UKMET (UK Met Office)',
-                'NOGAPS': 'NOGAPS (Navy Global Atmospheric)'
-              };
-              
-              // Use modelName property (from synthetic data) or model property as fallback
-              const modelCode = model.modelName || model.model || `Model${index + 1}`;
-              const fullModelName = modelNames[modelCode] || modelCode;
-              const confidencePercent = Math.round((model.confidence || 0) * 100);
-
-              return (
-                <div key={`legend-${modelCode}-${index}`} style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  marginBottom: '4px',
-                  fontSize: '0.75rem'
-                }}>
-                  <div style={{
-                    width: '16px',
-                    height: '3px',
-                    backgroundColor: model.color || '#666',
-                    marginRight: '8px',
-                    borderRadius: '2px'
-                  }}></div>
-                  <span style={{ color: '#333' }}>{fullModelName} ({confidencePercent}%)</span>
-                </div>
-              );
-            })}
-            <div style={{
-              fontSize: '0.65rem',
-              color: '#888',
-              marginTop: '6px',
-              fontStyle: 'italic',
-              borderTop: '1px solid #eee',
-              paddingTop: '4px'
-            }}>
-              Ensemble forecast tracks
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div style={{
+                width: '16px',
+                height: '12px',
+                backgroundColor: '#800000',
+                border: '1px solid #333',
+                borderRadius: '2px'
+              }}></div>
+              <span>70-89% (High)</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div style={{
+                width: '16px',
+                height: '12px',
+                backgroundColor: '#cc0000',
+                border: '1px solid #333',
+                borderRadius: '2px'
+              }}></div>
+              <span>50-69% (Moderate)</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div style={{
+                width: '16px',
+                height: '12px',
+                backgroundColor: '#ff6600',
+                border: '1px solid #333',
+                borderRadius: '2px'
+              }}></div>
+              <span>30-49% (Low-Mod)</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div style={{
+                width: '16px',
+                height: '12px',
+                backgroundColor: '#ffaa00',
+                border: '1px solid #333',
+                borderRadius: '2px'
+              }}></div>
+              <span>20-29% (Low)</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div style={{
+                width: '16px',
+                height: '12px',
+                backgroundColor: '#00aa00',
+                border: '1px solid #333',
+                borderRadius: '2px'
+              }}></div>
+              <span>10-19% (Very Low)</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div style={{
+                width: '16px',
+                height: '12px',
+                backgroundColor: '#0066cc',
+                border: '1px solid #333',
+                borderRadius: '2px'
+              }}></div>
+              <span>&lt;10% (Minimal)</span>
             </div>
           </div>
-        )
-      }
+          
+          <div style={{
+            fontSize: '0.65rem',
+            color: '#666',
+            marginTop: '6px',
+            fontStyle: 'italic',
+            borderTop: '1px solid #eee',
+            paddingTop: '4px'
+          }}>
+            {windSpeedProbType === '34kt' && 'Tropical storm force winds (39+ mph)'}
+            {windSpeedProbType === '50kt' && 'Strong tropical storm winds (58+ mph)'}
+            {windSpeedProbType === '64kt' && 'Hurricane force winds (74+ mph)'}
+          </div>
+        </div>
+      )}
       </div>
 
       {/* Floating Control Panel */}
@@ -1163,25 +1154,6 @@ const SimpleStormTracker: React.FC = () => {
                       </div>
                     </div>
                   )}
-                  <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.8rem', cursor: selectedStormId === null ? 'not-allowed' : 'pointer', opacity: selectedStormId === null ? 0.6 : 1 }}>
-                    <input
-                      type="checkbox"
-                      checked={showSpaghettiModels}
-                      onChange={(e) => setShowSpaghettiModels(e.target.checked)}
-                      disabled={selectedStormId === null}
-                      style={{ marginRight: '6px' }}
-                    />
-                    <span style={{ color: '#ff6600' }}>~~~</span> Spaghetti Models
-                    {selectedStormId === null ? (
-                      <span style={{ fontSize: '0.7rem', color: '#888', marginLeft: '5px' }}>
-                        (Select a storm to view models)
-                      </span>
-                    ) : spaghettiModels.available === false ? (
-                      <span style={{ fontSize: '0.7rem', color: '#888', marginLeft: '5px' }}>
-                        (No models available)
-                      </span>
-                    ) : null}
-                  </label>
                 </div>
               </div>
               
@@ -1239,32 +1211,11 @@ const SimpleStormTracker: React.FC = () => {
                         ) : windSpeedProb.available === false ? (
                           'No wind probability data available (typically only available during active storm threats)'
                         ) : windSpeedProb.probabilityData ? (
-                          `Showing ${windSpeedProb.probabilityData.features?.length || 0} probability zones for 34+ knot winds`
+                          `Showing ${windSpeedProb.probabilityData.features?.length || 0} probability zones for ${windSpeedProbType} winds`
                         ) : windSpeedProb.error ? (
                           `Error: ${windSpeedProb.error}`
                         ) : (
                           'Checking availability...'
-                        )}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {showSpaghettiModels && (
-                    <div style={{ marginTop: '8px', padding: '6px', backgroundColor: '#f5f5f5', borderRadius: '4px' }}>
-                      <div style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#ff6600' }}>
-                        Spaghetti Models Status
-                      </div>
-                      <div style={{ fontSize: '0.7rem', color: '#666', marginTop: '2px' }}>
-                        {spaghettiModels.loading ? (
-                          'Loading ensemble forecast models...'
-                        ) : spaghettiModels.available === false ? (
-                          'No ensemble models available for this storm'
-                        ) : spaghettiModels.spaghettiData?.models ? (
-                          `Showing ${spaghettiModels.spaghettiData.models.length} ensemble forecast models (GFS, ECMWF, HWRF, etc.)`
-                        ) : spaghettiModels.error ? (
-                          `Error: ${spaghettiModels.error}`
-                        ) : (
-                          'Checking model availability...'
                         )}
                       </div>
                     </div>
