@@ -789,22 +789,141 @@ async function extractWindArrivalFromKML(kmlContent) {
     const result = await parser.parseStringPromise(kmlContent);
     
     const features = [];
+    const styleMap = {}; // Map style IDs to time information
+
+    // First, extract style definitions to understand time mapping
+    function extractStyles(obj) {
+      if (!obj) return;
+      
+      if (obj.Style) {
+        const styles = Array.isArray(obj.Style) ? obj.Style : [obj.Style];
+        styles.forEach(style => {
+          if (style.id && style.IconStyle && style.IconStyle.Icon && style.IconStyle.Icon.href) {
+            const href = style.IconStyle.Icon.href;
+            const filename = href.split('/').pop(); // Get filename from path
+            const label = filename.replace('.png', ''); // Remove extension
+            styleMap[style.id] = label;
+          }
+        });
+      }
+      
+      // Look in folders and documents for styles
+      if (obj.Folder) {
+        const folders = Array.isArray(obj.Folder) ? obj.Folder : [obj.Folder];
+        folders.forEach(extractStyles);
+      }
+      
+      if (obj.Document) {
+        extractStyles(obj.Document);
+      }
+    }
+    
+    // Extract styles first
+    extractStyles(result.kml);
+    
+    // Helper function to convert word numbers to digits for hours
+    function convertHourWordToNumber(text) {
+      const numberMap = {
+        'one': '1', 'two': '2', 'three': '3', 'four': '4', 'five': '5', 'six': '6',
+        'seven': '7', 'eight': '8', 'nine': '9', 'ten': '10', 'eleven': '11', 'twelve': '12'
+      };
+      return numberMap[text.toLowerCase()] || text;
+    }
+
+    // Helper function to build time string from related styles
+    function buildTimeFromStyleId(styleId) {
+      if (!styleId) return null;
+      
+      // Extract base style number (e.g., "style1" from "style1a")
+      const baseMatch = styleId.match(/^style(\d+)/);
+      if (!baseMatch) return null;
+      
+      const baseNumber = baseMatch[1];
+      const basePattern = `style${baseNumber}`;
+      
+      // Find all related styles (a, b, c variants)
+      const relatedStyles = {};
+      Object.keys(styleMap).forEach(id => {
+        if (id.startsWith(basePattern)) {
+          const suffix = id.replace(basePattern, '');
+          relatedStyles[suffix] = styleMap[id];
+        }
+      });
+      
+      // Build time string from components
+      let day = '';
+      let hour = '';
+      let period = '';
+      
+      // Map common label patterns
+      Object.values(relatedStyles).forEach(label => {
+        if (['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].includes(label)) {
+          day = label;
+        } else if (['am', 'pm'].includes(label.toLowerCase())) {
+          period = label.toUpperCase();
+        } else if (['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'].includes(label.toLowerCase())) {
+          // Convert word numbers to digits
+          const numberMap = {
+            'one': '1', 'two': '2', 'three': '3', 'four': '4', 'five': '5', 'six': '6',
+            'seven': '7', 'eight': '8', 'nine': '9', 'ten': '10', 'eleven': '11', 'twelve': '12'
+          };
+          hour = numberMap[label.toLowerCase()] || label;
+        } else if (/^\d+$/.test(label)) {
+          hour = label;
+        }
+      });
+      
+      // Combine components
+      if (day && hour && period) {
+        return `${day} ${hour} ${period}`;
+      } else if (hour && period) {
+        return `${hour} ${period}`;
+      } else if (day) {
+        return day;
+      }
+      
+      return styleMap[styleId] || null; // Fallback to direct style mapping
+    }
 
     function findWindArrivalPolygons(obj) {
       if (!obj) return;
 
-      // Look for placemarks with polygon data
+      // Look for placemarks with point, line, or polygon data
       if (obj.Placemark) {
         const placemarks = Array.isArray(obj.Placemark) ? obj.Placemark : [obj.Placemark];
         
         placemarks.forEach(placemark => {
-          if (placemark.MultiGeometry && placemark.MultiGeometry.Polygon) {
-            const polygons = Array.isArray(placemark.MultiGeometry.Polygon) ? 
-              placemark.MultiGeometry.Polygon : [placemark.MultiGeometry.Polygon];
-            
-            polygons.forEach((polygon, polyIndex) => {
-              processWindArrivalPolygon(polygon, placemark, polyIndex);
-            });
+          // Handle Point geometries for wind arrival time labels
+          if (placemark.Point) {
+            processWindArrivalPoint(placemark.Point, placemark, 0);
+          }
+          // Handle LineString geometries for wind arrival time lines
+          else if (placemark.LineString) {
+            processWindArrivalLineString(placemark.LineString, placemark, 0);
+          }
+          // Also handle any polygon data if present
+          else if (placemark.MultiGeometry) {
+            if (placemark.MultiGeometry.Point) {
+              const points = Array.isArray(placemark.MultiGeometry.Point) ? 
+                placemark.MultiGeometry.Point : [placemark.MultiGeometry.Point];
+              points.forEach((point, pointIndex) => {
+                processWindArrivalPoint(point, placemark, pointIndex);
+              });
+            }
+            if (placemark.MultiGeometry.LineString) {
+              const lines = Array.isArray(placemark.MultiGeometry.LineString) ? 
+                placemark.MultiGeometry.LineString : [placemark.MultiGeometry.LineString];
+              lines.forEach((line, lineIndex) => {
+                processWindArrivalLineString(line, placemark, lineIndex);
+              });
+            }
+            if (placemark.MultiGeometry.Polygon) {
+              const polygons = Array.isArray(placemark.MultiGeometry.Polygon) ? 
+                placemark.MultiGeometry.Polygon : [placemark.MultiGeometry.Polygon];
+              polygons.forEach((polygon, polyIndex) => {
+                processWindArrivalPolygon(polygon, placemark, polyIndex);
+              });
+            }
           } else if (placemark.Polygon) {
             processWindArrivalPolygon(placemark.Polygon, placemark, 0);
           }
@@ -819,6 +938,148 @@ async function extractWindArrivalFromKML(kmlContent) {
       
       if (obj.Document) {
         findWindArrivalPolygons(obj.Document);
+      }
+    }
+    
+    function processWindArrivalLineString(lineString, placemark, lineIndex) {
+      if (lineString.coordinates) {
+        const coordinatesText = lineString.coordinates;
+        if (typeof coordinatesText === 'string') {
+          const coords = coordinatesText.trim().split(/\s+/).map(coord => {
+            const [lon, lat] = coord.split(',').map(Number);
+            return [lon, lat];
+          });
+
+          // Extract arrival time information from name and description
+          const name = placemark.name || '';
+          const description = placemark.description || '';
+          
+          // Get style information for visual representation
+          let styleId = null;
+          if (placemark.styleUrl) {
+            styleId = placemark.styleUrl.replace('#', '');
+          }
+          
+          // Use style mapping to get time information
+          let arrivalTime = buildTimeFromStyleId(styleId);
+          
+          // Fallback to parsing name/description if style mapping fails
+          if (!arrivalTime) {
+            const timePatterns = [
+              /(\w{3})\s+(\d{1,2})\s*(AM|PM)/i, // "Wed 8 AM", "Fri 2 PM"
+              /(\d{1,2})\s*(AM|PM)\s*(\w{3})/i, // "8 AM Wed", "2 PM Fri"
+              /(\d{1,2}):(\d{2})\s*(AM|PM)/i,   // "08:00 AM"
+              /(\d{4})\s*(UTC|GMT)/i            // "0800 UTC"
+            ];
+            
+            for (const pattern of timePatterns) {
+              const match = (name + ' ' + description).match(pattern);
+              if (match) {
+                arrivalTime = match[0];
+                break;
+              }
+            }
+          }
+
+          features.push({
+            type: 'Feature',
+            properties: {
+              name: name,
+              description: description,
+              arrivalTime: arrivalTime,
+              styleId: styleId,
+              windSpeed: '34kt', // Wind arrival is typically for tropical storm force winds
+              type: 'wind_arrival_line',
+              lineIndex: lineIndex
+            },
+            geometry: {
+              type: 'LineString',
+              coordinates: coords
+            }
+          });
+        }
+      }
+    }
+    
+    // Store individual label components to group later (moved to outer scope)
+    const labelComponents = [];
+    
+    function processWindArrivalPoint(point, placemark, pointIndex) {
+      if (point.coordinates) {
+        const coordinatesText = point.coordinates;
+        if (typeof coordinatesText === 'string') {
+          const coords = coordinatesText.trim().split(',').map(Number);
+          const [lon, lat] = coords;
+
+          // Extract arrival time information from name and description
+          const name = placemark.name || '';
+          const description = placemark.description || '';
+          
+          // Get style information for visual representation
+          let styleId = null;
+          if (placemark.styleUrl) {
+            styleId = placemark.styleUrl.replace('#', '');
+          }
+          
+          // Extract icon filename from style
+          let iconType = null;
+          if (styleId) {
+            // Parse style number and component (a, b, c)
+            const styleMatch = styleId.match(/style(\d+)([abc])/);
+            if (styleMatch) {
+              const groupNumber = styleMatch[1];
+              const component = styleMatch[2];
+              
+              // Store this component for grouping
+              labelComponents.push({
+                groupNumber: groupNumber,
+                component: component,
+                coordinates: [lon, lat],
+                styleId: styleId,
+                name: name,
+                description: description
+              });
+              return; // Don't create individual features yet
+            }
+          }
+          
+          // Fallback for non-grouped points
+          let arrivalTime = buildTimeFromStyleId(styleId);
+          if (!arrivalTime) {
+            const timePatterns = [
+              /(\w{3})\s+(\d{1,2})\s*(AM|PM)/i, // "Wed 8 AM", "Fri 2 PM"
+              /(\d{1,2})\s*(AM|PM)\s*(\w{3})/i, // "8 AM Wed", "2 PM Fri"
+              /(\d{1,2}):(\d{2})\s*(AM|PM)/i,   // "08:00 AM"
+              /(\d{4})\s*(UTC|GMT)/i            // "0800 UTC"
+            ];
+            
+            for (const pattern of timePatterns) {
+              const match = (name + ' ' + description).match(pattern);
+              if (match) {
+                arrivalTime = match[0];
+                break;
+              }
+            }
+          }
+
+          // Create single marker for non-grouped points
+          features.push({
+            type: 'Feature',
+            properties: {
+              name: name,
+              description: description,
+              arrivalTime: arrivalTime || 'Unknown',
+              styleId: styleId,
+              windSpeed: '34kt',
+              type: 'wind_arrival_point',
+              pointIndex: pointIndex
+            },
+            geometry: {
+              type: 'Point',
+              coordinates: [lon, lat]
+            }
+          });
+        }
       }
     }
     
@@ -887,6 +1148,74 @@ async function extractWindArrivalFromKML(kmlContent) {
     if (result.kml) {
       findWindArrivalPolygons(result.kml);
     }
+
+    // Group label components by arrival time
+    const groupedComponents = {};
+    labelComponents.forEach(component => {
+      if (!groupedComponents[component.groupNumber]) {
+        groupedComponents[component.groupNumber] = {};
+      }
+      groupedComponents[component.groupNumber][component.component] = component;
+    });
+
+    // Create grouped arrival point features
+    Object.keys(groupedComponents).forEach(groupNumber => {
+      const group = groupedComponents[groupNumber];
+      
+      // We expect components a, b, c for day, hour, am/pm
+      if (group.a && group.b && group.c) {
+        // Calculate average position for the group
+        const avgLon = (group.a.coordinates[0] + group.b.coordinates[0] + group.c.coordinates[0]) / 3;
+        const avgLat = (group.a.coordinates[1] + group.b.coordinates[1] + group.c.coordinates[1]) / 3;
+        
+        // Build arrival time from style IDs
+        const arrivalTime = buildTimeFromStyleId(group.a.styleId) || 
+                           buildTimeFromStyleId(group.b.styleId) || 
+                           buildTimeFromStyleId(group.c.styleId) ||
+                           'Unknown';
+
+        // Create main arrival point feature
+        features.push({
+          type: 'Feature',
+          properties: {
+            name: '',
+            description: '',
+            arrivalTime: arrivalTime,
+            styleId: `group${groupNumber}`,
+            windSpeed: '34kt',
+            type: 'wind_arrival_group',
+            pointIndex: 0,
+            components: [
+              {
+                type: 'day',
+                styleId: group.a.styleId,
+                text: styleMap[group.a.styleId] || '',
+                coordinates: group.a.coordinates,
+                offset: [-0.01, 0.01] // Northwest offset
+              },
+              {
+                type: 'hour', 
+                styleId: group.b.styleId,
+                text: convertHourWordToNumber(styleMap[group.b.styleId] || ''),
+                coordinates: group.b.coordinates,
+                offset: [0.01, 0.01] // Northeast offset
+              },
+              {
+                type: 'period',
+                styleId: group.c.styleId,
+                text: styleMap[group.c.styleId] || '',
+                coordinates: group.c.coordinates,
+                offset: [0, -0.01] // South offset
+              }
+            ]
+          },
+          geometry: {
+            type: 'Point',
+            coordinates: [avgLon, avgLat]
+          }
+        });
+      }
+    });
 
     return {
       type: 'FeatureCollection',

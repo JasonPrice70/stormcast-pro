@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Polyline, CircleMarker, Polygon } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, CircleMarker, Polygon, Tooltip } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import './SimpleStormTracker.css';
@@ -926,24 +926,192 @@ const SimpleStormTracker: React.FC = () => {
         })}
 
         {/* Wind Arrival Layer */}
-        {showWindArrival && selectedStormId && windArrival.arrivalData && windArrival.arrivalData.features && windArrival.arrivalData.features.map((feature: any, index: number) => {
-          if (feature.geometry && feature.geometry.type === 'Polygon') {
-            const coordinates = feature.geometry.coordinates[0].map((coord: number[]) => [coord[1], coord[0]] as [number, number]);
+        {showWindArrival && selectedStormId && windArrival.arrivalData && windArrival.arrivalData.features && (() => {
+          // Helper function to find line segments and calculate their top coordinates
+          const findLineSegmentTopCoords = (arrivalData: any) => {
+            const lineSegments: { [key: string]: { topLat: number, leftLon: number, rightLon: number } } = {};
             
-            // Color coding based on arrival time
-            let arrivalColor = '#9932CC'; // Default purple
-            let arrivalOpacity = 0.3;
+            arrivalData.features.forEach((feature: any) => {
+              if (feature.geometry?.type === 'LineString' && feature.properties?.styleId) {
+                const coordinates = feature.geometry.coordinates;
+                if (coordinates && coordinates.length > 0) {
+                  // Find the topmost (max latitude) point and leftmost/rightmost longitudes
+                  let topLat = -90;
+                  let leftLon = 180;
+                  let rightLon = -180;
+                  
+                  coordinates.forEach(([lon, lat]: [number, number]) => {
+                    if (lat > topLat) topLat = lat;
+                    if (lon < leftLon) leftLon = lon;
+                    if (lon > rightLon) rightLon = lon;
+                  });
+                  
+                  lineSegments[feature.properties.styleId] = { topLat, leftLon, rightLon };
+                }
+              }
+            });
             
-            if (feature.properties) {
-              const arrivalTime = feature.properties.arrival_time || feature.properties.time || '';
-              // You can add time-based color coding here
-              arrivalColor = '#9932CC'; // Purple for wind arrival
-              arrivalOpacity = 0.4;
+            return lineSegments;
+          };
+          
+          const lineSegmentCoords = findLineSegmentTopCoords(windArrival.arrivalData);
+          
+          return windArrival.arrivalData.features.map((feature: any, index: number) => {
+            if (!feature.geometry) return null;
+          
+          // Color coding based on arrival time
+          let arrivalColor = '#9932CC'; // Default purple
+          let arrivalOpacity = 0.3;
+          
+          if (feature.properties) {
+            const arrivalTime = feature.properties.arrivalTime || feature.properties.arrival_time || feature.properties.time || '';
+            // You can add time-based color coding here
+            arrivalColor = '#9932CC'; // Purple for wind arrival
+            arrivalOpacity = 0.4;
+          }
+          
+          // Handle Point geometries (arrival time labels)
+          if (feature.geometry.type === 'Point') {
+            const [lon, lat] = feature.geometry.coordinates;
+            const arrivalTime = feature.properties?.arrivalTime || 'Unknown';
+            
+            // Check if this is a grouped arrival point with components
+            if (feature.properties?.type === 'wind_arrival_group' && feature.properties?.components) {
+              return (
+                <React.Fragment key={`wind-arrival-group-${index}`}>
+                  {/* Main arrival point */}
+                  <CircleMarker
+                    center={[lat, lon]}
+                    radius={6}
+                    pathOptions={{
+                      color: '#9932CC',
+                      weight: 2,
+                      fillColor: '#9932CC',
+                      fillOpacity: 0.2
+                    }}
+                  >
+                    <Tooltip direction="center" offset={[0, 0]}>
+                      <div style={{ fontSize: '10px', fontWeight: 'bold', color: '#333' }}>
+                        {arrivalTime}
+                      </div>
+                    </Tooltip>
+                  </CircleMarker>
+                  
+                  {/* Component labels positioned at the top of line segments */}
+                  {feature.properties.components.map((component: any, compIndex: number) => {
+                    // Try to find corresponding line segment coordinates
+                    const lineSegment = lineSegmentCoords[component.styleId];
+                    
+                    let compLat, compLon;
+                    if (lineSegment) {
+                      // Position labels at the top of the line segment
+                      compLat = lineSegment.topLat + 0.02; // Slightly above the top of the line
+                      
+                      // Distribute components across the width of the line segment
+                      if (compIndex === 0) { // day (left)
+                        compLon = lineSegment.leftLon;
+                      } else if (compIndex === 1) { // hour (center)
+                        compLon = (lineSegment.leftLon + lineSegment.rightLon) / 2;
+                      } else { // period (right)
+                        compLon = lineSegment.rightLon;
+                      }
+                    } else {
+                      // Fallback to original positioning if no line segment found
+                      compLat = component.coordinates[1] + component.offset[1];
+                      compLon = component.coordinates[0] + component.offset[0];
+                    }
+                    
+                    // Use the text property from the component
+                    const labelText = component.text || component.type;
+                    
+                    return (
+                      <Marker
+                        key={`component-${index}-${compIndex}`}
+                        position={[compLat, compLon]}
+                        icon={L.divIcon({
+                          html: `<div style="
+                            display: flex;
+                            align-items: flex-end;
+                            justify-content: center;
+                            font-size: 20px;
+                            font-weight: bold;
+                            color: #000;
+                            -webkit-text-stroke: 1px white;
+                            text-stroke: 1px white;
+                            white-space: nowrap;
+                            height: 24px;
+                          ">${labelText}</div>`,
+                          className: '',
+                          iconSize: [40, 24],
+                          iconAnchor: [20, 24]
+                        })}
+                      />
+                    );
+                  })}
+                </React.Fragment>
+              );
+            } else {
+              // Legacy single point display
+              return (
+                <CircleMarker
+                  key={`wind-arrival-point-${index}`}
+                  center={[lat, lon]}
+                  radius={8}
+                  pathOptions={{
+                    color: '#9932CC',
+                    weight: 2,
+                    fillColor: '#9932CC',
+                    fillOpacity: arrivalOpacity
+                  }}
+                >
+                  <Tooltip permanent direction="top" offset={[0, -13]}>
+                    <div style={{ fontSize: '10px', fontWeight: 'bold', color: '#333' }}>
+                      {arrivalTime}
+                    </div>
+                  </Tooltip>
+                </CircleMarker>
+              );
+            }
+          }
+          
+          // Handle LineString geometries (arrival time lines)
+          else if (feature.geometry.type === 'LineString') {
+            const coordinates = feature.geometry.coordinates.map((coord: number[]) => [coord[1], coord[0]] as [number, number]);
+            // Create time labels based on style ID or use generic label
+            let arrivalTime = 'Wind Arrival Line';
+            if (feature.properties?.styleId) {
+              arrivalTime = `Wind Arrival Time Line (${feature.properties.styleId})`;
+            } else if (feature.properties?.arrivalTime) {
+              arrivalTime = feature.properties.arrivalTime;
             }
             
             return (
+              <Polyline
+                key={`wind-arrival-line-${index}`}
+                positions={coordinates}
+                pathOptions={{
+                  color: arrivalColor,
+                  weight: 3,
+                  opacity: arrivalOpacity + 0.3
+                }}
+              >
+                <Tooltip>
+                  <div>
+                    <strong>Wind Arrival Time</strong><br/>
+                    {arrivalTime}
+                  </div>
+                </Tooltip>
+              </Polyline>
+            );
+          }
+          
+          // Handle Polygon geometries (arrival time areas)
+          else if (feature.geometry.type === 'Polygon') {
+            const coordinates = feature.geometry.coordinates[0].map((coord: number[]) => [coord[1], coord[0]] as [number, number]);
+            
+            return (
               <Polygon
-                key={`wind-arrival-${index}`}
+                key={`wind-arrival-polygon-${index}`}
                 positions={coordinates}
                 pathOptions={{
                   color: arrivalColor,
@@ -957,7 +1125,7 @@ const SimpleStormTracker: React.FC = () => {
                 <Popup>
                   <div>
                     <strong>Tropical Storm Wind Arrival</strong><br />
-                    Most Likely Time: {feature.properties?.arrival_time || feature.properties?.time || 'Unknown'}<br />
+                    Most Likely Time: {feature.properties?.arrivalTime || feature.properties?.arrival_time || feature.properties?.time || 'Unknown'}<br />
                     <small>
                       Most likely arrival time of tropical storm force winds (34+ kt / 39+ mph)
                     </small>
@@ -965,36 +1133,11 @@ const SimpleStormTracker: React.FC = () => {
                 </Popup>
               </Polygon>
             );
-          } else if (feature.geometry && feature.geometry.type === 'LineString') {
-            // Render wind arrival contour lines
-            const coordinates = feature.geometry.coordinates.map((coord: number[]) => [coord[1], coord[0]] as [number, number]);
-            const arrivalTime = feature.properties?.arrival_time || 'Unknown';
-            
-            return (
-              <Polyline
-                key={`wind-arrival-contour-${index}`}
-                positions={coordinates}
-                pathOptions={{
-                  color: '#9932CC',
-                  weight: 3,
-                  opacity: 0.8,
-                  dashArray: '8, 4' // Dashed line to distinguish from other layers
-                }}
-              >
-                <Popup>
-                  <div>
-                    <strong>Wind Arrival Contour</strong><br />
-                    Most Likely Time: {arrivalTime}<br />
-                    <small>
-                      Most likely arrival time of tropical storm force winds (34+ kt / 39+ mph)
-                    </small>
-                  </div>
-                </Popup>
-              </Polyline>
-            );
           }
+          
           return null;
-        })}
+          });
+        })()}
 
       </MapContainer>
       
