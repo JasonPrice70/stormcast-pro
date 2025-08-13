@@ -726,6 +726,181 @@ async function extractWindProbFromKML(kmlContent, windSpeed = '34kt') {
 }
 
 /**
+ * Parse wind arrival KMZ data and convert to GeoJSON
+ */
+async function parseKmzToWindArrivalGeoJSON(kmzBuffer) {
+  return new Promise((resolve, reject) => {
+    yauzl.fromBuffer(kmzBuffer, { lazyEntries: true }, (err, zipfile) => {
+      if (err) {
+        console.error('Error opening KMZ file for wind arrival:', err);
+        return reject(err);
+      }
+
+      let kmlContent = '';
+      
+      zipfile.readEntry();
+      zipfile.on('entry', (entry) => {
+        if (entry.fileName.toLowerCase().endsWith('.kml')) {
+          zipfile.openReadStream(entry, (err, readStream) => {
+            if (err) {
+              console.error('Error reading KML from wind arrival KMZ:', err);
+              return reject(err);
+            }
+
+            const chunks = [];
+            readStream.on('data', (chunk) => chunks.push(chunk));
+            readStream.on('end', () => {
+              kmlContent = Buffer.concat(chunks).toString('utf8');
+              zipfile.readEntry();
+            });
+            readStream.on('error', reject);
+          });
+        } else {
+          zipfile.readEntry();
+        }
+      });
+
+      zipfile.on('end', () => {
+        if (!kmlContent) {
+          return reject(new Error('No KML file found in wind arrival KMZ'));
+        }
+
+        // Parse KML and extract wind arrival data
+        extractWindArrivalFromKML(kmlContent)
+          .then(resolve)
+          .catch(reject);
+      });
+
+      zipfile.on('error', reject);
+    });
+  });
+}
+
+/**
+ * Extract wind arrival time data from KML content
+ */
+async function extractWindArrivalFromKML(kmlContent) {
+  try {
+    const parser = new xml2js.Parser({ 
+      explicitArray: false, 
+      ignoreAttrs: false,
+      mergeAttrs: true 
+    });
+    const result = await parser.parseStringPromise(kmlContent);
+    
+    const features = [];
+
+    function findWindArrivalPolygons(obj) {
+      if (!obj) return;
+
+      // Look for placemarks with polygon data
+      if (obj.Placemark) {
+        const placemarks = Array.isArray(obj.Placemark) ? obj.Placemark : [obj.Placemark];
+        
+        placemarks.forEach(placemark => {
+          if (placemark.MultiGeometry && placemark.MultiGeometry.Polygon) {
+            const polygons = Array.isArray(placemark.MultiGeometry.Polygon) ? 
+              placemark.MultiGeometry.Polygon : [placemark.MultiGeometry.Polygon];
+            
+            polygons.forEach((polygon, polyIndex) => {
+              processWindArrivalPolygon(polygon, placemark, polyIndex);
+            });
+          } else if (placemark.Polygon) {
+            processWindArrivalPolygon(placemark.Polygon, placemark, 0);
+          }
+        });
+      }
+
+      // Look in folders
+      if (obj.Folder) {
+        const folders = Array.isArray(obj.Folder) ? obj.Folder : [obj.Folder];
+        folders.forEach(findWindArrivalPolygons);
+      }
+      
+      if (obj.Document) {
+        findWindArrivalPolygons(obj.Document);
+      }
+    }
+    
+    function processWindArrivalPolygon(polygon, placemark, polygonIndex) {
+      if (polygon.outerBoundaryIs && 
+          polygon.outerBoundaryIs.LinearRing && 
+          polygon.outerBoundaryIs.LinearRing.coordinates) {
+        
+        const coordinatesText = polygon.outerBoundaryIs.LinearRing.coordinates;
+        if (typeof coordinatesText === 'string') {
+          const coords = coordinatesText.trim().split(/\s+/).map(coord => {
+            const [lon, lat] = coord.split(',').map(Number);
+            return [lon, lat];
+          });
+
+          // Extract arrival time information from name and description
+          const name = placemark.name || '';
+          const description = placemark.description || '';
+          
+          // Parse arrival time (could be in various formats)
+          let arrivalTime = null;
+          let timeWindow = null;
+          
+          // Common time patterns in NHC data
+          const timePatterns = [
+            /(\d{1,2})\s*(AM|PM)\s*(UTC|GMT)/i,
+            /(\d{1,2}):(\d{2})\s*(AM|PM)\s*(UTC|GMT)/i,
+            /(\d{4})\s*(UTC|GMT)/i,
+            /(Mon|Tue|Wed|Thu|Fri|Sat|Sun)[\s,]*(\d{1,2})\s*(AM|PM)/i
+          ];
+          
+          for (const pattern of timePatterns) {
+            const match = (name + ' ' + description).match(pattern);
+            if (match) {
+              arrivalTime = match[0];
+              break;
+            }
+          }
+
+          // Get style information for color coding
+          let styleId = null;
+          if (placemark.styleUrl) {
+            styleId = placemark.styleUrl.replace('#', '');
+          }
+
+          features.push({
+            type: 'Feature',
+            properties: {
+              name: name,
+              description: description,
+              arrivalTime: arrivalTime,
+              styleId: styleId,
+              windSpeed: '34kt', // Wind arrival is typically for tropical storm force winds
+              type: 'wind_arrival',
+              polygonIndex: polygonIndex
+            },
+            geometry: {
+              type: 'Polygon',
+              coordinates: [coords]
+            }
+          });
+        }
+      }
+    }
+
+    if (result.kml) {
+      findWindArrivalPolygons(result.kml);
+    }
+
+    return {
+      type: 'FeatureCollection',
+      features: features,
+      source: 'kmz'
+    };
+
+  } catch (error) {
+    console.error('Error parsing KML for wind arrival:', error);
+    throw error;
+  }
+}
+
+/**
  * Lambda handler for NHC API proxy
  */
 exports.handler = async (event) => {
@@ -879,12 +1054,40 @@ exports.handler = async (event) => {
         isKmzEndpoint = true;
         break;
         
+      case 'wind-arrival-most-likely':
+        const mostLikelyStormId = queryStringParameters?.stormId;
+        if (!mostLikelyStormId) {
+          return {
+            statusCode: 400,
+            headers: corsHeaders,
+            body: JSON.stringify({ error: 'stormId parameter is required for wind-arrival-most-likely endpoint' })
+          };
+        }
+        // Use the most likely wind arrival KMZ format
+        nhcUrl = `${NHC_BASE_URL}/storm_graphics/api/${mostLikelyStormId.toUpperCase()}_most_likely_toa_34_latest.kmz`;
+        isKmzEndpoint = true;
+        break;
+        
+      case 'wind-arrival-earliest':
+        const earliestStormId = queryStringParameters?.stormId;
+        if (!earliestStormId) {
+          return {
+            statusCode: 400,
+            headers: corsHeaders,
+            body: JSON.stringify({ error: 'stormId parameter is required for wind-arrival-earliest endpoint' })
+          };
+        }
+        // Use the earliest reasonable wind arrival KMZ format
+        nhcUrl = `${NHC_BASE_URL}/storm_graphics/api/${earliestStormId.toUpperCase()}_earliest_reasonable_toa_34_latest.kmz`;
+        isKmzEndpoint = true;
+        break;
+        
       default:
         return {
           statusCode: 400,
           headers: corsHeaders,
           body: JSON.stringify({ 
-            error: 'Invalid endpoint. Supported endpoints: active-storms, track-kmz, forecast-track, historical-track, forecast-cone, forecast-track-kmz, storm-surge, wind-speed-probability, wind-speed-probability-50kt, wind-speed-probability-64kt' 
+            error: 'Invalid endpoint. Supported endpoints: active-storms, track-kmz, forecast-track, historical-track, forecast-cone, forecast-track-kmz, storm-surge, wind-speed-probability, wind-speed-probability-50kt, wind-speed-probability-64kt, wind-arrival-most-likely, wind-arrival-earliest' 
           })
         };
     }
@@ -931,6 +1134,9 @@ exports.handler = async (event) => {
         } else if (endpoint === 'wind-speed-probability-64kt') {
           responseData = await parseKmzToWindProbGeoJSON(response.data, '64kt');
           console.log(`Successfully parsed KMZ 64kt wind probability data with ${responseData.features.length} features`);
+        } else if (endpoint === 'wind-arrival-most-likely' || endpoint === 'wind-arrival-earliest') {
+          responseData = await parseKmzToWindArrivalGeoJSON(response.data, endpoint);
+          console.log(`Successfully parsed KMZ wind arrival data with ${responseData.features.length} features`);
         } else {
           throw new Error(`Unknown KMZ endpoint: ${endpoint}`);
         }

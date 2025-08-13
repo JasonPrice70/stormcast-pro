@@ -251,7 +251,7 @@ export const useStormDetails = (stormId: string | null) => {
 }
 
 // Hook for wind arrival data for a specific storm
-export const useWindArrival = (enabled: boolean, stormId: string | null) => {
+export const useWindArrival = (enabled: boolean, stormId: string | null, arrivalType: 'most-likely' | 'earliest' = 'most-likely') => {
   const [arrivalData, setArrivalData] = useState<any>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -269,8 +269,8 @@ export const useWindArrival = (enabled: boolean, stormId: string | null) => {
       setError(null)
 
       const nhcApi = new NHCApiService()
-      // Try to fetch wind arrival data for the specific storm
-      const windArrivalData = await nhcApi.getWindArrival(stormId)
+      // Try to fetch wind arrival data for the specific storm and arrival type
+      const windArrivalData = await nhcApi.getWindArrival(stormId, arrivalType)
       
       if (windArrivalData && windArrivalData.features && windArrivalData.features.length > 0) {
         setArrivalData(windArrivalData)
@@ -287,7 +287,7 @@ export const useWindArrival = (enabled: boolean, stormId: string | null) => {
     } finally {
       setLoading(false)
     }
-  }, [enabled, stormId])
+  }, [enabled, stormId, arrivalType])
 
   useEffect(() => {
     fetchWindArrival()

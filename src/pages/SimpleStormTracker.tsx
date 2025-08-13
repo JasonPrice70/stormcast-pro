@@ -205,6 +205,7 @@ const SimpleStormTracker: React.FC = () => {
   const [showForecastCones, setShowForecastCones] = useState(true);
   const [showStormSurge, setShowStormSurge] = useState(false);
   const [showWindArrival, setShowWindArrival] = useState(false);
+  const [windArrivalType, setWindArrivalType] = useState<'most-likely' | 'earliest'>('most-likely');
   const [showWindSpeedProb, setShowWindSpeedProb] = useState(false);
   const [windSpeedProbType, setWindSpeedProbType] = useState<'34kt' | '50kt' | '64kt'>('34kt');
 
@@ -249,7 +250,7 @@ const SimpleStormTracker: React.FC = () => {
   const windSpeedProb = useWindSpeedProbability(showWindSpeedProb && !selectedStormId, windSpeedProbType);
 
   // Use wind arrival hook for the selected storm
-  const windArrival = useWindArrival(showWindArrival && selectedStormId !== null, selectedStormId);
+  const windArrival = useWindArrival(showWindArrival && selectedStormId !== null, selectedStormId, windArrivalType);
 
   // Use NOAA NOMADS spaghetti models hook when enabled and a storm is selected
 
@@ -1307,6 +1308,32 @@ const SimpleStormTracker: React.FC = () => {
                       </span>
                     ) : null}
                   </label>
+                  {showWindArrival && selectedStormId && (
+                    <div style={{ marginLeft: '20px', marginTop: '4px' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.7rem', marginBottom: '2px' }}>
+                        <input
+                          type="radio"
+                          name="windArrivalType"
+                          value="most-likely"
+                          checked={windArrivalType === 'most-likely'}
+                          onChange={(e) => setWindArrivalType(e.target.value as 'most-likely' | 'earliest')}
+                          style={{ marginRight: '4px' }}
+                        />
+                        Most Likely Arrival
+                      </label>
+                      <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.7rem' }}>
+                        <input
+                          type="radio"
+                          name="windArrivalType"
+                          value="earliest"
+                          checked={windArrivalType === 'earliest'}
+                          onChange={(e) => setWindArrivalType(e.target.value as 'most-likely' | 'earliest')}
+                          style={{ marginRight: '4px' }}
+                        />
+                        Earliest Reasonable Arrival
+                      </label>
+                    </div>
+                  )}
                   <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.8rem', cursor: selectedStormId ? 'not-allowed' : 'pointer', opacity: selectedStormId ? 0.6 : 1 }}>
                     <input
                       type="checkbox"
