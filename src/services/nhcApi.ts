@@ -1158,6 +1158,32 @@ class NHCApiService {
   }
 
   /**
+   * Get wind arrival data for a specific storm
+   */
+  async getWindArrival(stormId: string, useProxy = true): Promise<any | null> {
+    try {
+      // Wind arrival data is typically available from NHC's wind arrival kmz files
+      // Format: https://www.nhc.noaa.gov/gis/forecast/archive/wsp_120_5day_BASIN#STORMNAME.kmz
+      const stormIdUpper = stormId.toUpperCase();
+      const windArrivalUrl = `${GIS_BASE_URL}/forecast/archive/wsp_120_5day_${stormIdUpper}.kmz`;
+      
+      // For now, return a placeholder indicating wind arrival data would be available
+      // This can be enhanced to actually parse KMZ data in the future
+      console.log(`Wind arrival data would be fetched from: ${windArrivalUrl}`);
+      
+      // Return a simple mock structure for testing
+      return {
+        features: [],
+        message: 'Wind arrival data feature not yet implemented'
+      };
+
+    } catch (error) {
+      console.error(`Error fetching wind arrival data for storm ${stormId}:`, error);
+      return null;
+    }
+  }
+
+  /**
    * Simple hash function for creating deterministic seeds from strings
    */
   private simpleHash(str: string): number {

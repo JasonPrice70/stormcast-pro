@@ -249,3 +249,55 @@ export const useStormDetails = (stormId: string | null) => {
     error
   }
 }
+
+// Hook for wind arrival data for a specific storm
+export const useWindArrival = (enabled: boolean, stormId: string | null) => {
+  const [arrivalData, setArrivalData] = useState<any>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [available, setAvailable] = useState<boolean | null>(null)
+
+  const fetchWindArrival = useCallback(async () => {
+    if (!enabled || !stormId) {
+      setArrivalData(null)
+      setAvailable(false)
+      return
+    }
+
+    try {
+      setLoading(true)
+      setError(null)
+
+      const nhcApi = new NHCApiService()
+      // Try to fetch wind arrival data for the specific storm
+      const windArrivalData = await nhcApi.getWindArrival(stormId)
+      
+      if (windArrivalData && windArrivalData.features && windArrivalData.features.length > 0) {
+        setArrivalData(windArrivalData)
+        setAvailable(true)
+      } else {
+        setArrivalData(null)
+        setAvailable(false)
+      }
+    } catch (err) {
+      console.error('Error fetching wind arrival data:', err)
+      setError(err instanceof Error ? err.message : 'Failed to fetch wind arrival data')
+      setArrivalData(null)
+      setAvailable(false)
+    } finally {
+      setLoading(false)
+    }
+  }, [enabled, stormId])
+
+  useEffect(() => {
+    fetchWindArrival()
+  }, [fetchWindArrival])
+
+  return {
+    arrivalData,
+    loading,
+    error,
+    available,
+    refresh: fetchWindArrival
+  }
+}

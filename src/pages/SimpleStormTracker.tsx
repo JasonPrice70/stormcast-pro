@@ -3,7 +3,7 @@ import { MapContainer, TileLayer, Marker, Popup, Polyline, CircleMarker, Polygon
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import './SimpleStormTracker.css';
-import { useNHCData, useStormSurge, useWindSpeedProbability } from '../hooks/useNHCData';
+import { useNHCData, useStormSurge, useWindSpeedProbability, useWindArrival } from '../hooks/useNHCData';
 import SimpleHeader from '../components/SimpleHeader';
 
 // Fix for default markers in React Leaflet
@@ -204,6 +204,7 @@ const SimpleStormTracker: React.FC = () => {
   const [showTracks, setShowTracks] = useState(true);
   const [showForecastCones, setShowForecastCones] = useState(true);
   const [showStormSurge, setShowStormSurge] = useState(false);
+  const [showWindArrival, setShowWindArrival] = useState(false);
   const [showWindSpeedProb, setShowWindSpeedProb] = useState(false);
   const [windSpeedProbType, setWindSpeedProbType] = useState<'34kt' | '50kt' | '64kt'>('34kt');
 
@@ -246,6 +247,9 @@ const SimpleStormTracker: React.FC = () => {
   
   // Use wind speed probability hook when enabled and no specific storm is selected
   const windSpeedProb = useWindSpeedProbability(showWindSpeedProb && !selectedStormId, windSpeedProbType);
+
+  // Use wind arrival hook for the selected storm
+  const windArrival = useWindArrival(showWindArrival && selectedStormId !== null, selectedStormId);
 
   // Use NOAA NOMADS spaghetti models hook when enabled and a storm is selected
 
@@ -920,6 +924,77 @@ const SimpleStormTracker: React.FC = () => {
           return null;
         })}
 
+        {/* Wind Arrival Layer */}
+        {showWindArrival && selectedStormId && windArrival.arrivalData && windArrival.arrivalData.features && windArrival.arrivalData.features.map((feature: any, index: number) => {
+          if (feature.geometry && feature.geometry.type === 'Polygon') {
+            const coordinates = feature.geometry.coordinates[0].map((coord: number[]) => [coord[1], coord[0]] as [number, number]);
+            
+            // Color coding based on arrival time
+            let arrivalColor = '#9932CC'; // Default purple
+            let arrivalOpacity = 0.3;
+            
+            if (feature.properties) {
+              const arrivalTime = feature.properties.arrival_time || feature.properties.time || '';
+              // You can add time-based color coding here
+              arrivalColor = '#9932CC'; // Purple for wind arrival
+              arrivalOpacity = 0.4;
+            }
+            
+            return (
+              <Polygon
+                key={`wind-arrival-${index}`}
+                positions={coordinates}
+                pathOptions={{
+                  color: arrivalColor,
+                  weight: 2,
+                  opacity: 0.8,
+                  fillColor: arrivalColor,
+                  fillOpacity: arrivalOpacity,
+                  dashArray: '5, 5' // Dashed line to distinguish from other layers
+                }}
+              >
+                <Popup>
+                  <div>
+                    <strong>Tropical Storm Wind Arrival</strong><br />
+                    Most Likely Time: {feature.properties?.arrival_time || feature.properties?.time || 'Unknown'}<br />
+                    <small>
+                      Most likely arrival time of tropical storm force winds (34+ kt / 39+ mph)
+                    </small>
+                  </div>
+                </Popup>
+              </Polygon>
+            );
+          } else if (feature.geometry && feature.geometry.type === 'LineString') {
+            // Render wind arrival contour lines
+            const coordinates = feature.geometry.coordinates.map((coord: number[]) => [coord[1], coord[0]] as [number, number]);
+            const arrivalTime = feature.properties?.arrival_time || 'Unknown';
+            
+            return (
+              <Polyline
+                key={`wind-arrival-contour-${index}`}
+                positions={coordinates}
+                pathOptions={{
+                  color: '#9932CC',
+                  weight: 3,
+                  opacity: 0.8,
+                  dashArray: '8, 4' // Dashed line to distinguish from other layers
+                }}
+              >
+                <Popup>
+                  <div>
+                    <strong>Wind Arrival Contour</strong><br />
+                    Most Likely Time: {arrivalTime}<br />
+                    <small>
+                      Most likely arrival time of tropical storm force winds (34+ kt / 39+ mph)
+                    </small>
+                  </div>
+                </Popup>
+              </Polyline>
+            );
+          }
+          return null;
+        })}
+
       </MapContainer>
       
       {/* Wind Speed Probability Legend */}
@@ -1212,6 +1287,25 @@ const SimpleStormTracker: React.FC = () => {
                         (N/A for EP storms)
                       </span>
                     )}
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.8rem', cursor: !selectedStormId ? 'not-allowed' : 'pointer', opacity: !selectedStormId ? 0.6 : 1 }}>
+                    <input
+                      type="checkbox"
+                      checked={showWindArrival}
+                      onChange={(e) => setShowWindArrival(e.target.checked)}
+                      disabled={!selectedStormId}
+                      style={{ marginRight: '6px' }}
+                    />
+                    <span style={{ color: '#9932CC' }}>▣▣▣</span> Wind Arrival Time
+                    {!selectedStormId ? (
+                      <span style={{ fontSize: '0.7rem', color: '#888', marginLeft: '5px' }}>
+                        (Select a storm to view)
+                      </span>
+                    ) : windArrival.available === false ? (
+                      <span style={{ fontSize: '0.7rem', color: '#888', marginLeft: '5px' }}>
+                        (No data available)
+                      </span>
+                    ) : null}
                   </label>
                   <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.8rem', cursor: selectedStormId ? 'not-allowed' : 'pointer', opacity: selectedStormId ? 0.6 : 1 }}>
                     <input
