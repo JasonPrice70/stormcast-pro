@@ -8,7 +8,7 @@ const SimpleHeader = () => {
     <header className="header">
       <div className="container">
         <div>
-          <h1>🌪️ CycloTrak</h1>
+          <h1>Hurricane Command Center</h1>
           <p>Professional Hurricane & Tropical Cyclone Tracking</p>
         </div>
 {/*}        <nav>

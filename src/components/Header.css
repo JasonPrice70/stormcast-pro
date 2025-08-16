@@ -1,5 +1,6 @@
 .header {
-  background: linear-gradient(135deg, rgba(26, 35, 126, 0.5) 0%, rgba(94, 53, 177, 0.5) 100%);
+  /*background: linear-gradient(135deg, rgba(26, 35, 126, 0.5) 0%, rgba(94, 53, 177, 0.5) 100%);*/
+  background: (0, 0, 0, 0.7)
   color: white;
   padding: 0;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
