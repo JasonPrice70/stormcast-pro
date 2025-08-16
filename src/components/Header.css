@@ -225,7 +225,7 @@
   background: none;
   border: none;
   color: white;
-  font-size: 24px;
+  font-size: 16px;
   cursor: pointer;
   padding: 5px;
   border-radius: 50%;
@@ -277,9 +277,10 @@
 }
 
 .menu-icon {
-  font-size: 1.2rem;
-  width: 24px;
+  font-size: 1rem;
+  width: 20px;
   text-align: center;
+  color: inherit;
 }
 
 /* Mobile optimizations for hamburger menu */
@@ -316,7 +317,7 @@
   }
   
   .menu-icon {
-    font-size: 1rem;
-    width: 20px;
+    font-size: 0.9rem;
+    width: 18px;
   }
 }

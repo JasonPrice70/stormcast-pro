@@ -1,5 +1,10 @@
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
+import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined'
+import CloudOutlinedIcon from '@mui/icons-material/CloudOutlined'
+import ShowChartOutlinedIcon from '@mui/icons-material/ShowChartOutlined'
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
+import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined'
 import './Header.css'
 
 const SimpleHeader = () => {
@@ -45,9 +50,9 @@ const SimpleHeader = () => {
       <nav className={`slide-menu ${isMenuOpen ? 'active' : ''}`}>
         <div className="slide-menu-header">
           <h3>Navigation</h3>
-          <button className="close-btn" onClick={closeMenu} aria-label="Close menu">
-            ×
-          </button>
+                  <button className="hamburger-close" onClick={closeMenu}>
+          <CloseOutlinedIcon />
+        </button>
         </div>
         
         <ul className="slide-menu-items">
@@ -57,7 +62,7 @@ const SimpleHeader = () => {
               className={location.pathname === '/' ? 'active' : ''}
               onClick={closeMenu}
             >
-              <span className="menu-icon">🏠</span>
+              <HomeOutlinedIcon className="menu-icon" />
               Home
             </Link>
           </li>
@@ -67,8 +72,8 @@ const SimpleHeader = () => {
               className={location.pathname === '/tracker' ? 'active' : ''}
               onClick={closeMenu}
             >
-              <span className="menu-icon">🌪️</span>
-              Storm Tracker
+                            <CloudOutlinedIcon className="menu-icon" />
+              Tracker
             </Link>
           </li>
           <li>
@@ -77,7 +82,7 @@ const SimpleHeader = () => {
               className={location.pathname === '/forecast' ? 'active' : ''}
               onClick={closeMenu}
             >
-              <span className="menu-icon">📊</span>
+              <ShowChartOutlinedIcon className="menu-icon" />
               Forecast
             </Link>
           </li>
@@ -87,7 +92,7 @@ const SimpleHeader = () => {
               className={location.pathname === '/about' ? 'active' : ''}
               onClick={closeMenu}
             >
-              <span className="menu-icon">ℹ️</span>
+              <InfoOutlinedIcon className="menu-icon" />
               About
             </Link>
           </li>

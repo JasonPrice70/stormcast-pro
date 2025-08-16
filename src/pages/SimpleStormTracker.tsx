@@ -5,6 +5,8 @@ import 'leaflet/dist/leaflet.css';
 import './SimpleStormTracker.css';
 import { useNHCData, useStormSurge, useWindSpeedProbability, useWindArrival } from '../hooks/useNHCData';
 import SimpleHeader from '../components/SimpleHeader';
+import ExpandLessOutlinedIcon from '@mui/icons-material/ExpandLessOutlined';
+import ExpandMoreOutlinedIcon from '@mui/icons-material/ExpandMoreOutlined';
 
 // Fix for default markers in React Leaflet
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -208,11 +210,9 @@ const SimpleStormTracker: React.FC = () => {
   const [windArrivalType, setWindArrivalType] = useState<'most-likely' | 'earliest'>('most-likely');
   const [showWindSpeedProb, setShowWindSpeedProb] = useState(false);
   const [windSpeedProbType, setWindSpeedProbType] = useState<'34kt' | '50kt' | '64kt'>('34kt');
-
+  const [isControlPanelMinimized, setIsControlPanelMinimized] = useState(false);
   const [fetchLiveTrackData, setFetchLiveTrackData] = useState(true); // Enable track data fetching by default
-  const [selectedStormId, setSelectedStormId] = useState<string | null>(null); // New state for selected storm
-  
-  // Use live data hook only - fetch on mount by default
+  const [selectedStormId, setSelectedStormId] = useState<string | null>(null); // New state for selected storm  // Use live data hook only - fetch on mount by default
   const liveData = useNHCData({ 
     autoRefresh: false, // Disable auto-refresh - only call when user requests
     fetchOnMount: true, // Fetch on mount - load live data by default
@@ -1258,10 +1258,24 @@ const SimpleStormTracker: React.FC = () => {
       </div>
 
       {/* Floating Control Panel */}
-      <div className="floating-control-panel">
-        <h3 className="control-panel-header">
-           Live Storm Tracking
-        </h3>
+      <div className={`floating-control-panel ${isControlPanelMinimized ? 'minimized' : ''}`}>
+        <div className="control-panel-header-wrapper">
+          <h3 className="control-panel-header">
+             Live Storm Tracking
+          </h3>
+          <button 
+            className="control-panel-minimize-btn"
+            onClick={() => setIsControlPanelMinimized(!isControlPanelMinimized)}
+            title={isControlPanelMinimized ? "Expand panel" : "Minimize panel"}
+          >
+            {isControlPanelMinimized ? (
+              <ExpandLessOutlinedIcon fontSize="small" />
+            ) : (
+              <ExpandMoreOutlinedIcon fontSize="small" />
+            )}
+          </button>
+        </div>
+        {!isControlPanelMinimized && (
         <div className="control-panel-content">
           {loading ? (
             <span className="control-panel-loading">Loading storms...</span>
@@ -1606,6 +1620,7 @@ const SimpleStormTracker: React.FC = () => {
             </>
           )}
         </div>
+        )}
       </div>
     </div>
   );
