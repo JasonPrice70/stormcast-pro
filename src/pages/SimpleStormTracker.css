@@ -125,6 +125,42 @@
   font-size: 1rem;
 }
 
+/* Minimize functionality styles */
+.control-panel-header-wrapper {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.control-panel-minimize-btn {
+  background: #1a237e;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  width: 24px;
+  height: 24px;
+  cursor: pointer;
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+}
+
+.control-panel-minimize-btn:hover {
+  background: #303f9f;
+  transform: scale(1.1);
+}
+
+.floating-control-panel.minimized {
+  padding: 10px 15px;
+}
+
+.floating-control-panel.minimized .control-panel-header-wrapper {
+  margin-bottom: 0;
+}
+
 .control-panel-content {
   display: flex;
   flex-direction: column;
