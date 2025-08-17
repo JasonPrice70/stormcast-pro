@@ -301,7 +301,7 @@ const SimpleStormTracker: React.FC = () => {
               icon={createStormIcon(storm.category, storm.classification)}
               zIndexOffset={1000}
             >
-            <Popup closeOnClick={false} autoClose={false}>
+            <Popup closeOnClick={true} autoClose={true}>
               <div className="storm-popup">
                 <div className="storm-popup-header">
                   <h3 className="storm-popup-title">
