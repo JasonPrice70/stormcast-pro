@@ -6,7 +6,7 @@ import './SimpleStormTracker.css';
 import { useNHCData, useStormSurge, useWindSpeedProbability, useWindArrival } from '../hooks/useNHCData';
 import SimpleHeader from '../components/SimpleHeader';
 import ExpandLessOutlinedIcon from '@mui/icons-material/ExpandLessOutlined';
-import ExpandMoreOutlinedIcon from '@mui/icons-material/ExpandMoreOutlined';
+import LayersOutlinedIcon from '@mui/icons-material/LayersOutlined';
 
 // Fix for default markers in React Leaflet
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -210,7 +210,7 @@ const SimpleStormTracker: React.FC = () => {
   const [windArrivalType, setWindArrivalType] = useState<'most-likely' | 'earliest'>('most-likely');
   const [showWindSpeedProb, setShowWindSpeedProb] = useState(false);
   const [windSpeedProbType, setWindSpeedProbType] = useState<'34kt' | '50kt' | '64kt'>('34kt');
-  const [isControlPanelMinimized, setIsControlPanelMinimized] = useState(false);
+  const [isControlPanelClosed, setIsControlPanelClosed] = useState(true);
   const [fetchLiveTrackData, setFetchLiveTrackData] = useState(true); // Enable track data fetching by default
   const [selectedStormId, setSelectedStormId] = useState<string | null>(null); // New state for selected storm  // Use live data hook only - fetch on mount by default
   const liveData = useNHCData({ 
@@ -301,7 +301,7 @@ const SimpleStormTracker: React.FC = () => {
               icon={createStormIcon(storm.category, storm.classification)}
               zIndexOffset={1000}
             >
-            <Popup closeOnClick={false} autoClose={false}>
+            <Popup closeOnClick={true} autoClose={true}>
               <div className="storm-popup">
                 <div className="storm-popup-header">
                   <h3 className="storm-popup-title">
@@ -1257,25 +1257,23 @@ const SimpleStormTracker: React.FC = () => {
       )}
       </div>
 
-      {/* Floating Control Panel */}
-      <div className={`floating-control-panel ${isControlPanelMinimized ? 'minimized' : ''}`}>
+      {/* Layer Toggle Button */}
+      <button 
+        className="layer-toggle-btn"
+        onClick={() => setIsControlPanelClosed(!isControlPanelClosed)}
+        onBlur={() => setIsControlPanelClosed(true)}
+        title={isControlPanelClosed ? "Open Layers Panel" : "Close Layers Panel"}
+      >
+        <LayersOutlinedIcon fontSize="medium" />
+      </button>
+
+      {/* Sliding Control Panel */}
+      <div className={`sliding-control-panel ${isControlPanelClosed ? 'closed' : 'open'}`}>
         <div className="control-panel-header-wrapper">
           <h3 className="control-panel-header">
              Live Storm Tracking
           </h3>
-          <button 
-            className="control-panel-minimize-btn"
-            onClick={() => setIsControlPanelMinimized(!isControlPanelMinimized)}
-            title={isControlPanelMinimized ? "Expand panel" : "Minimize panel"}
-          >
-            {isControlPanelMinimized ? (
-              <ExpandLessOutlinedIcon fontSize="small" />
-            ) : (
-              <ExpandMoreOutlinedIcon fontSize="small" />
-            )}
-          </button>
         </div>
-        {!isControlPanelMinimized && (
         <div className="control-panel-content">
           {loading ? (
             <span className="control-panel-loading">Loading storms...</span>
@@ -1600,14 +1598,14 @@ const SimpleStormTracker: React.FC = () => {
                   )}
               </div>
               
-              <div className="control-panel-buttons">
+              {/*<div className="control-panel-buttons">
                 <button 
                   onClick={refresh}
                   className="control-panel-button"
                 >
                   Refresh
                 </button>
-              </div>
+              </div>*/}
               {!hasStorms && (
                 <div className="no-storms-message">
                   <div className="no-storms-icon">🌤️</div>
@@ -1620,7 +1618,6 @@ const SimpleStormTracker: React.FC = () => {
             </>
           )}
         </div>
-        )}
       </div>
     </div>
   );
