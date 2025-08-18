@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, CircleMarker, Polygon, Tooltip } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -211,6 +211,31 @@ const SimpleStormTracker: React.FC = () => {
   const [showWindSpeedProb, setShowWindSpeedProb] = useState(false);
   const [windSpeedProbType, setWindSpeedProbType] = useState<'34kt' | '50kt' | '64kt'>('34kt');
   const [isControlPanelClosed, setIsControlPanelClosed] = useState(true);
+  
+  // Refs for click-outside detection
+  const layerButtonRef = useRef<HTMLButtonElement>(null);
+  const controlPanelRef = useRef<HTMLDivElement>(null);
+
+  // Click-outside effect to close panel
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        !isControlPanelClosed &&
+        layerButtonRef.current &&
+        controlPanelRef.current &&
+        !layerButtonRef.current.contains(event.target as Node) &&
+        !controlPanelRef.current.contains(event.target as Node)
+      ) {
+        setIsControlPanelClosed(true);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isControlPanelClosed]);
+
   const [fetchLiveTrackData, setFetchLiveTrackData] = useState(true); // Enable track data fetching by default
   const [selectedStormId, setSelectedStormId] = useState<string | null>(null); // New state for selected storm  // Use live data hook only - fetch on mount by default
   const liveData = useNHCData({ 
@@ -1259,16 +1284,19 @@ const SimpleStormTracker: React.FC = () => {
 
       {/* Layer Toggle Button */}
       <button 
+        ref={layerButtonRef}
         className="layer-toggle-btn"
         onClick={() => setIsControlPanelClosed(!isControlPanelClosed)}
-        onBlur={() => setIsControlPanelClosed(true)}
         title={isControlPanelClosed ? "Open Layers Panel" : "Close Layers Panel"}
       >
         <LayersOutlinedIcon fontSize="medium" />
       </button>
 
       {/* Sliding Control Panel */}
-      <div className={`sliding-control-panel ${isControlPanelClosed ? 'closed' : 'open'}`}>
+      <div 
+        ref={controlPanelRef}
+        className={`sliding-control-panel ${isControlPanelClosed ? 'closed' : 'open'}`}
+      >
         <div className="control-panel-header-wrapper">
           <h3 className="control-panel-header">
              Live Storm Tracking

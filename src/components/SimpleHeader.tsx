@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined'
-import CloudOutlinedIcon from '@mui/icons-material/CloudOutlined'
+import CycloneOutlined from '@mui/icons-material/CycloneOutlined'
 import ShowChartOutlinedIcon from '@mui/icons-material/ShowChartOutlined'
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
 import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined'
@@ -37,7 +37,7 @@ const SimpleHeader = () => {
             
             <div className="header-text">
               <h1>Hurricane Command Center</h1>
-              <p>Professional Hurricane & Tropical Cyclone Tracking</p>
+              <p>Hurricane & Tropical Cyclone Tracking</p>
             </div>
           </div>
         </div>
@@ -72,8 +72,8 @@ const SimpleHeader = () => {
               className={location.pathname === '/tracker' ? 'active' : ''}
               onClick={closeMenu}
             >
-                            <CloudOutlinedIcon className="menu-icon" />
-              Tracker
+                            <CycloneOutlined className="menu-icon" />
+                            Tracker
             </Link>
           </li>
           <li>

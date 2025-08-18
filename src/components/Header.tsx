@@ -7,8 +7,8 @@ const Header = () => {
   return (
     <header className="header">
       <div className="container">
-        <h1>Hurricane Command Center</h1>
-        <p>Professional Hurricane & Tropical Cyclone Tracking</p>
+        <h1>Cyclotrak</h1>
+        <p>Hurricane & Tropical Cyclone Tracking</p>
         <nav>
           <ul className="nav">
             <li>
