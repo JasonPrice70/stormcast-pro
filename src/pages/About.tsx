@@ -7,7 +7,7 @@ const About = () => {
       <SimpleHeader />
       <div className="container" style={{ padding: '40px 20px' }}>
         <div className="hero">
-          <h1>About CycloTrak</h1>
+          <h1>About Hurricane Command Center</h1>
           <p>Professional Hurricane & Tropical Cyclone Tracking Platform</p>
         </div>
 
@@ -15,7 +15,7 @@ const About = () => {
           <section className="storm-info">
             <h2>Mission Statement</h2>
             <p>
-              CycloTrak is dedicated to providing accurate, real-time hurricane and tropical cyclone 
+              Hurricane Command Center is dedicated to providing accurate, real-time hurricane and tropical cyclone 
               tracking information to help communities, emergency responders, and researchers stay 
               informed about developing weather threats.
             </p>
@@ -59,6 +59,28 @@ const About = () => {
               Built with modern web technologies including React, TypeScript, Leaflet mapping, 
               and AWS cloud infrastructure for reliable, scalable storm tracking.
             </p>
+          </section>
+
+          <section className="storm-info">
+            <h2>Contact Information</h2>
+            <p>
+              For questions, feedback, or technical support regarding Hurricane Command Center, please reach out:
+            </p>
+            <div className="contact-info">
+              <p>
+                <strong>📧 Email:</strong> 
+                <a href="mailto:jason.cyclotrak@gmail.com" style={{
+                  color: '#1a237e',
+                  textDecoration: 'none',
+                  marginLeft: '8px'
+                }}>
+                  jason.cyclotrak@gmail.com
+                </a>
+              </p>
+              <p style={{ marginTop: '10px', fontSize: '0.9rem', color: '#666' }}>
+                We welcome your feedback and suggestions to help improve Hurricane Command Center's storm tracking capabilities.
+              </p>
+            </div>
           </section>
 
           <section className="storm-info">
