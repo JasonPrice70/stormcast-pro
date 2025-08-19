@@ -1,5 +1,34 @@
 /* Simple Storm Tracker Styles */
 
+/* Spinner animation */
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.loading-spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid #f3f3f3;
+  border-top: 2px solid #1976d2;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-right: 6px;
+}
+
+.gefs-spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid #f3f3f3;
+  border-top: 2px solid #1976d2;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-left: 6px;
+  margin-right: 4px;
+}
+
 .simple-storm-tracker {
   height: 100vh;
   width: 100vw;
@@ -184,6 +213,8 @@
 .control-panel-loading {
   font-size: 0.9rem;
   color: #666;
+  display: flex;
+  align-items: center;
 }
 
 .control-panel-error {
