@@ -4,6 +4,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import './SimpleStormTracker.css';
 import { useNHCData, useStormSurge, useWindSpeedProbability, useWindArrival } from '../hooks/useNHCData';
+import { useGEFSSpaghetti } from '../hooks/useGEFSSpaghetti';
 import SimpleHeader from '../components/SimpleHeader';
 import ExpandLessOutlinedIcon from '@mui/icons-material/ExpandLessOutlined';
 import LayersOutlinedIcon from '@mui/icons-material/LayersOutlined';
@@ -210,6 +211,7 @@ const SimpleStormTracker: React.FC = () => {
   const [windArrivalType, setWindArrivalType] = useState<'most-likely' | 'earliest'>('most-likely');
   const [showWindSpeedProb, setShowWindSpeedProb] = useState(false);
   const [windSpeedProbType, setWindSpeedProbType] = useState<'34kt' | '50kt' | '64kt'>('34kt');
+  const [showGEFSSpaghetti, setShowGEFSSpaghetti] = useState(false);
   const [isControlPanelClosed, setIsControlPanelClosed] = useState(true);
   
   // Refs for click-outside detection
@@ -278,6 +280,7 @@ const SimpleStormTracker: React.FC = () => {
   const windArrival = useWindArrival(showWindArrival && selectedStormId !== null, selectedStormId, windArrivalType);
 
   // Use NOAA NOMADS spaghetti models hook when enabled and a storm is selected
+  const gefs = useGEFSSpaghetti(showGEFSSpaghetti && !!selectedStormId, selectedStormId);
 
 
   // Helper function to open CORS proxy access page
@@ -523,6 +526,40 @@ const SimpleStormTracker: React.FC = () => {
           
           return null;
         })}
+
+        {/* GEFS Spaghetti (A-deck proxy) */}
+        {showGEFSSpaghetti && selectedStormId && gefs.tracks && gefs.tracks.tracks && (
+          <React.Fragment>
+            {gefs.tracks.tracks.map((t, idx) => {
+              // Deduplicate repeated points that can appear in A-deck for the same tau
+              const seen = new Set<string>();
+              const deduped = t.points.filter((p: any) => {
+                const key = `${p.tau}:${p.lat?.toFixed(2)}:${p.lon?.toFixed(2)}`;
+                if (seen.has(key)) return false;
+                seen.add(key);
+                return true;
+              });
+              const positions = deduped
+                .map((p: any) => [p.lat, p.lon] as [number, number])
+                .filter(([lat, lon]) => isFinite(lat) && isFinite(lon));
+              if (positions.length < 2) return null;
+              const colors = ['#1976d2','#388e3c','#f57c00','#7b1fa2','#c2185b','#0097a7','#512da8','#00796b','#455a64','#8d6e63'];
+              const isMean = t.modelId === 'AEMI' || t.modelId === 'AEMN' || t.modelId === 'AEM2';
+              const color = isMean ? '#0d47a1' : colors[idx % colors.length];
+              const weight = isMean ? 3 : 1.5;
+              const opacity = isMean ? 0.95 : 0.6;
+              return (
+                <Polyline
+                  key={`gefs-${t.modelId}-${idx}`}
+                  positions={positions}
+                  pathOptions={{ color, weight, opacity }}
+                >
+                  <Tooltip sticky>{t.modelId}</Tooltip>
+                </Polyline>
+              );
+            })}
+          </React.Fragment>
+        )}
 
         {/* Render forecast tracks from KMZ data or forecast data */}
         {showTracks && stormsToDisplay.map((storm) => {
@@ -1299,7 +1336,7 @@ const SimpleStormTracker: React.FC = () => {
       >
         <div className="control-panel-header-wrapper">
           <h3 className="control-panel-header">
-             Live Storm Tracking
+             Map Layers
           </h3>
         </div>
         <div className="control-panel-content">
@@ -1434,7 +1471,7 @@ const SimpleStormTracker: React.FC = () => {
               {/* Path Visibility Controls */}
               <div style={{ marginTop: '10px', padding: '8px 0', borderTop: '1px solid #e0e0e0' }}>
                 <div style={{ fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '5px', color: '#1a237e' }}>
-                  Storm Paths
+                  NHC Layers
                   <div style={{ fontSize: '0.7rem', fontWeight: 'normal', color: '#666', marginTop: '2px' }}>
                     Real-time NHC forecast & historical data
                   </div>
@@ -1447,7 +1484,7 @@ const SimpleStormTracker: React.FC = () => {
                       onChange={(e) => setShowTracks(e.target.checked)}
                       style={{ marginRight: '6px' }}
                     />
-                    <span style={{ color: '#666666' }}>━━━━</span> Track Path
+                    <span style={{ color: '#666666' }}></span> Track Path
                   </label>
                   <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.8rem', cursor: 'pointer' }}>
                     <input
@@ -1456,7 +1493,7 @@ const SimpleStormTracker: React.FC = () => {
                       onChange={(e) => setShowForecastCones(e.target.checked)}
                       style={{ marginRight: '6px' }}
                     />
-                    <span style={{ color: '#2196F3' }}>▲▲▲</span> Forecast Cone
+                    <span style={{ color: '#2196F3' }}></span> Forecast Cone
                   </label>
                   <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.8rem', cursor: 'pointer' }}>
                     <input
@@ -1465,7 +1502,7 @@ const SimpleStormTracker: React.FC = () => {
                       onChange={(e) => setShowStormSurge(e.target.checked)}
                       style={{ marginRight: '6px' }}
                     />
-                    <span style={{ color: '#ff4444' }}>〰〰〰</span> Storm Surge
+                    <span style={{ color: '#ff4444' }}></span> Storm Surge
                     {stormSurge.available === false && (
                       <span style={{ fontSize: '0.7rem', color: '#888', marginLeft: '5px' }}>
                         (N/A for EP storms)
@@ -1480,14 +1517,14 @@ const SimpleStormTracker: React.FC = () => {
                       disabled={!selectedStormId}
                       style={{ marginRight: '6px' }}
                     />
-                    <span style={{ color: '#9932CC' }}>▣▣▣</span> Wind Arrival Time
+                    <span style={{ color: '#9932CC' }}></span> Wind Arrival Time
                     {!selectedStormId ? (
                       <span style={{ fontSize: '0.7rem', color: '#888', marginLeft: '5px' }}>
                         (Select a storm to view)
                       </span>
                     ) : windArrival.available === false ? (
                       <span style={{ fontSize: '0.7rem', color: '#888', marginLeft: '5px' }}>
-                        (No data available)
+                        
                       </span>
                     ) : null}
                   </label>
@@ -1517,6 +1554,7 @@ const SimpleStormTracker: React.FC = () => {
                       </label>
                     </div>
                   )}
+
                   <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.8rem', cursor: selectedStormId ? 'not-allowed' : 'pointer', opacity: selectedStormId ? 0.6 : 1 }}>
                     <input
                       type="checkbox"
@@ -1525,7 +1563,7 @@ const SimpleStormTracker: React.FC = () => {
                       disabled={selectedStormId !== null}
                       style={{ marginRight: '6px' }}
                     />
-                    <span style={{ color: '#0066cc' }}>⬢⬢⬢</span> {windSpeedProbType} Wind Probability
+                    <span style={{ color: '#0066cc' }}></span> {windSpeedProbType} Wind Probability
                     {selectedStormId ? (
                       <span style={{ fontSize: '0.7rem', color: '#888', marginLeft: '5px' }}>
                         (Only available when viewing all storms)
@@ -1625,7 +1663,49 @@ const SimpleStormTracker: React.FC = () => {
                     </div>
                   )}
               </div>
-              
+              <div style={{ marginTop: '10px', padding: '8px 0', borderTop: '1px solid #e0e0e0' }}>
+              <div style={{ fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '5px', color: '#1a237e' }}>
+                  Spaghetti Models
+                  {/*<div style={{ fontSize: '0.7rem', fontWeight: 'normal', color: '#666', marginTop: '2px' }}>
+                    Real-time NHC forecast & historical data
+                  </div>*/}
+                </div>
+                  {/* GEFS Spaghetti - standalone layer toggle */}
+                  <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.8rem', cursor: selectedStormId ? 'pointer' : 'not-allowed', opacity: selectedStormId ? 1 : 0.6 }}>
+                    <input
+                      type="checkbox"
+                      checked={showGEFSSpaghetti}
+                      onChange={(e) => setShowGEFSSpaghetti(e.target.checked)}
+                      disabled={!selectedStormId}
+                      style={{ marginRight: '6px' }}
+                    />
+                    GEFS 
+                    {gefs.loading && (
+                      <span style={{ marginLeft: '6px', fontSize: '0.7rem', color: '#1976d2' }}>
+                        ▣ loading...
+                      </span>
+                    )}
+                    {selectedStormId && gefs.tracks && gefs.tracks.modelsPresent && gefs.tracks.modelsPresent.length > 0 && (
+                      <span style={{ fontSize: '0.7rem', color: '#1976d2', marginLeft: '6px' }}>
+                        ({gefs.tracks.modelsPresent.length} models)
+                      </span>
+                    )}
+                    {gefs.error && (
+                      <span style={{ fontSize: '0.7rem', color: '#d32f2f', marginLeft: '6px' }}>
+                        {gefs.error}
+                      </span>
+                    )}
+                    {!selectedStormId ? (
+                      <span style={{ fontSize: '0.7rem', color: '#888', marginLeft: '5px' }}>
+                        (Select a storm)
+                      </span>
+                    ) : gefs.available === false ? (
+                      <span style={{ fontSize: '0.7rem', color: '#888', marginLeft: '5px' }}>
+                        (No data found)
+                      </span>
+                    ) : null}
+                  </label>
+                  </div>
               {/*<div className="control-panel-buttons">
                 <button 
                   onClick={refresh}
