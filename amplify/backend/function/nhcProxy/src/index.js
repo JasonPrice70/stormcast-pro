@@ -1,9 +1,21 @@
 const axios = require('axios');
 const yauzl = require('yauzl');
 const xml2js = require('xml2js');
+const zlib = require('zlib');
 
 // NHC API endpoints
 const NHC_BASE_URL = 'https://www.nhc.noaa.gov';
+const NHC_ATCF_ADECK = 'https://ftp.nhc.noaa.gov/atcf/aid_public';
+const NHC_ATCF_ADECK_SOURCES = [
+  'https://ftp.nhc.noaa.gov/atcf/aid_public',
+  'https://www.nhc.noaa.gov/atcf/aid_public',
+  'https://www.nhc.noaa.gov/data/atcf/aid_public'
+];
+// Also try HTTP mirrors and NRL as a last resort for discovery only
+const NHC_ATCF_ADECK_SOURCES_EXTRA = [
+  'http://ftp.nhc.noaa.gov/atcf/aid_public',
+  'https://www.nrlmry.navy.mil/atcf_web/data/aid_public'
+];
 
 // Request timeout (30 seconds)
 const REQUEST_TIMEOUT = 30000;
@@ -15,6 +27,262 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'GET,OPTIONS',
   'Content-Type': 'application/json'
 };
+
+// Utility: list S3 (public) using XML API
+async function listS3Public(bucketHost, params) {
+  const url = `${bucketHost}?${new URLSearchParams(params).toString()}`;
+  const resp = await axios.get(url, { timeout: REQUEST_TIMEOUT, responseType: 'text' });
+  const parser = new xml2js.Parser({ explicitArray: false });
+  const result = await parser.parseStringPromise(resp.data);
+  return result?.ListBucketResult || {};
+}
+
+async function listAllCommonPrefixes(bucketHost, prefix) {
+  let prefixes = [];
+  let continuationToken = undefined;
+  do {
+    const params = { 'list-type': '2', prefix, delimiter: '/' };
+    if (continuationToken) params['continuation-token'] = continuationToken;
+    const res = await listS3Public(bucketHost, params);
+    const pagePrefixes = res.CommonPrefixes ? (Array.isArray(res.CommonPrefixes) ? res.CommonPrefixes : [res.CommonPrefixes]) : [];
+    prefixes = prefixes.concat(pagePrefixes);
+    continuationToken = res.IsTruncated === 'true' || res.IsTruncated === true ? res.NextContinuationToken : undefined;
+  } while (continuationToken);
+  return prefixes;
+}
+
+async function getLatestGEFSPDSAvailability() {
+  const bucket = 'https://noaa-gefs-pds.s3.amazonaws.com';
+  // 1) List all dates: prefixes under 'gefs.' with pagination
+  const prefixes = await listAllCommonPrefixes(bucket, 'gefs.');
+  const dates = prefixes
+    .map(p => (p.Prefix || '').match(/^gefs\.(\d{8})\/$/))
+    .filter(Boolean)
+    .map(m => m[1])
+    .sort((a, b) => a.localeCompare(b));
+  const latestDate = dates[dates.length - 1];
+  if (!latestDate) return { date: null, cycle: null, members: [], resolutions: [] };
+  // 2) List all cycles under date
+  const cyclePrefixes = await listAllCommonPrefixes(bucket, `gefs.${latestDate}/`);
+  const cycles = cyclePrefixes
+    .map(p => (p.Prefix || '').match(/^gefs\.\d{8}\/(\d{2})\//))
+    .filter(Boolean)
+    .map(m => m[1])
+    .sort((a, b) => a.localeCompare(b));
+  const latestCycle = cycles[cycles.length - 1] || null;
+  if (!latestCycle) return { date: latestDate, cycle: null, members: [], resolutions: [] };
+  // 3) List atmos pgrb2a paths (0p50 and/or 0p25)
+  // Try 0p25 first, then 0p50
+  const bases = [
+    `gefs.${latestDate}/${latestCycle}/atmos/pgrb2ap25/`,
+    `gefs.${latestDate}/${latestCycle}/atmos/pgrb2ap5/`
+  ];
+  const membersSet = new Set();
+  const resolutions = [];
+  for (const base of bases) {
+    try {
+      const listFiles = await listS3Public(bucket, { 'list-type': '2', prefix: base });
+      const files = listFiles.Contents ? (Array.isArray(listFiles.Contents) ? listFiles.Contents : [listFiles.Contents]) : [];
+      if (files.length === 0) continue;
+      const res = base.includes('p25') ? '0p25' : '0p50';
+      resolutions.push(res);
+      files.forEach(obj => {
+        const key = obj.Key || '';
+        const m = key.match(/\/(ge[cp]\d{2})\.t(\d{2})z\.pgrb2a\.0p(25|50)\./);
+        if (m) membersSet.add(m[1]);
+      });
+    } catch (e) {
+      // ignore missing resolution path
+    }
+  }
+  const members = Array.from(membersSet).sort();
+  return { date: latestDate, cycle: latestCycle, members, resolutions };
+}
+
+// Utility: parse lat/lon like 25.2N / 072.5W into signed decimals
+function parseAtcfCoord(coordStr) {
+  if (!coordStr || typeof coordStr !== 'string') return null;
+  const s = coordStr.trim().toUpperCase();
+  const m = s.match(/^(\d+(?:\.\d+)?)\s*([NSEW])$/);
+  if (!m) return null;
+  let val = parseFloat(m[1]);
+  // ATCF A-deck commonly encodes coords as tenths of a degree without a decimal (e.g., 252N => 25.2, 0723W => 72.3)
+  // If there's no explicit decimal point in the numeric portion, interpret it as tenths
+  if (!m[1].includes('.')) {
+    val = val / 10.0;
+  }
+  const hemi = m[2];
+  if (hemi === 'S' || hemi === 'W') return -val;
+  return val;
+}
+
+// Fetch and parse A-deck for GEFS-like models (AEM*, AE*)
+async function fetchGEFSAdeckTracks(stormId) {
+  const id = (stormId || '').toLowerCase();
+  if (!/^([aezlp][a-z])\d{2}\d{4}$/i.test(id)) {
+    throw new Error('Invalid stormId format');
+  }
+  // Try common A-deck filename patterns: 'aal' + id and plain id
+  const adeck = await fetchAdeckText(id);
+  const lines = adeck.text.split(/\r?\n/).filter(Boolean);
+  const byModel = new Map();
+  const modelsPresent = new Set();
+  let latestCycle = null;
+  for (const line of lines) {
+    const parts = line.split(',').map(s => s.trim());
+    if (parts.length < 10) continue;
+    // ATCF A-deck fields: basin(0), num(1), ymdh(2), technum/min(3), tech(4), tau(5), lat(6), lon(7), vmax(8), mslp(9), ...
+    const ymdh = parts[2];
+    const tech = parts[4];
+    const tauStr = parts[5];
+    const latStr = parts[6];
+    const lonStr = parts[7];
+    const vmaxStr = parts[8];
+    if (!tech || !tauStr || !latStr || !lonStr) continue;
+  // Filter GEFS-related techs:
+  // - AE* (ensemble mean/controls from various centers)
+  // - AP01..AP30 (GEFS individual perturbed members)
+  if (!/^AE/i.test(tech) && !/^AP\d{2}$/i.test(tech)) continue;
+    const tau = parseInt(tauStr, 10);
+    const lat = parseAtcfCoord(latStr);
+    const lon = parseAtcfCoord(lonStr);
+    const vmax = parseInt(vmaxStr, 10) || null;
+    if (!isFinite(tau) || lat === null || lon === null) continue;
+    modelsPresent.add(tech);
+    if (!byModel.has(tech)) byModel.set(tech, []);
+  // lon string already encodes hemisphere (E/W) and parseAtcfCoord returns signed value
+  // Do NOT invert again; just use the signed lon directly
+  byModel.get(tech).push({ tau, lat, lon, vmax, ymdh });
+    // Track latest cycle (ymdh max)
+    if (ymdh && /\d{10}/.test(ymdh)) {
+      if (!latestCycle || ymdh > latestCycle) latestCycle = ymdh;
+    }
+  }
+  // Sort each model by tau and optionally only keep latest cycle entries if multiple cycles exist
+  const tracks = [];
+  for (const [model, pts] of byModel.entries()) {
+    // If multiple cycles present, filter to latest ymdh
+    let filtered = pts;
+    const cycles = Array.from(new Set(pts.map(p => p.ymdh).filter(Boolean))).sort();
+    if (cycles.length > 1) {
+      const last = cycles[cycles.length - 1];
+      filtered = pts.filter(p => p.ymdh === last);
+    }
+    filtered.sort((a, b) => a.tau - b.tau);
+    tracks.push({ modelId: model, points: filtered.map(({ tau, lat, lon, vmax }) => ({ tau, lat, lon, vmax })) });
+  }
+  return {
+  filename: adeck.filename || `${id}.dat`,
+    modelsPresent: Array.from(modelsPresent).sort(),
+    tracks
+  };
+}
+
+// Utility: list unique tech codes present in an A-deck for debugging/inspection
+async function listAdeckTechs(stormId) {
+  const id = (stormId || '').toLowerCase();
+  if (!/^([aezlp][a-z])\d{2}\d{4}$/i.test(id)) {
+    throw new Error('Invalid stormId format');
+  }
+  const adeck = await fetchAdeckText(id);
+  const lines = adeck.text.split(/\r?\n/).filter(Boolean);
+  const techs = new Set();
+  lines.forEach(line => {
+    const parts = line.split(',').map(s => s.trim());
+    if (parts.length >= 5) {
+      const tech = parts[4];
+      if (tech) techs.add(tech);
+    }
+  });
+  return { filename: adeck.filename || `${id}.dat`, techs: Array.from(techs).sort(), count: techs.size };
+}
+
+// Helper: fetch A-deck text trying multiple filename patterns
+async function fetchAdeckText(id) {
+  const attempted = [];
+  const candidates = [];
+  for (const base of NHC_ATCF_ADECK_SOURCES) {
+    // Plain .dat
+    candidates.push(`${base}/a${id}.dat`); // e.g., aal052025.dat
+    candidates.push(`${base}/${id}.dat`);  // e.g., al052025.dat
+    // Gzip .dat.gz
+    candidates.push(`${base}/a${id}.dat.gz`);
+    candidates.push(`${base}/${id}.dat.gz`);
+  }
+  let lastErr;
+  for (const url of candidates) {
+    attempted.push(url);
+    try {
+      // Use arraybuffer to support raw gzip payloads as well as plain text
+      const resp = await axios.get(url, { timeout: 20000, responseType: 'arraybuffer' });
+      let buf = Buffer.from(resp.data);
+      if (!buf || buf.length === 0) continue;
+      const isGzip = url.toLowerCase().endsWith('.gz') || (buf.length > 2 && buf[0] === 0x1f && buf[1] === 0x8b);
+      let text;
+      if (isGzip) {
+        try {
+          const unzipped = zlib.gunzipSync(buf);
+          text = unzipped.toString('utf8');
+        } catch (unzErr) {
+          lastErr = unzErr;
+          continue;
+        }
+      } else {
+        text = buf.toString('utf8');
+      }
+      if (typeof text === 'string' && text.trim().length > 0) {
+        const filename = url.substring(url.lastIndexOf('/') + 1);
+        return { text, filename };
+      }
+    } catch (e) {
+      lastErr = e;
+      continue;
+    }
+  }
+  // As a fallback, try to discover the exact filename by scraping directory listings
+  try {
+    const discovered = await discoverAdeckFilename(id);
+    if (discovered && discovered.url) {
+      attempted.push(discovered.url);
+      const resp = await axios.get(discovered.url, { timeout: 20000, responseType: 'text' });
+      if (typeof resp.data === 'string' && resp.data.trim().length > 0) {
+        return { text: resp.data, filename: discovered.filename };
+      }
+    }
+  } catch (e) {
+    lastErr = e;
+  }
+  const err = new Error(`A-deck file not found for ${id}. Attempted: ${attempted.join(', ')}`);
+  err.attempted = attempted;
+  throw err;
+}
+
+// Discover A-deck filename by listing directory index pages across sources
+async function discoverAdeckFilename(id) {
+  const patterns = [
+  new RegExp(`a${id}\.dat(\.gz)?`, 'i'), // aal052025.dat or .dat.gz
+  new RegExp(`${id}\.dat(\.gz)?`, 'i')   // al052025.dat or .dat.gz
+  ];
+  const sources = [...NHC_ATCF_ADECK_SOURCES, ...NHC_ATCF_ADECK_SOURCES_EXTRA];
+  for (const base of sources) {
+    try {
+      const indexUrl = `${base}/`;
+      const resp = await axios.get(indexUrl, { timeout: 20000, responseType: 'text' });
+      const html = String(resp.data || '');
+      for (const pat of patterns) {
+    const m = html.match(new RegExp(`href=["']([^"'>]*${pat.source})["']`, 'i')) || html.match(pat);
+        if (m) {
+          const filename = (m[1] || m[0]).split('/').pop();
+          const url = `${base}/${filename}`;
+          return { filename, url };
+        }
+      }
+    } catch (e) {
+      // ignore and try next base
+    }
+  }
+  return null;
+}
 
 /**
  * Parse KMZ file and extract track data as GeoJSON
@@ -1265,6 +1533,67 @@ exports.handler = async (event) => {
       case 'active-storms':
         nhcUrl = `${NHC_BASE_URL}/CurrentStorms.json`;
         break;
+      case 'adeck-techs': {
+        const stormId = queryStringParameters?.stormId;
+        if (!stormId) {
+          return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ success: false, error: 'stormId is required' }) };
+        }
+        try {
+          const result = await listAdeckTechs(stormId);
+          return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ success: true, endpoint: 'adeck-techs', data: result }) };
+        } catch (e) {
+          return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ success: true, endpoint: 'adeck-techs', data: { message: e.message, filename: `${stormId.toLowerCase()}.dat`, techs: [], count: 0 } }) };
+        }
+      }
+      case 'gefs-adeck': {
+        const stormId = queryStringParameters?.stormId;
+        if (!stormId) {
+          return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ success: false, error: 'stormId is required' }) };
+        }
+        try {
+          const result = await fetchGEFSAdeckTracks(stormId);
+          // Wrap in data for consistency with other endpoints
+          return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ success: true, endpoint: 'gefs-adeck', data: result }) };
+        } catch (e) {
+          // Still return success with empty data to indicate "no data available" rather than an error
+          return { 
+            statusCode: 200, 
+            headers: corsHeaders, 
+            body: JSON.stringify({ 
+              success: true, 
+              endpoint: 'gefs-adeck', 
+              data: { message: e.message, filename: `${stormId.toLowerCase()}.dat`, tracks: [], modelsPresent: [] }
+            }) 
+          };
+        }
+      }
+      case 'gefs-pds-latest': {
+        const avail = await getLatestGEFSPDSAvailability();
+        return {
+          statusCode: 200,
+          headers: corsHeaders,
+          body: JSON.stringify({ success: true, endpoint: 'gefs-pds-latest', data: avail, timestamp: new Date().toISOString() })
+        };
+      }
+      case 'gefs-member-grids': {
+        // Returns a lightweight listing of file keys for a given date/cycle/resolution to help client compute tracks later.
+        const date = queryStringParameters?.date; // YYYYMMDD
+        const cycle = queryStringParameters?.cycle; // HH
+        const res = queryStringParameters?.res || '0p25'; // 0p25 or 0p50
+        const bucket = 'https://noaa-gefs-pds.s3.amazonaws.com';
+        if (!date || !cycle) {
+          return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ success: false, error: 'date and cycle are required' }) };
+        }
+        const base = res === '0p50' ? `gefs.${date}/${cycle}/atmos/pgrb2ap5/` : `gefs.${date}/${cycle}/atmos/pgrb2ap25/`;
+        try {
+          const list = await listS3Public(bucket, { 'list-type': '2', prefix: base });
+          const files = list.Contents ? (Array.isArray(list.Contents) ? list.Contents : [list.Contents]) : [];
+          const keys = files.map(o => o.Key).filter(Boolean);
+          return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ success: true, endpoint: 'gefs-member-grids', data: { base, keys } }) };
+        } catch (e) {
+          return { statusCode: 500, headers: corsHeaders, body: JSON.stringify({ success: false, error: e.message }) };
+        }
+      }
         
       case 'track-kmz':
         const trackStormId = queryStringParameters?.stormId;
@@ -1412,11 +1741,11 @@ exports.handler = async (event) => {
         break;
         
       default:
-        return {
+    return {
           statusCode: 400,
           headers: corsHeaders,
           body: JSON.stringify({ 
-            error: 'Invalid endpoint. Supported endpoints: active-storms, track-kmz, forecast-track, historical-track, forecast-cone, forecast-track-kmz, storm-surge, wind-speed-probability, wind-speed-probability-50kt, wind-speed-probability-64kt, wind-arrival-most-likely, wind-arrival-earliest' 
+      error: 'Invalid endpoint. Supported endpoints: active-storms, track-kmz, forecast-track, historical-track, forecast-cone, forecast-track-kmz, storm-surge, wind-speed-probability, wind-speed-probability-50kt, wind-speed-probability-64kt, wind-arrival-most-likely, wind-arrival-earliest, gefs-pds-latest, gefs-member-grids' 
           })
         };
     }

@@ -90,6 +90,30 @@ class NHCApiService {
   }
 
   /**
+   * Fetch GEFS-like ensemble tracks from NHC ATCF A-deck for a stormId.
+   * Returns { filename, modelsPresent, tracks: [{ modelId, points: [{tau,lat,lon,vmax}]}] }
+   */
+  async getGEFSAdeckTracks(stormId: string): Promise<{
+    filename: string;
+    modelsPresent: string[];
+    tracks: Array<{ modelId: string; points: Array<{ tau: number; lat: number; lon: number; vmax: number | null }> }>;
+  } | null> {
+    if (!stormId) return null;
+    const data = await this.fetchWithLambdaFallback('gefs-adeck', { stormId });
+    if (data && (data.tracks || data.modelsPresent)) return data;
+    return null;
+  }
+
+  /**
+   * Fetch latest GEFS PDS availability (date, cycle, members, resolutions)
+   */
+  async getGEFSPDSAvailability(): Promise<{ date: string|null; cycle: string|null; members: string[]; resolutions: string[] } | null> {
+    const data = await this.fetchWithLambdaFallback('gefs-pds-latest');
+    if (data && (data.date || data.members)) return data;
+    return null;
+  }
+
+  /**
    * Try next CORS proxy if current one fails
    */
   private tryNextProxy(): boolean {
