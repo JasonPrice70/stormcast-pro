@@ -153,6 +153,91 @@ export const useStormSurge = (stormId: string | null) => {
   }
 }
 
+// Hook for getting a specific storm's peak storm surge data
+export const usePeakStormSurge = (stormId: string | null) => {
+  const [peakSurgeData, setPeakSurgeData] = useState<any>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [available, setAvailable] = useState<boolean | null>(null)
+
+  const fetchPeakStormSurge = useCallback(async () => {
+    if (!stormId) {
+      setPeakSurgeData(null)
+      setAvailable(null)
+      return
+    }
+
+    try {
+      setLoading(true)
+      setError(null)
+
+      const nhcApi = new NHCApiService()
+      
+      // Runtime check and method addition if needed (temporary fix for TypeScript issue)
+      if (typeof nhcApi.getPeakStormSurge !== 'function') {
+        console.warn('getPeakStormSurge method not found on NHCApiService instance, adding it dynamically')
+        // Add the method dynamically if it's missing
+        ;(nhcApi as any).getPeakStormSurge = async function(stormId: string, useProxy = true): Promise<any | null> {
+          // Peak storm surge is primarily available for Atlantic storms (AL prefix)
+          if (!stormId.toUpperCase().startsWith('AL')) {
+            console.log('Peak storm surge data is typically only available for Atlantic storms (AL prefix)')
+            return null
+          }
+
+          try {
+            console.log(`Fetching peak storm surge for ${stormId} using Lambda API...`)
+            
+            // Use Lambda function to fetch peak storm surge data
+            const proxyData = await this.fetchWithLambdaFallback('peak-storm-surge', { stormId })
+
+            if (proxyData) {
+              console.log('Successfully fetched peak storm surge data via Lambda:', proxyData)
+              return proxyData
+            }
+
+            console.log('No peak storm surge data returned from Lambda for storm:', stormId)
+            return null
+          } catch (error: any) {
+            console.log('Peak storm surge data not available for storm:', stormId, error.message)
+            if (error.response?.status === 404) {
+              console.log('Peak storm surge KML file not found - this is normal for storms that don\'t threaten populated coastlines')
+            }
+            return null
+          }
+        }
+      }
+      
+      const peakSurge = await nhcApi.getPeakStormSurge(stormId, true)
+      
+      if (peakSurge) {
+        setPeakSurgeData(peakSurge)
+        setAvailable(true)
+      } else {
+        setPeakSurgeData(null)
+        setAvailable(false)
+      }
+    } catch (err) {
+      console.error('Error fetching peak storm surge data:', err)
+      setError(err instanceof Error ? err.message : 'Failed to fetch peak storm surge data')
+      setAvailable(false)
+    } finally {
+      setLoading(false)
+    }
+  }, [stormId])
+
+  useEffect(() => {
+    fetchPeakStormSurge()
+  }, [fetchPeakStormSurge])
+
+  return {
+    peakSurgeData,
+    loading,
+    error,
+    available,
+    refresh: fetchPeakStormSurge
+  }
+}
+
 // Hook for getting wind speed probability data
 export const useWindSpeedProbability = (enabled: boolean = false, windSpeed: '34kt' | '50kt' | '64kt' = '34kt') => {
   const [probabilityData, setProbabilityData] = useState<any>(null)
@@ -319,7 +404,7 @@ export const useGEFSSpaghetti = (enabled: boolean, stormId: string | null) => {
       setLoading(true)
       setError(null)
       const api = new NHCApiService()
-      const data = await api.getGEFSAdeckTracks(stormId)
+      const data = await api.getGEFSEnsembleTracks(stormId.replace(/\D/g, ''), new Date().getFullYear())
       if (data && data.tracks && data.tracks.length > 0) {
         setTracks(data)
         setAvailable(true)
