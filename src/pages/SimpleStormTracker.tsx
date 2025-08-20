@@ -208,7 +208,8 @@ const getIntensityCategoryFromWinds = (windSpeed: number, isKnots: boolean = tru
 };
 
 const SimpleStormTracker: React.FC = () => {
-  const [showTracks, setShowTracks] = useState(true);
+  const [showHistoricalTracks, setShowHistoricalTracks] = useState(true);
+  const [showForecastTracks, setShowForecastTracks] = useState(true);
   const [showForecastCones, setShowForecastCones] = useState(true);
   const [showStormSurge, setShowStormSurge] = useState(false);
   const [showWindArrival, setShowWindArrival] = useState(false);
@@ -377,7 +378,7 @@ const SimpleStormTracker: React.FC = () => {
         })}
 
         {/* Render storm tracks from KMZ data or historical data */}
-        {showTracks && stormsToDisplay.map((storm) => {
+        {showHistoricalTracks && stormsToDisplay.map((storm) => {
           // First try to use official track data from KMZ
           if (storm.track && storm.track.features && storm.track.features.length > 0) {
             return (
@@ -566,7 +567,7 @@ const SimpleStormTracker: React.FC = () => {
         )}
 
         {/* Render forecast tracks from KMZ data or forecast data */}
-        {showTracks && stormsToDisplay.map((storm) => {
+        {showForecastTracks && stormsToDisplay.map((storm) => {
           // First try to use official forecast track data from KMZ
           if (storm.forecastTrack && storm.forecastTrack.features && storm.forecastTrack.features.length > 0) {
             return (
@@ -1487,11 +1488,34 @@ const SimpleStormTracker: React.FC = () => {
                   <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.8rem', cursor: 'pointer' }}>
                     <input
                       type="checkbox"
-                      checked={showTracks}
-                      onChange={(e) => setShowTracks(e.target.checked)}
+                      checked={showHistoricalTracks}
+                      onChange={(e) => setShowHistoricalTracks(e.target.checked)}
                       style={{ marginRight: '6px' }}
                     />
-                    <span style={{ color: '#666666' }}></span> Track Path
+                    <span style={{ 
+                      width: '12px', 
+                      height: '2px', 
+                      backgroundColor: '#666666', 
+                      marginRight: '6px',
+                      borderRadius: '1px',
+                      border: '1px dashed #666666'
+                    }}></span> Historical Track
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.8rem', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={showForecastTracks}
+                      onChange={(e) => setShowForecastTracks(e.target.checked)}
+                      style={{ marginRight: '6px' }}
+                    />
+                    <span style={{ 
+                      width: '12px', 
+                      height: '2px', 
+                      backgroundColor: '#222222', 
+                      marginRight: '6px',
+                      borderRadius: '1px',
+                      border: '1px dashed #222222'
+                    }}></span> Forecast Track
                   </label>
                   <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.8rem', cursor: 'pointer' }}>
                     <input
