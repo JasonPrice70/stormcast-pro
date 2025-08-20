@@ -353,3 +353,124 @@
 .path-control-legend.forecast {
   color: #ff3333;
 }
+
+/* Peak Storm Surge Legend and Labels */
+.surge-label-marker {
+  pointer-events: none; /* Allow clicking through labels to underlying map */
+}
+
+.surge-label-marker div {
+  transform: translateX(-50%) translateY(-50%);
+  transition: all 0.2s ease;
+}
+
+/* Enhance label visibility */
+.leaflet-div-icon {
+  background: transparent !important;
+  border: none !important;
+}
+
+/* Mobile Responsive Styles */
+@media (max-width: 768px) {
+  /* Make control panel take full width on mobile */
+  .sliding-control-panel {
+    width: 100vw;
+    top: 60px; /* Adjust for smaller header on mobile */
+    height: calc(100vh - 60px);
+    border-radius: 0;
+    border: none;
+    transform: translateX(100%);
+  }
+  
+  /* Position layer toggle button better for mobile */
+  .layer-toggle-btn {
+    right: 15px;
+    top: 70px;
+    width: 44px;
+    height: 44px;
+    border-radius: 22px;
+  }
+  
+  /* Make legend items more touch-friendly */
+  .control-panel-content label {
+    padding: 8px 4px;
+    border-radius: 4px;
+  }
+  
+  .control-panel-content label:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+  }
+  
+  /* Increase font sizes slightly for better mobile readability */
+  .control-panel-content {
+    font-size: 0.9rem;
+  }
+  
+  /* Make checkboxes larger for mobile */
+  .control-panel-content input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    margin-right: 8px;
+  }
+  
+  /* Better spacing for storm selector on mobile */
+  .control-panel-content select {
+    padding: 10px;
+    font-size: 0.9rem;
+    border-radius: 6px;
+  }
+  
+  /* Mobile-friendly positioning for Peak Storm Surge legend */
+  .peak-surge-legend {
+    bottom: 10px !important;
+    left: 10px !important;
+    max-width: calc(100vw - 80px) !important;
+    font-size: 0.7rem !important;
+    padding: 8px !important;
+  }
+  
+  .peak-surge-legend div[style*="fontSize"] {
+    font-size: 0.7rem !important;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Even smaller screens - adjust header */
+  .sliding-control-panel {
+    top: 50px;
+    height: calc(100vh - 50px);
+  }
+  
+  .layer-toggle-btn {
+    top: 60px;
+    right: 10px;
+    width: 40px;
+    height: 40px;
+  }
+  
+  /* Reduce padding on very small screens */
+  .control-panel-content {
+    padding: 15px;
+  }
+  
+  .control-panel-header-wrapper {
+    padding: 15px;
+  }
+}
+
+/* Add touch-friendly dragging for mobile (optional enhancement) */
+@media (hover: none) and (pointer: coarse) {
+  .sliding-control-panel {
+    /* Add subtle indication that panel can be swiped */
+    border-left: 3px solid rgba(26, 35, 126, 0.3);
+  }
+  
+  /* Make interactive elements more touch-friendly */
+  .control-panel-content label,
+  .control-panel-content button,
+  .control-panel-content select {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+  }
+}

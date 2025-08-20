@@ -3,7 +3,7 @@ import { MapContainer, TileLayer, Marker, Popup, Polyline, CircleMarker, Polygon
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import './SimpleStormTracker.css';
-import { useNHCData, useStormSurge, useWindSpeedProbability, useWindArrival } from '../hooks/useNHCData';
+import { useNHCData, useStormSurge, usePeakStormSurge, useWindSpeedProbability, useWindArrival } from '../hooks/useNHCData';
 import { useGEFSSpaghetti } from '../hooks/useGEFSSpaghetti';
 import SimpleHeader from '../components/SimpleHeader';
 import ExpandLessOutlinedIcon from '@mui/icons-material/ExpandLessOutlined';
@@ -212,6 +212,7 @@ const SimpleStormTracker: React.FC = () => {
   const [showForecastTracks, setShowForecastTracks] = useState(true);
   const [showForecastCones, setShowForecastCones] = useState(true);
   const [showStormSurge, setShowStormSurge] = useState(false);
+  const [showPeakStormSurge, setShowPeakStormSurge] = useState(false);
   const [showWindArrival, setShowWindArrival] = useState(false);
   const [windArrivalType, setWindArrivalType] = useState<'most-likely' | 'earliest'>('most-likely');
   const [showWindSpeedProb, setShowWindSpeedProb] = useState(false);
@@ -277,6 +278,9 @@ const SimpleStormTracker: React.FC = () => {
   
   // Use storm surge hook for the selected storm
   const stormSurge = useStormSurge(showStormSurge && selectedStormId ? selectedStormId : null);
+  
+  // Use peak storm surge hook for the selected storm
+  const peakStormSurge = usePeakStormSurge(showPeakStormSurge && selectedStormId ? selectedStormId : null);
   
   // Use wind speed probability hook when enabled and no specific storm is selected
   const windSpeedProb = useWindSpeedProbability(showWindSpeedProb && !selectedStormId, windSpeedProbType);
@@ -927,6 +931,279 @@ const SimpleStormTracker: React.FC = () => {
           return null;
         })}
 
+        {/* Peak Storm Surge Layer */}
+        {showPeakStormSurge && peakStormSurge.peakSurgeData && peakStormSurge.peakSurgeData.features && peakStormSurge.peakSurgeData.features.map((feature: any, index: number) => {
+          // Handle Polygon features (water body areas)
+          if (feature.geometry && feature.geometry.type === 'Polygon') {
+            const coordinates = feature.geometry.coordinates[0].map((coord: number[]) => [coord[1], coord[0]] as [number, number]);
+            
+            // Get color from KML data, with fallback to height-based coloring
+            let surgeColor = '#0066cc'; // Default blue
+            let surgeOpacity = 0.4;
+            
+            if (feature.properties?.color) {
+              // Use color specified in KML file
+              switch (feature.properties.color.toLowerCase()) {
+                case 'yellow':
+                  surgeColor = '#ffcc00';
+                  surgeOpacity = 0.5;
+                  break;
+                case 'orange':
+                  surgeColor = '#ff6600';
+                  surgeOpacity = 0.5;
+                  break;
+                case 'red':
+                  surgeColor = '#cc0000';
+                  surgeOpacity = 0.6;
+                  break;
+                case 'purple':
+                case 'magenta':
+                  surgeColor = '#cc00cc';
+                  surgeOpacity = 0.5;
+                  break;
+                case 'blue':
+                default:
+                  surgeColor = '#0066cc';
+                  surgeOpacity = 0.4;
+                  break;
+              }
+            } else if (feature.properties) {
+              // Fallback to height-based coloring if no color specified in KML
+              const height = feature.properties.SURGE_FT || feature.properties.height || 0;
+              if (height >= 15) {
+                surgeColor = '#660066'; // Dark purple for 15+ feet
+                surgeOpacity = 0.6;
+              } else if (height >= 10) {
+                surgeColor = '#990099'; // Purple for 10-15 feet
+                surgeOpacity = 0.5;
+              } else if (height >= 6) {
+                surgeColor = '#cc00cc'; // Magenta for 6-10 feet
+                surgeOpacity = 0.45;
+              } else if (height >= 3) {
+                surgeColor = '#ff66ff'; // Light purple for 3-6 feet
+                surgeOpacity = 0.4;
+              } else {
+                surgeColor = '#ff99ff'; // Light pink for 0-3 feet
+                surgeOpacity = 0.35;
+              }
+            }
+            
+            // Create custom surge area marker with label for area name and height
+            const areaName = feature.properties?.areaName || 'Unknown Area';
+            const surgeRange = feature.properties?.surgeRange || '';
+            const centerLat = feature.properties?.centerLat;
+            const centerLon = feature.properties?.centerLon;
+            
+            return (
+              <React.Fragment key={`peak-surge-${index}`}>
+                {/* Surge Area Polygon */}
+                <Polygon
+                  positions={coordinates}
+                  pathOptions={{
+                    color: surgeColor,
+                    weight: 2,
+                    opacity: 0.9,
+                    fillColor: surgeColor,
+                    fillOpacity: surgeOpacity,
+                    dashArray: '8, 4' // Dashed border to distinguish from regular surge
+                  }}
+                >
+                  <Popup>
+                    <div style={{ minWidth: '200px' }}>
+                      <div style={{ 
+                        fontWeight: 'bold', 
+                        color: surgeColor, 
+                        borderBottom: '1px solid #eee',
+                        paddingBottom: '4px',
+                        marginBottom: '6px'
+                      }}>
+                        🌊 Peak Storm Surge Zone
+                      </div>
+                      <div><strong>Area:</strong> {areaName}</div>
+                      <div><strong>Surge Height:</strong> {surgeRange || `${feature.properties?.SURGE_FT || feature.properties?.height || 'Unknown'} ft`}</div>
+                      <div style={{ fontSize: '0.8rem', color: '#666', marginTop: '4px' }}>
+                        <strong>Impact Level:</strong> {
+                          (feature.properties?.SURGE_FT || 0) >= 10 ? 
+                            '🔴 Extreme' : 
+                          (feature.properties?.SURGE_FT || 0) >= 6 ? 
+                            '🟠 High' : 
+                          (feature.properties?.SURGE_FT || 0) >= 3 ? 
+                            '🟡 Moderate' : 
+                            '🟢 Low'
+                        }
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: '#666', marginTop: '4px', fontStyle: 'italic' }}>
+                        Maximum potential storm surge heights for this area
+                      </div>
+                    </div>
+                  </Popup>
+                  <Tooltip direction="top" offset={[0, -10]} opacity={0.9}>
+                    <div>
+                      <strong>{areaName}</strong><br />
+                      {surgeRange}
+                    </div>
+                  </Tooltip>
+                </Polygon>
+                
+                {/* Area Label Marker - only if we have center coordinates */}
+                {centerLat && centerLon && (
+                  <Marker
+                    position={[centerLat, centerLon]}
+                    icon={L.divIcon({
+                      html: `
+                        <div style="
+                          background: transparent;
+                          border: none;
+                          border-radius: 4px;
+                          padding: 2px 6px;
+                          font-size: 0.85rem;
+                          font-weight: bold;
+                          color: black;
+                          text-align: center;
+                          text-shadow: 1px 1px 2px rgba(255,255,255,0.8), -1px -1px 2px rgba(255,255,255,0.8), 1px -1px 2px rgba(255,255,255,0.8), -1px 1px 2px rgba(255,255,255,0.8);
+                          white-space: nowrap;
+                          max-width: 120px;
+                          overflow: hidden;
+                          text-overflow: ellipsis;
+                        ">
+                          ${surgeRange || `${feature.properties?.SURGE_FT || '?'} ft`}
+                        </div>
+                      `,
+                      className: 'surge-label-marker',
+                      iconSize: [80, 20],
+                      iconAnchor: [40, 10]
+                    })}
+                  />
+                )}
+              </React.Fragment>
+            );
+          }
+          
+          // Handle LineString features (coastal surge lines)
+          if (feature.geometry && feature.geometry.type === 'LineString') {
+            const coordinates = feature.geometry.coordinates.map((coord: number[]) => [coord[1], coord[0]] as [number, number]);
+            
+            // Get color from KML data
+            let lineColor = '#0066cc'; // Default blue
+            let lineWeight = 3;
+            
+            if (feature.properties?.color) {
+              switch (feature.properties.color.toLowerCase()) {
+                case 'yellow':
+                  lineColor = '#ffcc00';
+                  break;
+                case 'orange':
+                  lineColor = '#ff6600';
+                  break;
+                case 'red':
+                  lineColor = '#cc0000';
+                  break;
+                case 'purple':
+                case 'magenta':
+                  lineColor = '#cc00cc';
+                  break;
+                case 'blue':
+                default:
+                  lineColor = '#0066cc';
+                  break;
+              }
+            }
+            
+            const coastalSegment = feature.properties?.coastalSegment || 'Unknown Segment';
+            const surgeRange = feature.properties?.surgeRange || '';
+            
+            return (
+              <React.Fragment key={`coastal-surge-line-${index}`}>
+                <Polyline
+                  positions={coordinates}
+                  pathOptions={{
+                    color: lineColor,
+                    weight: lineWeight,
+                    opacity: 0.8,
+                    dashArray: '12, 8' // Dashed line to distinguish from other features
+                  }}
+                >
+                  <Popup>
+                    <div style={{ minWidth: '200px' }}>
+                      <div style={{ 
+                        fontWeight: 'bold', 
+                        color: lineColor, 
+                        borderBottom: '1px solid #eee',
+                        paddingBottom: '4px',
+                        marginBottom: '6px'
+                      }}>
+                        🌊 Coastal Surge Line
+                      </div>
+                      <div><strong>Segment:</strong> {coastalSegment}</div>
+                      <div><strong>Surge Height:</strong> {surgeRange}</div>
+                      <div style={{ fontSize: '0.8rem', color: '#666', marginTop: '4px' }}>
+                        Expected surge heights along this coastal segment
+                      </div>
+                    </div>
+                  </Popup>
+                  <Tooltip direction="top" offset={[0, -10]} opacity={0.9}>
+                    <div style={{
+                      background: 'rgba(0,0,0,0.8)',
+                      color: 'white',
+                      padding: '4px 8px',
+                      borderRadius: '4px',
+                      fontSize: '0.8rem',
+                      textAlign: 'center'
+                    }}>
+                      {surgeRange}
+                    </div>
+                  </Tooltip>
+                </Polyline>
+              </React.Fragment>
+            );
+          }
+          
+          // Handle Point features (line labels)
+          if (feature.geometry && feature.geometry.type === 'Point' && feature.properties?.labelType === 'line') {
+            const [lat, lon] = [feature.geometry.coordinates[1], feature.geometry.coordinates[0]];
+            const surgeRange = feature.properties?.surgeRange || feature.properties?.name || '';
+            
+            // Get color based on surge height
+            let labelColor = '#0066cc';
+            const height = feature.properties?.SURGE_FT || 0;
+            if (height >= 4) {
+              labelColor = '#ffcc00'; // Yellow for higher surge
+            } else if (height >= 2) {
+              labelColor = '#0066cc'; // Blue for moderate surge
+            }
+            
+            return (
+              <Marker
+                key={`surge-line-label-${index}`}
+                position={[lat, lon]}
+                icon={L.divIcon({
+                  html: `
+                    <div style="
+                      background: transparent;
+                      border: none;
+                      border-radius: 4px;
+                      padding: 3px 8px;
+                      font-size: 0.9rem;
+                      font-weight: bold;
+                      color: ${labelColor};
+                      text-align: center;
+                      text-shadow: 1px 1px 2px rgba(255,255,255,0.9), -1px -1px 2px rgba(255,255,255,0.9), 1px -1px 2px rgba(255,255,255,0.9), -1px 1px 2px rgba(255,255,255,0.9);
+                      white-space: nowrap;
+                    ">
+                      ${surgeRange}
+                    </div>
+                  `,
+                  className: 'surge-line-label-marker',
+                  iconSize: [60, 24],
+                  iconAnchor: [30, 12]
+                })}
+              />
+            );
+          }
+          
+          return null;
+        })}
+
         {/* Wind Speed Probability Layer (34kt winds) */}
         {/* Only show wind probability when all storms are displayed, not for individual storm selection */}
         {showWindSpeedProb && !selectedStormId && windSpeedProb.probabilityData && windSpeedProb.probabilityData.features && windSpeedProb.probabilityData.features.map((feature: any, index: number) => {
@@ -1322,6 +1599,120 @@ const SimpleStormTracker: React.FC = () => {
           </div>
         </div>
       )}
+      
+      {/* Peak Storm Surge Legend - Bottom Left */}
+      {showPeakStormSurge && selectedStormId && peakStormSurge.peakSurgeData && (
+        <div className="peak-surge-legend" style={{
+          position: 'absolute',
+          bottom: '20px',
+          left: '20px',
+          backgroundColor: 'rgba(255, 255, 255, 0.95)',
+          padding: '10px',
+          borderRadius: '6px',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+          border: '1px solid #ddd',
+          fontSize: '0.75rem',
+          zIndex: 1000,
+          minWidth: '180px',
+          maxWidth: '220px'
+        }}>
+          <div style={{ 
+            fontWeight: 'bold', 
+            marginBottom: '6px', 
+            color: '#333',
+            borderBottom: '1px solid #eee',
+            paddingBottom: '3px',
+            fontSize: '0.8rem'
+          }}>
+            🌊 Peak Storm Surge
+          </div>
+          
+          {/* Surge Statistics Summary */}
+          {(() => {
+            const features = peakStormSurge.peakSurgeData.features || [];
+            const totalAreas = features.length;
+            const extremeAreas = features.filter((f: any) => (f.properties?.SURGE_FT || 0) >= 10).length;
+            const highAreas = features.filter((f: any) => (f.properties?.SURGE_FT || 0) >= 6 && (f.properties?.SURGE_FT || 0) < 10).length;
+            const maxHeight = Math.max(...features.map((f: any) => f.properties?.SURGE_FT || 0));
+            
+            return (
+              <div style={{ marginBottom: '8px', fontSize: '0.7rem', color: '#666' }}>
+                <div><strong>{totalAreas}</strong> affected areas</div>
+                {extremeAreas > 0 && <div>🔴 <strong>{extremeAreas}</strong> extreme zones (10+ ft)</div>}
+                {highAreas > 0 && <div>🟠 <strong>{highAreas}</strong> high-impact zones (6-10 ft)</div>}
+                {maxHeight > 0 && <div>📏 Max height: <strong>{maxHeight} ft</strong></div>}
+              </div>
+            );
+          })()}
+          
+          {/* Official NHC surge color scale from KML */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div style={{
+                width: '16px',
+                height: '12px',
+                backgroundColor: '#cc0000',
+                border: '1px solid #333',
+                borderStyle: 'dashed',
+                flexShrink: 0
+              }}></div>
+              <span>High surge areas</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div style={{
+                width: '16px',
+                height: '12px',
+                backgroundColor: '#ff6600',
+                border: '1px solid #333',
+                borderStyle: 'dashed',
+                flexShrink: 0
+              }}></div>
+              <span>Moderate-high surge</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div style={{
+                width: '16px',
+                height: '12px',
+                backgroundColor: '#ffcc00',
+                border: '1px solid #333',
+                borderStyle: 'dashed',
+                flexShrink: 0
+              }}></div>
+              <span>Moderate surge areas</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div style={{
+                width: '16px',
+                height: '12px',
+                backgroundColor: '#0066cc',
+                border: '1px solid #333',
+                borderStyle: 'dashed',
+                flexShrink: 0
+              }}></div>
+              <span>Lower surge areas</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div style={{
+                width: '16px',
+                height: '12px',
+                backgroundColor: '#cc00cc',
+                border: '1px solid #333',
+                borderStyle: 'dashed',
+                flexShrink: 0
+              }}></div>
+              <span>Special surge zones</span>
+            </div>
+          </div>
+          <div style={{ 
+            fontSize: '0.65rem', 
+            color: '#666', 
+            marginTop: '4px',
+            fontStyle: 'italic'
+          }}>
+            Colors match official NHC surge data
+          </div>
+        </div>
+      )}
       </div>
 
       {/* Layer Toggle Button */}
@@ -1512,6 +1903,7 @@ const SimpleStormTracker: React.FC = () => {
                     />
                     <span style={{ color: '#2196F3' }}></span> Forecast Cone
                   </label>
+                  {/* Hidden: Regular Storm Surge toggle
                   <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.8rem', cursor: 'pointer' }}>
                     <input
                       type="checkbox"
@@ -1525,6 +1917,26 @@ const SimpleStormTracker: React.FC = () => {
                         (N/A for EP storms)
                       </span>
                     )}
+                  </label>
+                  */}
+                  <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.8rem', cursor: !selectedStormId ? 'not-allowed' : 'pointer', opacity: !selectedStormId ? 0.6 : 1 }}>
+                    <input
+                      type="checkbox"
+                      checked={showPeakStormSurge}
+                      onChange={(e) => setShowPeakStormSurge(e.target.checked)}
+                      disabled={!selectedStormId}
+                      style={{ marginRight: '6px' }}
+                    />
+                    <span style={{ color: '#cc00cc' }}></span> Peak Storm Surge
+                    {!selectedStormId ? (
+                      <span style={{ fontSize: '0.7rem', color: '#888', marginLeft: '5px' }}>
+                        (Select a storm to view)
+                      </span>
+                    ) : peakStormSurge.available === false ? (
+                      <span style={{ fontSize: '0.7rem', color: '#888', marginLeft: '5px' }}>
+                        (N/A for EP storms)
+                      </span>
+                    ) : null}
                   </label>
                   <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.8rem', cursor: !selectedStormId ? 'not-allowed' : 'pointer', opacity: !selectedStormId ? 0.6 : 1 }}>
                     <input
@@ -1655,6 +2067,31 @@ const SimpleStormTracker: React.FC = () => {
                           `Showing surge data with ${stormSurge.surgeData.features?.length || 0} areas`
                         ) : stormSurge.error ? (
                           `Error: ${stormSurge.error}`
+                        ) : (
+                          'Checking availability...'
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Peak Storm Surge Status */}
+                  {showPeakStormSurge && (
+                    <div style={{ marginTop: '8px', padding: '6px', backgroundColor: '#f5f5f5', borderRadius: '4px' }}>
+                      <div style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#cc00cc' }}>
+                        Peak Storm Surge Status
+                      </div>
+                      <div style={{ fontSize: '0.7rem', color: '#666', marginTop: '2px' }}>
+                        {peakStormSurge.loading ? (
+                          <span style={{ display: 'flex', alignItems: 'center' }}>
+                            <div className="loading-spinner"></div>
+                            Loading peak surge data...
+                          </span>
+                        ) : peakStormSurge.available === false ? (
+                          'No peak surge data (Eastern Pacific storms typically don\'t have surge products)'
+                        ) : peakStormSurge.peakSurgeData ? (
+                          `Showing peak surge data with ${peakStormSurge.peakSurgeData.features?.length || 0} areas`
+                        ) : peakStormSurge.error ? (
+                          `Error: ${peakStormSurge.error}`
                         ) : (
                           'Checking availability...'
                         )}
