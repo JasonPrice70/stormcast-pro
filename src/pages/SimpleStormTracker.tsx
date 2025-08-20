@@ -937,54 +937,27 @@ const SimpleStormTracker: React.FC = () => {
           if (feature.geometry && feature.geometry.type === 'Polygon') {
             const coordinates = feature.geometry.coordinates[0].map((coord: number[]) => [coord[1], coord[0]] as [number, number]);
             
-            // Get color from KML data, with fallback to height-based coloring
-            let surgeColor = '#0066cc'; // Default blue
+            // Use height-based color scheme with specified ranges
+            let surgeColor = '#0070ff'; // Default blue (0, 112, 255)
             let surgeOpacity = 0.4;
             
-            if (feature.properties?.color) {
-              // Use color specified in KML file
-              switch (feature.properties.color.toLowerCase()) {
-                case 'yellow':
-                  surgeColor = '#ffcc00';
-                  surgeOpacity = 0.5;
-                  break;
-                case 'orange':
-                  surgeColor = '#ff6600';
-                  surgeOpacity = 0.5;
-                  break;
-                case 'red':
-                  surgeColor = '#cc0000';
-                  surgeOpacity = 0.6;
-                  break;
-                case 'purple':
-                case 'magenta':
-                  surgeColor = '#cc00cc';
-                  surgeOpacity = 0.5;
-                  break;
-                case 'blue':
-                default:
-                  surgeColor = '#0066cc';
-                  surgeOpacity = 0.4;
-                  break;
-              }
-            } else if (feature.properties) {
-              // Fallback to height-based coloring if no color specified in KML
+            if (feature.properties) {
               const height = feature.properties.SURGE_FT || feature.properties.height || 0;
-              if (height >= 15) {
-                surgeColor = '#660066'; // Dark purple for 15+ feet
+              if (height >= 10) {
+                surgeColor = '#ff0000'; // Red (255, 0, 0) - 10+ feet
                 surgeOpacity = 0.6;
-              } else if (height >= 10) {
-                surgeColor = '#990099'; // Purple for 10-15 feet
+              } else if (height >= 7) {
+                surgeColor = '#ffaa00'; // Orange (255, 170, 0) - 7-9 feet
                 surgeOpacity = 0.5;
-              } else if (height >= 6) {
-                surgeColor = '#cc00cc'; // Magenta for 6-10 feet
+              } else if (height >= 4) {
+                surgeColor = '#ffff00'; // Yellow (255, 255, 0) - 4-6 feet
                 surgeOpacity = 0.45;
-              } else if (height >= 3) {
-                surgeColor = '#ff66ff'; // Light purple for 3-6 feet
+              } else if (height >= 1) {
+                surgeColor = '#0070ff'; // Blue (0, 112, 255) - 1-3 feet
                 surgeOpacity = 0.4;
               } else {
-                surgeColor = '#ff99ff'; // Light pink for 0-3 feet
-                surgeOpacity = 0.35;
+                surgeColor = '#cccccc'; // Light gray for areas under 1 foot
+                surgeOpacity = 0.3;
               }
             }
             
@@ -1083,29 +1056,22 @@ const SimpleStormTracker: React.FC = () => {
           if (feature.geometry && feature.geometry.type === 'LineString') {
             const coordinates = feature.geometry.coordinates.map((coord: number[]) => [coord[1], coord[0]] as [number, number]);
             
-            // Get color from KML data
-            let lineColor = '#0066cc'; // Default blue
+            // Use height-based color scheme for coastal lines
+            let lineColor = '#0070ff'; // Default blue (0, 112, 255)
             let lineWeight = 3;
             
-            if (feature.properties?.color) {
-              switch (feature.properties.color.toLowerCase()) {
-                case 'yellow':
-                  lineColor = '#ffcc00';
-                  break;
-                case 'orange':
-                  lineColor = '#ff6600';
-                  break;
-                case 'red':
-                  lineColor = '#cc0000';
-                  break;
-                case 'purple':
-                case 'magenta':
-                  lineColor = '#cc00cc';
-                  break;
-                case 'blue':
-                default:
-                  lineColor = '#0066cc';
-                  break;
+            if (feature.properties) {
+              const height = feature.properties.SURGE_FT || feature.properties.height || 0;
+              if (height >= 10) {
+                lineColor = '#ff0000'; // Red (255, 0, 0) - 10+ feet
+              } else if (height >= 7) {
+                lineColor = '#ffaa00'; // Orange (255, 170, 0) - 7-9 feet
+              } else if (height >= 4) {
+                lineColor = '#ffff00'; // Yellow (255, 255, 0) - 4-6 feet
+              } else if (height >= 1) {
+                lineColor = '#0070ff'; // Blue (0, 112, 255) - 1-3 feet
+              } else {
+                lineColor = '#cccccc'; // Light gray for areas under 1 foot
               }
             }
             
@@ -1163,14 +1129,25 @@ const SimpleStormTracker: React.FC = () => {
             const [lat, lon] = [feature.geometry.coordinates[1], feature.geometry.coordinates[0]];
             const surgeRange = feature.properties?.surgeRange || feature.properties?.name || '';
             
-            // Get color based on surge height
-            let labelColor = '#0066cc';
+            // Get color based on surge height using new ranges
+            let labelColor = '#0070ff'; // Default blue (0, 112, 255)
             const height = feature.properties?.SURGE_FT || 0;
-            if (height >= 4) {
-              labelColor = '#ffcc00'; // Yellow for higher surge
-            } else if (height >= 2) {
-              labelColor = '#0066cc'; // Blue for moderate surge
+            if (height >= 10) {
+              labelColor = '#ff0000'; // Red (255, 0, 0) - 10+ feet
+            } else if (height >= 7) {
+              labelColor = '#ffaa00'; // Orange (255, 170, 0) - 7-9 feet
+            } else if (height >= 4) {
+              labelColor = '#ffff00'; // Yellow (255, 255, 0) - 4-6 feet
+            } else if (height >= 1) {
+              labelColor = '#0070ff'; // Blue (0, 112, 255) - 1-3 feet
+            } else {
+              labelColor = '#cccccc'; // Light gray for areas under 1 foot
             }
+            
+            // Determine text shadow based on color - black outline for yellow, white for others
+            const textShadow = labelColor === '#ffff00' 
+              ? '1px 1px 2px rgba(0,0,0,0.9), -1px -1px 2px rgba(0,0,0,0.9), 1px -1px 2px rgba(0,0,0,0.9), -1px 1px 2px rgba(0,0,0,0.9)'
+              : '1px 1px 2px rgba(255,255,255,0.9), -1px -1px 2px rgba(255,255,255,0.9), 1px -1px 2px rgba(255,255,255,0.9), -1px 1px 2px rgba(255,255,255,0.9)';
             
             return (
               <Marker
@@ -1187,7 +1164,7 @@ const SimpleStormTracker: React.FC = () => {
                       font-weight: bold;
                       color: ${labelColor};
                       text-align: center;
-                      text-shadow: 1px 1px 2px rgba(255,255,255,0.9), -1px -1px 2px rgba(255,255,255,0.9), 1px -1px 2px rgba(255,255,255,0.9), -1px 1px 2px rgba(255,255,255,0.9);
+                      text-shadow: ${textShadow};
                       white-space: nowrap;
                     ">
                       ${surgeRange}
@@ -1632,75 +1609,75 @@ const SimpleStormTracker: React.FC = () => {
             const features = peakStormSurge.peakSurgeData.features || [];
             const totalAreas = features.length;
             const extremeAreas = features.filter((f: any) => (f.properties?.SURGE_FT || 0) >= 10).length;
-            const highAreas = features.filter((f: any) => (f.properties?.SURGE_FT || 0) >= 6 && (f.properties?.SURGE_FT || 0) < 10).length;
+            const highAreas = features.filter((f: any) => (f.properties?.SURGE_FT || 0) >= 7 && (f.properties?.SURGE_FT || 0) < 10).length;
             const maxHeight = Math.max(...features.map((f: any) => f.properties?.SURGE_FT || 0));
             
             return (
               <div style={{ marginBottom: '8px', fontSize: '0.7rem', color: '#666' }}>
                 <div><strong>{totalAreas}</strong> affected areas</div>
                 {extremeAreas > 0 && <div>🔴 <strong>{extremeAreas}</strong> extreme zones (10+ ft)</div>}
-                {highAreas > 0 && <div>🟠 <strong>{highAreas}</strong> high-impact zones (6-10 ft)</div>}
+                {highAreas > 0 && <div>🟠 <strong>{highAreas}</strong> high-impact zones (7-9 ft)</div>}
                 {maxHeight > 0 && <div>📏 Max height: <strong>{maxHeight} ft</strong></div>}
               </div>
             );
           })()}
           
-          {/* Official NHC surge color scale from KML */}
+          {/* Height-based surge color scale with specified RGB values */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <div style={{
                 width: '16px',
                 height: '12px',
-                backgroundColor: '#cc0000',
+                backgroundColor: '#ff0000',
                 border: '1px solid #333',
                 borderStyle: 'dashed',
                 flexShrink: 0
               }}></div>
-              <span>High surge areas</span>
+              <span>10+ ft above ground</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <div style={{
                 width: '16px',
                 height: '12px',
-                backgroundColor: '#ff6600',
+                backgroundColor: '#ffaa00',
                 border: '1px solid #333',
                 borderStyle: 'dashed',
                 flexShrink: 0
               }}></div>
-              <span>Moderate-high surge</span>
+              <span>7-9 ft above ground</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <div style={{
                 width: '16px',
                 height: '12px',
-                backgroundColor: '#ffcc00',
+                backgroundColor: '#ffff00',
                 border: '1px solid #333',
                 borderStyle: 'dashed',
                 flexShrink: 0
               }}></div>
-              <span>Moderate surge areas</span>
+              <span>4-6 ft above ground</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <div style={{
                 width: '16px',
                 height: '12px',
-                backgroundColor: '#0066cc',
+                backgroundColor: '#0070ff',
                 border: '1px solid #333',
                 borderStyle: 'dashed',
                 flexShrink: 0
               }}></div>
-              <span>Lower surge areas</span>
+              <span>1-3 ft above ground</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <div style={{
                 width: '16px',
                 height: '12px',
-                backgroundColor: '#cc00cc',
+                backgroundColor: '#cccccc',
                 border: '1px solid #333',
                 borderStyle: 'dashed',
                 flexShrink: 0
               }}></div>
-              <span>Special surge zones</span>
+              <span>Less than 1 ft</span>
             </div>
           </div>
           <div style={{ 
@@ -1709,7 +1686,7 @@ const SimpleStormTracker: React.FC = () => {
             marginTop: '4px',
             fontStyle: 'italic'
           }}>
-            Colors match official NHC surge data
+            Storm surge heights above ground level
           </div>
         </div>
       )}
@@ -1928,11 +1905,14 @@ const SimpleStormTracker: React.FC = () => {
                       style={{ marginRight: '6px' }}
                     />
                     <span style={{ color: '#cc00cc' }}></span> Peak Storm Surge
+                    {peakStormSurge.loading && selectedStormId && (
+                      <div className="loading-spinner" style={{ marginLeft: '8px' }}></div>
+                    )}
                     {!selectedStormId ? (
                       <span style={{ fontSize: '0.7rem', color: '#888', marginLeft: '5px' }}>
                         (Select a storm to view)
                       </span>
-                    ) : peakStormSurge.available === false ? (
+                    ) : peakStormSurge.available === false && !peakStormSurge.loading ? (
                       <span style={{ fontSize: '0.7rem', color: '#888', marginLeft: '5px' }}>
                         (N/A for EP storms)
                       </span>
