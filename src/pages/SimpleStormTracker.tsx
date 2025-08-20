@@ -208,7 +208,7 @@ const getIntensityCategoryFromWinds = (windSpeed: number, isKnots: boolean = tru
 };
 
 const SimpleStormTracker: React.FC = () => {
-  const [showHistoricalTracks, setShowHistoricalTracks] = useState(true);
+  const [showHistoricalTracks, setShowHistoricalTracks] = useState(false);
   const [showForecastTracks, setShowForecastTracks] = useState(true);
   const [showForecastCones, setShowForecastCones] = useState(true);
   const [showStormSurge, setShowStormSurge] = useState(false);
@@ -1492,14 +1492,7 @@ const SimpleStormTracker: React.FC = () => {
                       onChange={(e) => setShowHistoricalTracks(e.target.checked)}
                       style={{ marginRight: '6px' }}
                     />
-                    <span style={{ 
-                      width: '12px', 
-                      height: '2px', 
-                      backgroundColor: '#666666', 
-                      marginRight: '6px',
-                      borderRadius: '1px',
-                      border: '1px dashed #666666'
-                    }}></span> Historical Track
+                    Historical Track
                   </label>
                   <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.8rem', cursor: 'pointer' }}>
                     <input
@@ -1508,14 +1501,7 @@ const SimpleStormTracker: React.FC = () => {
                       onChange={(e) => setShowForecastTracks(e.target.checked)}
                       style={{ marginRight: '6px' }}
                     />
-                    <span style={{ 
-                      width: '12px', 
-                      height: '2px', 
-                      backgroundColor: '#222222', 
-                      marginRight: '6px',
-                      borderRadius: '1px',
-                      border: '1px dashed #222222'
-                    }}></span> Forecast Track
+                    Forecast Track
                   </label>
                   <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.8rem', cursor: 'pointer' }}>
                     <input
