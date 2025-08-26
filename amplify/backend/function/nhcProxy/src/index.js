@@ -676,6 +676,153 @@ async function extractSurgeFromKML(kmlContent) {
 }
 
 /**
+ * Parse A-deck text and extract GEFS-related tracks for the latest cycle.
+ * Returns { modelsPresent: string[], tracks: [{ modelId, points: [{ tau, lat, lon, vmax }] }] }
+ */
+function parseAdeckGEFSTracks(text) {
+  const lines = text.split(/\r?\n/).filter(l => l && l.includes(','));
+  if (lines.length === 0) return { modelsPresent: [], tracks: [] };
+
+  let latestCycle = null;
+  const records = [];
+  const allCycles = new Set();
+  
+  for (const line of lines) {
+    const parts = line.split(',').map(s => s.trim());
+    if (parts.length < 9) continue;
+    const cycle = parts[2]; // yyyymmddhh
+    if (!/^[0-9]{10}$/.test(cycle)) continue;
+    allCycles.add(cycle);
+    if (!latestCycle || cycle > latestCycle) latestCycle = cycle;
+    records.push(parts);
+  }
+  
+  if (!latestCycle) return { modelsPresent: [], tracks: [] };
+
+  const sortedCycles = Array.from(allCycles).sort().reverse();
+  const gefsRegex = /^A(EMN|EMI|C00|P\d{2})$/i;
+  let targetCycle = latestCycle;
+  let latest = records.filter(p => p[2] === targetCycle);
+  
+  // Check if we have ensemble members in the latest cycle
+  const ensembleInLatest = latest.filter(p => {
+    const tech = (p[4] || '').toUpperCase();
+    return gefsRegex.test(tech) && (tech === 'AC00' || tech.startsWith('AP'));
+  });
+  
+  // If no ensemble members in latest cycle, try the previous cycle
+  if (ensembleInLatest.length === 0 && sortedCycles.length > 1) {
+    targetCycle = sortedCycles[1]; // Previous cycle
+    latest = records.filter(p => p[2] === targetCycle);
+  }
+
+  const modelMap = new Map();
+  const debugInfo = {
+    latestCycle,
+    targetCycle,
+    allCycles: sortedCycles,
+    totalRecords: records.length,
+    latestRecords: latest.length,
+    gefsInTargetCycle: [],
+    ensembleInLatest: ensembleInLatest.length,
+    invalidCoords: [],
+    processedModels: []
+  };
+
+  for (const p of latest) {
+    const tech = (p[4] || '').toUpperCase();
+    if (gefsRegex.test(tech)) {
+      debugInfo.gefsInTargetCycle.push(tech);
+      const tau = parseInt(p[5] || '0', 10);
+      const lat = parseATCFLat(p[6] || '');
+      const lon = parseATCFLon(p[7] || '');
+      const vmax = toNumberOrNull(p[8] || '');
+      
+      if (isNaN(tau) || lat == null || lon == null) {
+        debugInfo.invalidCoords.push({
+          tech, tau: p[5], lat: p[6], lon: p[7], 
+          parsedLat: lat, parsedLon: lon
+        });
+        continue;
+      }
+      
+      if (!modelMap.has(tech)) modelMap.set(tech, []);
+      modelMap.get(tech).push({ tau, lat, lon, vmax });
+      debugInfo.processedModels.push(tech);
+    }
+  }
+
+  const tracks = [];
+  const modelsPresent = [];
+  for (const [modelId, points] of modelMap.entries()) {
+    const byTau = new Map();
+    points.sort((a, b) => a.tau - b.tau);
+    for (const pt of points) {
+      if (!byTau.has(pt.tau)) byTau.set(pt.tau, pt);
+    }
+    const uniquePoints = Array.from(byTau.values());
+    if (uniquePoints.length > 0) {
+      tracks.push({ modelId, points: uniquePoints });
+      modelsPresent.push(modelId);
+    }
+  }
+
+  const orderVal = (m) => (m === 'AEMN' || m === 'AEMI' ? 0 : m === 'AC00' ? 1 : 2);
+  tracks.sort((a, b) => orderVal(a.modelId) - orderVal(b.modelId) || a.modelId.localeCompare(b.modelId));
+  modelsPresent.sort((a, b) => orderVal(a) - orderVal(b) || a.localeCompare(b));
+  
+  return { modelsPresent, tracks, debug: debugInfo };
+}
+
+function parseATCFLat(token) {
+  if (!token) return null;
+  const m = /^(-?\d+)([NS])$/i.exec(token);
+  if (m) {
+    const val = parseInt(m[1], 10) / 10.0;
+    const hemi = m[2].toUpperCase();
+    return hemi === 'S' ? -val : val;
+  }
+  const m2 = /^(-?\d+(?:\.\d+)?)([NS])$/i.exec(token);
+  if (m2) {
+    const val = parseFloat(m2[1]);
+    const hemi = m2[2].toUpperCase();
+    return hemi === 'S' ? -val : val;
+  }
+  return null;
+}
+
+function parseATCFLon(token) {
+  if (!token) return null;
+  const m = /^(-?\d+)([EW])$/i.exec(token);
+  if (m) {
+    const val = parseInt(m[1], 10) / 10.0;
+    const hemi = m[2].toUpperCase();
+    const signed = hemi === 'W' ? -val : val;
+    return normalizeLon(signed);
+  }
+  const m2 = /^(-?\d+(?:\.\d+)?)([EW])$/i.exec(token);
+  if (m2) {
+    const val = parseFloat(m2[1]);
+    const hemi = m2[2].toUpperCase();
+    const signed = hemi === 'W' ? -val : val;
+    return normalizeLon(signed);
+  }
+  return null;
+}
+
+function normalizeLon(lon) {
+  let x = lon;
+  while (x > 180) x -= 360;
+  while (x < -180) x += 360;
+  return x;
+}
+
+function toNumberOrNull(s) {
+  const n = parseInt(String(s).trim(), 10);
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
  * Parse KMZ file and extract wind speed probability data as GeoJSON
  */
 async function parseKmzToWindProbGeoJSON(kmzBuffer, windSpeed = '34kt') {
@@ -1405,7 +1552,7 @@ exports.handler = async (event) => {
     }
 
     // Determine which NHC endpoint to call based on path
-    const endpoint = pathParameters?.proxy || 'active-storms';
+  const endpoint = pathParameters?.proxy || 'active-storms';
     let nhcUrl;
     let isKmzEndpoint = false;
     
@@ -1413,6 +1560,122 @@ exports.handler = async (event) => {
       case 'active-storms':
         nhcUrl = `${NHC_BASE_URL}/CurrentStorms.json`;
         break;
+
+      case 'gefs-adeck': {
+        const stormId = queryStringParameters?.stormId;
+        if (!stormId) {
+          return {
+            statusCode: 400,
+            headers: corsHeaders,
+            body: JSON.stringify({ error: 'stormId parameter is required for gefs-adeck endpoint' })
+          };
+        }
+
+        try {
+          // Build A-deck filename from stormId like AL052025 -> aal052025.dat
+          const match = /^(AL|EP|CP)(\d{2})(\d{4})$/i.exec(stormId.trim());
+          if (!match) {
+            return {
+              statusCode: 400,
+              headers: corsHeaders,
+              body: JSON.stringify({ error: `Invalid stormId format: ${stormId}. Expected like AL052025` })
+            };
+          }
+
+          const basin = match[1].toLowerCase();
+          const num = match[2];
+          const year = match[3];
+          const baseFilename = `a${basin}${num}${year}.dat`;
+          
+          // Try both .dat and .dat.gz (gzipped) versions
+          const urlsToTry = [
+            `https://ftp.nhc.noaa.gov/atcf/aid_public/${baseFilename}.gz`,
+            `https://ftp.nhc.noaa.gov/atcf/aid_public/${baseFilename}`
+          ];
+          
+          let resp = null;
+          let filename = null;
+          let isGzipped = false;
+          
+          for (const adeckUrl of urlsToTry) {
+            try {
+              console.log(`Trying A-deck from: ${adeckUrl}`);
+              resp = await axios.get(adeckUrl, {
+                timeout: REQUEST_TIMEOUT,
+                responseType: adeckUrl.endsWith('.gz') ? 'arraybuffer' : 'text',
+                headers: {
+                  'User-Agent': 'StormCast Pro (cyclotrak.com, jasonprice70@gmail.com)',
+                  'Accept': adeckUrl.endsWith('.gz') ? 'application/gzip, */*' : 'text/plain, */*'
+                },
+                transformResponse: [data => data]
+              });
+              filename = adeckUrl.split('/').pop();
+              isGzipped = adeckUrl.endsWith('.gz');
+              console.log(`Successfully fetched A-deck: ${filename}`);
+              break;
+            } catch (err) {
+              console.log(`Failed to fetch ${adeckUrl}: ${err.message}`);
+              continue;
+            }
+          }
+          
+          if (!resp) {
+            return {
+              statusCode: 404,
+              headers: corsHeaders,
+              body: JSON.stringify({ error: 'A-deck file not found (tried both .dat and .dat.gz)', baseFilename })
+            };
+          }
+
+          let raw;
+          if (isGzipped) {
+            // Decompress gzipped content
+            const zlib = require('zlib');
+            try {
+              const buffer = Buffer.from(resp.data);
+              const decompressed = zlib.gunzipSync(buffer);
+              raw = decompressed.toString('utf-8');
+            } catch (gzipErr) {
+              return {
+                statusCode: 500,
+                headers: corsHeaders,
+                body: JSON.stringify({ error: 'Failed to decompress gzipped A-deck file', details: gzipErr.message })
+              };
+            }
+          } else {
+            raw = typeof resp.data === 'string' ? resp.data : String(resp.data || '');
+          }
+          if (!raw || raw.trim().length === 0) {
+            return {
+              statusCode: 404,
+              headers: corsHeaders,
+              body: JSON.stringify({ error: 'A-deck file is empty or not available', filename })
+            };
+          }
+
+          const parsed = parseAdeckGEFSTracks(raw);
+          return {
+            statusCode: 200,
+            headers: corsHeaders,
+            body: JSON.stringify({ success: true, data: { filename, ...parsed } })
+          };
+        } catch (err) {
+          const status = err?.response?.status;
+          console.warn('Failed to fetch/parse A-deck:', status, err?.message);
+          if (status === 404) {
+            return {
+              statusCode: 404,
+              headers: corsHeaders,
+              body: JSON.stringify({ error: 'A-deck file not found on NHC server', details: err?.message })
+            };
+          }
+          return {
+            statusCode: 502,
+            headers: corsHeaders,
+            body: JSON.stringify({ error: 'Failed to retrieve A-deck from NHC', details: err?.message })
+          };
+        }
+      }
         
       case 'track-kmz':
         const trackStormId = queryStringParameters?.stormId;

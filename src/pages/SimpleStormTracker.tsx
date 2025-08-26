@@ -262,13 +262,22 @@ const SimpleStormTracker: React.FC = () => {
   const displayStorms = storms || []; // Always use live storms (empty array if none)
   const hasStorms = displayStorms.length > 0;
 
-  // Auto-select first storm only if storms list changes and we had a selected storm that no longer exists
+  // Auto-select first storm when storms are available and none is selected
   React.useEffect(() => {
-    if (selectedStormId && displayStorms.length > 0) {
-      const stormExists = displayStorms.find(s => s.id === selectedStormId);
-      if (!stormExists) {
-        setSelectedStormId(null); // Reset to show all storms
+    if (displayStorms.length > 0) {
+      if (selectedStormId) {
+        // Check if currently selected storm still exists
+        const stormExists = displayStorms.find(s => s.id === selectedStormId);
+        if (!stormExists) {
+          setSelectedStormId(displayStorms[0].id); // Select first available storm
+        }
+      } else {
+        // Auto-select first storm if none is selected
+        setSelectedStormId(displayStorms[0].id);
       }
+    } else {
+      // Clear selection if no storms available
+      setSelectedStormId(null);
     }
   }, [displayStorms, selectedStormId]);
 
@@ -305,6 +314,24 @@ const SimpleStormTracker: React.FC = () => {
     storms: storms?.length || 0,
     error: error?.substring(0, 50)
   });
+
+  // Function to get full intensity name for storms
+  const getFullIntensityName = (storm: any) => {
+    if (storm.category >= 5) return 'Category 5 Hurricane';
+    if (storm.category >= 4) return 'Category 4 Hurricane';
+    if (storm.category >= 3) return 'Category 3 Hurricane';
+    if (storm.category >= 2) return 'Category 2 Hurricane';
+    if (storm.category >= 1) return 'Category 1 Hurricane';
+    
+    // Check for abbreviations first
+    const classification = storm.classification.toLowerCase();
+    if (classification === 'ts' || classification.includes('tropical storm')) return 'Tropical Storm';
+    if (classification === 'td' || classification.includes('tropical depression')) return 'Tropical Depression';
+    if (classification === 'ss' || classification.includes('subtropical')) return 'Subtropical Storm';
+    if (classification.includes('hurricane')) return `Category ${storm.category || 'Unknown'} Hurricane`;
+    
+    return storm.classification; // Fallback to original classification
+  };
 
   return (
     <div className="simple-storm-tracker">
@@ -347,7 +374,7 @@ const SimpleStormTracker: React.FC = () => {
                 </div>
                 <div className="storm-popup-content">
                   <p className="storm-popup-field">
-                    <strong>Classification:</strong> {storm.classification}
+                    <strong>Classification:</strong> {getFullIntensityName(storm)}
                   </p>
                   <p className="storm-popup-field">
                     <strong>Category:</strong> {storm.category > 0 ? storm.category : 'N/A'}
@@ -1811,44 +1838,134 @@ const SimpleStormTracker: React.FC = () => {
                 </span>
               )}
               
-              {/* Storm Selector Dropdown */}
+              {/* Visual Storm Selector */}
               {displayStorms.length > 0 && (
-                <div style={{ marginTop: '10px', padding: '8px 0', borderTop: '1px solid #e0e0e0' }}>
-                  <div style={{ fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '5px', color: '#1a237e' }}>
+                <div style={{ marginTop: '10px', padding: '8px 0', borderTop: '1px solid rgba(255, 255, 255, 0.2)' }}>
+                  <div style={{ fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '8px', color: '#ffffff' }}>
                     Select Storm
                   </div>
-                  <select 
-                    value={selectedStormId || ''}
-                    onChange={(e) => setSelectedStormId(e.target.value || null)}
-                    style={{
-                      width: '100%',
-                      padding: '6px 8px',
-                      fontSize: '0.8rem',
-                      borderRadius: '4px',
-                      border: '1px solid #ccc',
-                      backgroundColor: 'white'
-                    }}
-                  >
-                    <option value="">All Storms</option>
-                    {displayStorms.map(storm => (
-                      <option key={storm.id} value={storm.id}>
-                        {storm.name} ({storm.classification})
-                      </option>
-                    ))}
-                  </select>
+                  
+                  {/* Individual Storm Options */}
+                  {displayStorms.map(storm => {
+                    const isSelected = selectedStormId === storm.id;
+                    const categoryColor = storm.category >= 5 ? '#8B0000' : 
+                                        storm.category >= 3 ? '#FF4500' : 
+                                        storm.category >= 1 ? '#FFD700' : 
+                                        storm.classification.toLowerCase().includes('tropical storm') || storm.classification.toLowerCase() === 'ts' ? '#32CD32' : '#87CEEB';
+                    
+                    // Function to get badge text for category indicator
+                    const getBadgeText = (storm: any) => {
+                      if (storm.category >= 1) return storm.category.toString();
+                      const classification = storm.classification.toLowerCase();
+                      if (classification === 'ts' || classification.includes('tropical storm')) return 'TS';
+                      if (classification === 'td' || classification.includes('tropical depression')) return 'TD';
+                      if (classification === 'ss' || classification.includes('subtropical')) return 'SS';
+                      return 'TS'; // Default fallback
+                    };
+                    
+                    return (
+                      <div 
+                        key={storm.id}
+                        className={`storm-selector-box ${isSelected ? 'selected' : ''}`}
+                        onClick={() => setSelectedStormId(storm.id)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          padding: '8px',
+                          marginBottom: '8px',
+                          borderRadius: '8px',
+                          border: isSelected ? '2px solid #4fc3f7' : '1px solid rgba(255, 255, 255, 0.3)',
+                          backgroundColor: isSelected ? 'rgba(79, 195, 247, 0.2)' : 'rgba(255, 255, 255, 0.1)',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease'
+                        }}
+                      >
+                        {/* Tropical Atlantic Map Box */}
+                        <div style={{
+                          width: '64px',
+                          height: '64px',
+                          borderRadius: '8px',
+                          backgroundColor: '#e1f5fe',
+                          backgroundImage: `
+                            radial-gradient(circle at 30% 40%, rgba(139, 69, 19, 0.3) 8px, transparent 8px),
+                            radial-gradient(circle at 70% 20%, rgba(139, 69, 19, 0.2) 6px, transparent 6px),
+                            radial-gradient(circle at 80% 70%, rgba(139, 69, 19, 0.25) 4px, transparent 4px),
+                            radial-gradient(circle at 20% 80%, rgba(139, 69, 19, 0.2) 5px, transparent 5px),
+                            linear-gradient(120deg, #81d4fa 0%, #4fc3f7 50%, #29b6f6 100%)
+                          `,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '18px',
+                          fontWeight: 'bold',
+                          color: 'white',
+                          textShadow: '1px 1px 2px rgba(0,0,0,0.7)',
+                          marginRight: '12px',
+                          border: `2px solid ${categoryColor}`,
+                          position: 'relative',
+                          overflow: 'hidden'
+                        }}>
+                          {/* Storm position indicator */}
+                          <div style={{
+                            position: 'absolute',
+                            top: `${Math.max(10, Math.min(50, 60 - ((storm.position[0] - 10) / 30) * 50))}%`,
+                            left: `${Math.max(10, Math.min(50, 50 + ((storm.position[1] + 100) / 40) * 40))}%`,
+                            width: '8px',
+                            height: '8px',
+                            borderRadius: '50%',
+                            backgroundColor: categoryColor,
+                            border: '2px solid white',
+                            transform: 'translate(-50%, -50%)',
+                            animation: 'pulse 2s infinite'
+                          }} />
+                          
+                          {/* Category indicator */}
+                          <div style={{
+                            position: 'absolute',
+                            bottom: '2px',
+                            right: '2px',
+                            backgroundColor: categoryColor,
+                            color: 'white',
+                            fontSize: '10px',
+                            fontWeight: 'bold',
+                            padding: '1px 3px',
+                            borderRadius: '3px',
+                            minWidth: '16px',
+                            textAlign: 'center'
+                          }}>
+                            {getBadgeText(storm)}
+                          </div>
+                        </div>
+                        
+                        {/* Storm Info */}
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#ffffff' }}>
+                            {storm.name}
+                          </div>
+                          <div style={{ fontSize: '0.75rem', color: '#cccccc', marginTop: '2px' }}>
+                            {getFullIntensityName(storm)}
+                          </div>
+                          <div style={{ fontSize: '0.7rem', color: '#aaaaaa', marginTop: '1px' }}>
+                            {storm.maxWinds} mph • {storm.pressure} mb
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  
                   {selectedStorm && (
-                    <div style={{ fontSize: '0.7rem', color: '#666', marginTop: '3px' }}>
-                      Showing: {selectedStorm.name} - {selectedStorm.maxWinds} mph winds
+                    <div style={{ fontSize: '0.7rem', color: '#cccccc', marginTop: '6px', padding: '6px', backgroundColor: 'rgba(255, 255, 255, 0.1)', borderRadius: '4px' }}>
+                      <strong>Tracking:</strong> {selectedStorm.name} - {selectedStorm.maxWinds} mph winds
                     </div>
                   )}
                 </div>
               )}
               
               {/* Path Visibility Controls */}
-              <div style={{ marginTop: '10px', padding: '8px 0', borderTop: '1px solid #e0e0e0' }}>
-                <div style={{ fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '5px', color: '#1a237e' }}>
+              <div style={{ marginTop: '10px', padding: '8px 0', borderTop: '1px solid rgba(255, 255, 255, 0.2)' }}>
+                <div style={{ fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '5px', color: '#ffffff' }}>
                   NHC Layers
-                  <div style={{ fontSize: '0.7rem', fontWeight: 'normal', color: '#666', marginTop: '2px' }}>
+                  <div style={{ fontSize: '0.7rem', fontWeight: 'normal', color: '#cccccc', marginTop: '2px' }}>
                     Real-time NHC forecast & historical data
                   </div>
                 </div>
@@ -1890,7 +2007,7 @@ const SimpleStormTracker: React.FC = () => {
                     />
                     <span style={{ color: '#ff4444' }}></span> Storm Surge
                     {stormSurge.available === false && (
-                      <span style={{ fontSize: '0.7rem', color: '#888', marginLeft: '5px' }}>
+                      <span style={{ fontSize: '0.7rem', color: '#aaaaaa', marginLeft: '5px' }}>
                         (N/A for EP storms)
                       </span>
                     )}
@@ -1909,11 +2026,11 @@ const SimpleStormTracker: React.FC = () => {
                       <div className="loading-spinner" style={{ marginLeft: '8px' }}></div>
                     )}
                     {!selectedStormId ? (
-                      <span style={{ fontSize: '0.7rem', color: '#888', marginLeft: '5px' }}>
+                      <span style={{ fontSize: '0.7rem', color: '#aaaaaa', marginLeft: '5px' }}>
                         (Select a storm to view)
                       </span>
                     ) : peakStormSurge.available === false && !peakStormSurge.loading ? (
-                      <span style={{ fontSize: '0.7rem', color: '#888', marginLeft: '5px' }}>
+                      <span style={{ fontSize: '0.7rem', color: '#aaaaaa', marginLeft: '5px' }}>
                         (N/A for EP storms)
                       </span>
                     ) : null}
@@ -1928,11 +2045,11 @@ const SimpleStormTracker: React.FC = () => {
                     />
                     <span style={{ color: '#9932CC' }}></span> Wind Arrival Time
                     {!selectedStormId ? (
-                      <span style={{ fontSize: '0.7rem', color: '#888', marginLeft: '5px' }}>
+                      <span style={{ fontSize: '0.7rem', color: '#aaaaaa', marginLeft: '5px' }}>
                         (Select a storm to view)
                       </span>
                     ) : windArrival.available === false ? (
-                      <span style={{ fontSize: '0.7rem', color: '#888', marginLeft: '5px' }}>
+                      <span style={{ fontSize: '0.7rem', color: '#aaaaaa', marginLeft: '5px' }}>
                         
                       </span>
                     ) : null}
@@ -1974,11 +2091,11 @@ const SimpleStormTracker: React.FC = () => {
                     />
                     <span style={{ color: '#0066cc' }}></span> {windSpeedProbType} Wind Probability
                     {selectedStormId ? (
-                      <span style={{ fontSize: '0.7rem', color: '#888', marginLeft: '5px' }}>
+                      <span style={{ fontSize: '0.7rem', color: '#aaaaaa', marginLeft: '5px' }}>
                         (Only available when viewing all storms)
                       </span>
                     ) : windSpeedProb.available === false ? (
-                      <span style={{ fontSize: '0.7rem', color: '#888', marginLeft: '5px' }}>
+                      <span style={{ fontSize: '0.7rem', color: '#aaaaaa', marginLeft: '5px' }}>
                         (No data available)
                       </span>
                     ) : null}
@@ -1987,7 +2104,7 @@ const SimpleStormTracker: React.FC = () => {
                   {/* Wind Speed Options - only show when wind speed probability is enabled */}
                   {showWindSpeedProb && !selectedStormId && (
                     <div style={{ marginLeft: '20px', marginTop: '5px' }}>
-                      <div style={{ fontSize: '0.75rem', color: '#666', marginBottom: '3px' }}>Wind Speed Options:</div>
+                      <div style={{ fontSize: '0.75rem', color: '#cccccc', marginBottom: '3px' }}>Wind Speed Options:</div>
                       <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                         {(['34kt', '50kt', '64kt'] as const).map((speed) => (
                           <label key={speed} style={{ display: 'flex', alignItems: 'center', fontSize: '0.7rem', cursor: 'pointer' }}>
@@ -2009,8 +2126,8 @@ const SimpleStormTracker: React.FC = () => {
               </div>
               
               {/* Live Track Data Control - Hidden */}
-              <div style={{ display: 'none', marginTop: '10px', padding: '8px 0', borderTop: '1px solid #e0e0e0' }}>
-                <div style={{ fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '5px', color: '#1a237e' }}>
+              <div style={{ display: 'none', marginTop: '10px', padding: '8px 0', borderTop: '1px solid rgba(255, 255, 255, 0.2)' }}>
+                <div style={{ fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '5px', color: '#ffffff' }}>
                   Track Data Options
                 </div>
                   <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.8rem', cursor: 'pointer' }}>
@@ -2022,7 +2139,7 @@ const SimpleStormTracker: React.FC = () => {
                     />
                     Fetch Live Track Data
                   </label>
-                  <div style={{ fontSize: '0.7rem', color: '#666', marginTop: '3px', marginLeft: '20px' }}>
+                  <div style={{ fontSize: '0.7rem', color: '#cccccc', marginTop: '3px', marginLeft: '20px' }}>
                     {fetchLiveTrackData ? 
                       'Fetching forecast paths and cones from NHC (may cause CORS errors)' : 
                       'Using basic storm positions only (prevents CORS errors)'
@@ -2031,11 +2148,11 @@ const SimpleStormTracker: React.FC = () => {
                   
                   {/* Storm Surge Status */}
                   {showStormSurge && (
-                    <div style={{ marginTop: '8px', padding: '6px', backgroundColor: '#f5f5f5', borderRadius: '4px' }}>
+                    <div style={{ marginTop: '8px', padding: '6px', backgroundColor: 'rgba(255, 255, 255, 0.1)', borderRadius: '4px' }}>
                       <div style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#d32f2f' }}>
                         Storm Surge Status
                       </div>
-                      <div style={{ fontSize: '0.7rem', color: '#666', marginTop: '2px' }}>
+                      <div style={{ fontSize: '0.7rem', color: '#cccccc', marginTop: '2px' }}>
                         {stormSurge.loading ? (
                           <span style={{ display: 'flex', alignItems: 'center' }}>
                             <div className="loading-spinner"></div>
@@ -2056,11 +2173,11 @@ const SimpleStormTracker: React.FC = () => {
                   
                   {/* Peak Storm Surge Status */}
                   {showPeakStormSurge && (
-                    <div style={{ marginTop: '8px', padding: '6px', backgroundColor: '#f5f5f5', borderRadius: '4px' }}>
+                    <div style={{ marginTop: '8px', padding: '6px', backgroundColor: 'rgba(255, 255, 255, 0.1)', borderRadius: '4px' }}>
                       <div style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#cc00cc' }}>
                         Peak Storm Surge Status
                       </div>
-                      <div style={{ fontSize: '0.7rem', color: '#666', marginTop: '2px' }}>
+                      <div style={{ fontSize: '0.7rem', color: '#cccccc', marginTop: '2px' }}>
                         {peakStormSurge.loading ? (
                           <span style={{ display: 'flex', alignItems: 'center' }}>
                             <div className="loading-spinner"></div>
@@ -2080,11 +2197,11 @@ const SimpleStormTracker: React.FC = () => {
                   )}
                   
                   {showWindSpeedProb && (
-                    <div style={{ marginTop: '8px', padding: '6px', backgroundColor: '#f5f5f5', borderRadius: '4px' }}>
-                      <div style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#1976d2' }}>
+                    <div style={{ marginTop: '8px', padding: '6px', backgroundColor: 'rgba(255, 255, 255, 0.1)', borderRadius: '4px' }}>
+                      <div style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#4fc3f7' }}>
                         Wind Probability Status
                       </div>
-                      <div style={{ fontSize: '0.7rem', color: '#666', marginTop: '2px' }}>
+                      <div style={{ fontSize: '0.7rem', color: '#cccccc', marginTop: '2px' }}>
                         {windSpeedProb.loading ? (
                           <span style={{ display: 'flex', alignItems: 'center' }}>
                             <div className="loading-spinner"></div>
@@ -2103,8 +2220,8 @@ const SimpleStormTracker: React.FC = () => {
                     </div>
                   )}
               </div>
-              <div style={{ marginTop: '10px', padding: '8px 0', borderTop: '1px solid #e0e0e0' }}>
-              <div style={{ fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '5px', color: '#1a237e' }}>
+              <div style={{ marginTop: '10px', padding: '8px 0', borderTop: '1px solid rgba(255, 255, 255, 0.2)' }}>
+              <div style={{ fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '5px', color: '#ffffff' }}>
                   Spaghetti Models
                   {/*<div style={{ fontSize: '0.7rem', fontWeight: 'normal', color: '#666', marginTop: '2px' }}>
                     Real-time NHC forecast & historical data
@@ -2121,13 +2238,13 @@ const SimpleStormTracker: React.FC = () => {
                     />
                     GEFS 
                     {gefs.loading && (
-                      <span style={{ display: 'flex', alignItems: 'center', marginLeft: '6px', fontSize: '0.7rem', color: '#1976d2' }}>
+                      <span style={{ display: 'flex', alignItems: 'center', marginLeft: '6px', fontSize: '0.7rem', color: '#4fc3f7' }}>
                         <div className="gefs-spinner"></div>
                         loading...
                       </span>
                     )}
                     {selectedStormId && gefs.tracks && gefs.tracks.modelsPresent && gefs.tracks.modelsPresent.length > 0 && (
-                      <span style={{ fontSize: '0.7rem', color: '#1976d2', marginLeft: '6px' }}>
+                      <span style={{ fontSize: '0.7rem', color: '#4fc3f7', marginLeft: '6px' }}>
                         ({gefs.tracks.modelsPresent.length} models)
                       </span>
                     )}
@@ -2137,11 +2254,11 @@ const SimpleStormTracker: React.FC = () => {
                       </span>
                     )}
                     {!selectedStormId ? (
-                      <span style={{ fontSize: '0.7rem', color: '#888', marginLeft: '5px' }}>
+                      <span style={{ fontSize: '0.7rem', color: '#aaaaaa', marginLeft: '5px' }}>
                         (Select a storm)
                       </span>
                     ) : gefs.available === false ? (
-                      <span style={{ fontSize: '0.7rem', color: '#888', marginLeft: '5px' }}>
+                      <span style={{ fontSize: '0.7rem', color: '#aaaaaa', marginLeft: '5px' }}>
                         (No data found)
                       </span>
                     ) : null}

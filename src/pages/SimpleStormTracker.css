@@ -6,6 +6,38 @@
   100% { transform: rotate(360deg); }
 }
 
+/* Storm Selector Box Styles */
+.storm-selector-box {
+  transition: all 0.2s ease;
+}
+
+.storm-selector-box:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(79, 195, 247, 0.3);
+  border-color: #4fc3f7 !important;
+  background-color: rgba(79, 195, 247, 0.15) !important;
+}
+
+.storm-selector-box.selected {
+  box-shadow: 0 2px 8px rgba(79, 195, 247, 0.4);
+}
+
+/* Pulse animation for storm position indicator */
+@keyframes pulse {
+  0% { 
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+  50% { 
+    transform: translate(-50%, -50%) scale(1.3);
+    opacity: 0.7;
+  }
+  100% { 
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+}
+
 .loading-spinner {
   display: inline-block;
   width: 12px;
@@ -169,7 +201,7 @@
   right: 0;
   height: calc(100vh - 110px);
   width: 300px;
-  background: rgba(255, 255, 255, 0.95);
+  background: rgba(0, 0, 0, 0.7);
   backdrop-filter: blur(10px);
   border: 1px solid #e0e0e0;
   border-right: none;
@@ -192,13 +224,13 @@
 /* Control Panel Header */
 .control-panel-header-wrapper {
   padding: 20px 20px 15px 20px;
-  border-bottom: 1px solid #e0e0e0;
-  background: rgba(255, 255, 255, 0.8);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(0, 0, 0, 0.3);
 }
 
 .control-panel-header {
   margin: 0;
-  color: #1a237e;
+  color: #ffffff;
   font-size: 1.1rem;
   font-weight: 600;
 }
@@ -208,23 +240,24 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+  color: #ffffff;
 }
 
 .control-panel-loading {
   font-size: 0.9rem;
-  color: #666;
+  color: #cccccc;
   display: flex;
   align-items: center;
 }
 
 .control-panel-error {
   font-size: 0.9rem;
-  color: #dc3545;
+  color: #ff6b6b;
 }
 
 .control-panel-updated {
   font-size: 0.8rem;
-  color: #666;
+  color: #cccccc;
 }
 
 .control-panel-buttons {
@@ -284,10 +317,10 @@
 .no-storms-message {
   text-align: center;
   padding: 10px;
-  background: #d4edda;
-  border: 1px solid #c3e6cb;
+  background: rgba(76, 175, 80, 0.2);
+  border: 1px solid rgba(76, 175, 80, 0.4);
   border-radius: 4px;
-  color: #155724;
+  color: #a5d6a7;
   margin-top: 5px;
 }
 
@@ -398,7 +431,7 @@
   }
   
   .control-panel-content label:hover {
-    background-color: rgba(0, 0, 0, 0.05);
+    background-color: rgba(255, 255, 255, 0.1);
   }
   
   /* Increase font sizes slightly for better mobile readability */
