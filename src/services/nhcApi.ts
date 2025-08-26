@@ -99,9 +99,18 @@ class NHCApiService {
     tracks: Array<{ modelId: string; points: Array<{ tau: number; lat: number; lon: number; vmax: number | null }> }>;
   } | null> {
     if (!stormId) return null;
+    // Try Lambda first
     const data = await this.fetchWithLambdaFallback('gefs-adeck', { stormId });
-    if (data && (data.tracks || data.modelsPresent)) return data;
-    return null;
+    if (data && (data.tracks || data.modelsPresent) && data.filename) return data;
+
+    // Fallback: fetch A-deck directly via CORS proxies and parse client-side
+    try {
+      const adeck = await this.fetchAdeckViaProxies(stormId);
+      return adeck;
+    } catch (e) {
+      console.warn('A-deck client fallback failed:', e);
+      return null;
+    }
   }
 
   /**
@@ -187,6 +196,213 @@ class NHCApiService {
 
     // Fall back to CORS proxies - return null to indicate caller should handle CORS proxy fallback
     return null;
+  }
+
+  /**
+   * Client-side fallback to fetch and parse A-deck from NHC aid_public using CORS proxies
+   */
+  private async fetchAdeckViaProxies(stormId: string): Promise<{
+    filename: string;
+    modelsPresent: string[];
+    tracks: Array<{ modelId: string; points: Array<{ tau: number; lat: number; lon: number; vmax: number | null }> }>;
+  } | null> {
+    const match = /^(AL|EP|CP)(\d{2})(\d{4})$/i.exec(stormId.trim());
+    if (!match) {
+      throw new Error(`Invalid stormId format: ${stormId}`);
+    }
+    const basin = match[1].toLowerCase();
+    const num = match[2];
+    const year = match[3];
+    const baseFilename = `a${basin}${num}${year}.dat`;
+    
+    // Try both .dat.gz and .dat versions
+    const urlsToTry = [
+      `https://ftp.nhc.noaa.gov/atcf/aid_public/${baseFilename}.gz`,
+      `https://ftp.nhc.noaa.gov/atcf/aid_public/${baseFilename}`
+    ];
+
+    const proxiesToTry = CORS_PROXIES.slice(0, 3);
+    let lastErr: any = null;
+    
+    for (const baseUrl of urlsToTry) {
+      const isGzipped = baseUrl.endsWith('.gz');
+      
+      for (const proxy of proxiesToTry) {
+        try {
+          const url = `${proxy}${encodeURIComponent(baseUrl)}`;
+          const resp = await axios.get(url, { 
+            timeout: 20000, 
+            responseType: isGzipped ? 'arraybuffer' : undefined,
+            transformResponse: isGzipped ? [(d) => d] : [(d) => d] 
+          });
+          
+          let raw: string | null = null;
+          const data = resp.data;
+          
+          if (isGzipped) {
+            // Handle gzipped response
+            try {
+              let buffer: ArrayBuffer;
+              if (data && typeof data === 'object' && typeof data.contents === 'string') {
+                // allorigins response - decode base64 if needed
+                const contents = data.contents;
+                buffer = Uint8Array.from(atob(contents), c => c.charCodeAt(0)).buffer;
+              } else if (data instanceof ArrayBuffer) {
+                buffer = data;
+              } else {
+                throw new Error('Unexpected gzipped data format');
+              }
+              
+              // Note: Browser doesn't have zlib, so we'll need to use a different approach
+              // For now, skip gzipped files in browser fallback
+              console.warn('Gzipped A-deck files not supported in browser fallback, skipping');
+              continue;
+            } catch (gzipErr) {
+              console.warn('Failed to handle gzipped A-deck:', gzipErr);
+              continue;
+            }
+          } else {
+            // Handle regular text response
+            if (typeof data === 'string') {
+              try {
+                const maybeJson = JSON.parse(data);
+                if (maybeJson && typeof maybeJson === 'object' && typeof maybeJson.contents === 'string') {
+                  raw = maybeJson.contents;
+                } else {
+                  raw = data;
+                }
+              } catch {
+                raw = data;
+              }
+            } else if (data && typeof data === 'object' && typeof data.contents === 'string') {
+              raw = data.contents;
+            }
+          }
+          
+          if (!raw || raw.trim().length === 0) {
+            throw new Error('Empty A-deck response');
+          }
+          
+          const parsed = this.parseAdeckGEFSTracks(raw);
+          if (parsed.tracks.length > 0) {
+            return { filename: baseUrl.split('/').pop() || baseFilename, ...parsed };
+          }
+        } catch (err) {
+          lastErr = err;
+          continue;
+        }
+      }
+    }
+    if (lastErr) throw lastErr;
+    return null;
+  }
+
+  /**
+   * Parse A-deck text and extract GEFS tracks for the latest cycle
+   */
+  private parseAdeckGEFSTracks(text: string): {
+    modelsPresent: string[];
+    tracks: Array<{ modelId: string; points: Array<{ tau: number; lat: number; lon: number; vmax: number | null }> }>;
+  } {
+    const lines = text.split(/\r?\n/).filter(l => l && l.includes(','));
+    if (lines.length === 0) return { modelsPresent: [], tracks: [] };
+
+    let latestCycle: string | null = null;
+    const records: string[][] = [];
+    for (const line of lines) {
+      const parts = line.split(',').map(s => s.trim());
+      if (parts.length < 9) continue;
+      const cycle = parts[2];
+      if (!/^\d{10}$/.test(cycle)) continue;
+      if (!latestCycle || cycle > latestCycle) latestCycle = cycle;
+      records.push(parts);
+    }
+    if (!latestCycle) return { modelsPresent: [], tracks: [] };
+
+    const latest = records.filter(p => p[2] === latestCycle);
+    // Include both AEMI and AEMN as possible ensemble means
+    const gefsRegex = /^A(EMN|EMI|C00|P\d{2})$/i;
+    const modelMap = new Map<string, Array<{ tau: number; lat: number; lon: number; vmax: number | null }>>();
+
+    for (const p of latest) {
+      const tech = (p[4] || '').toUpperCase();
+      if (!gefsRegex.test(tech)) continue;
+      const tau = parseInt(p[5] || '0', 10);
+      const lat = this.parseATCFLat(p[6] || '');
+      const lon = this.parseATCFLon(p[7] || '');
+      const vmax = this.toNumberOrNull(p[8] || '');
+      if (isNaN(tau) || lat == null || lon == null) continue;
+      if (!modelMap.has(tech)) modelMap.set(tech, []);
+      modelMap.get(tech)!.push({ tau, lat, lon, vmax });
+    }
+
+    const tracks: Array<{ modelId: string; points: Array<{ tau: number; lat: number; lon: number; vmax: number | null }> }> = [];
+    const modelsPresent: string[] = [];
+    for (const [modelId, points] of modelMap.entries()) {
+      const byTau = new Map<number, { tau: number; lat: number; lon: number; vmax: number | null }>();
+      points.sort((a, b) => a.tau - b.tau);
+      for (const pt of points) {
+        if (!byTau.has(pt.tau)) byTau.set(pt.tau, pt);
+      }
+      const uniquePoints = Array.from(byTau.values());
+      if (uniquePoints.length > 0) {
+        tracks.push({ modelId, points: uniquePoints });
+        modelsPresent.push(modelId);
+      }
+    }
+
+    const orderVal = (m: string) => (m === 'AEMN' || m === 'AEMI' ? 0 : m === 'AC00' ? 1 : 2);
+    tracks.sort((a, b) => orderVal(a.modelId) - orderVal(b.modelId) || a.modelId.localeCompare(b.modelId));
+    modelsPresent.sort((a, b) => orderVal(a) - orderVal(b) || a.localeCompare(b));
+    return { modelsPresent, tracks };
+  }
+
+  private parseATCFLat(token: string): number | null {
+    if (!token) return null;
+    let m = /^(-?\d+)([NS])$/i.exec(token);
+    if (m) {
+      const val = parseInt(m[1], 10) / 10.0;
+      const hemi = m[2].toUpperCase();
+      return hemi === 'S' ? -val : val;
+    }
+    m = /^(-?\d+(?:\.\d+)?)([NS])$/i.exec(token);
+    if (m) {
+      const val = parseFloat(m[1]);
+      const hemi = m[2].toUpperCase();
+      return hemi === 'S' ? -val : val;
+    }
+    return null;
+  }
+
+  private parseATCFLon(token: string): number | null {
+    if (!token) return null;
+    let m = /^(-?\d+)([EW])$/i.exec(token);
+    if (m) {
+      const val = parseInt(m[1], 10) / 10.0;
+      const hemi = m[2].toUpperCase();
+      const signed = hemi === 'W' ? -val : val;
+      return this.normalizeLon(signed);
+    }
+    m = /^(-?\d+(?:\.\d+)?)([EW])$/i.exec(token);
+    if (m) {
+      const val = parseFloat(m[1]);
+      const hemi = m[2].toUpperCase();
+      const signed = hemi === 'W' ? -val : val;
+      return this.normalizeLon(signed);
+    }
+    return null;
+  }
+
+  private normalizeLon(lon: number): number {
+    let x = lon;
+    while (x > 180) x -= 360;
+    while (x < -180) x += 360;
+    return x;
+  }
+
+  private toNumberOrNull(s: string): number | null {
+    const n = parseInt(String(s).trim(), 10);
+    return Number.isFinite(n) ? n : null;
   }
 
   /**
