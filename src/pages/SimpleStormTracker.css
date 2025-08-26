@@ -14,7 +14,7 @@
 .storm-selector-box:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(79, 195, 247, 0.3);
-  border-color: #4fc3f7 !important;
+  border-color: #4FC3F7 !important;
   background-color: rgba(79, 195, 247, 0.15) !important;
 }
 
@@ -408,8 +408,8 @@
   /* Make control panel take full width on mobile */
   .sliding-control-panel {
     width: 100vw;
-    top: 60px; /* Adjust for smaller header on mobile */
-    height: calc(100vh - 60px);
+    top: 100px; /* Increased to account for taller mobile header */
+    height: calc(100vh - 100px);
     border-radius: 0;
     border: none;
     transform: translateX(100%);
@@ -418,7 +418,7 @@
   /* Position layer toggle button better for mobile */
   .layer-toggle-btn {
     right: 15px;
-    top: 70px;
+    top: 110px; /* Increased to ensure it's below the header */
     width: 44px;
     height: 44px;
     border-radius: 22px;
@@ -470,12 +470,12 @@
 @media (max-width: 480px) {
   /* Even smaller screens - adjust header */
   .sliding-control-panel {
-    top: 50px;
-    height: calc(100vh - 50px);
+    top: 90px; /* Increased for mobile header height */
+    height: calc(100vh - 90px);
   }
   
   .layer-toggle-btn {
-    top: 60px;
+    top: 100px; /* Increased to ensure it's below the header */
     right: 10px;
     width: 40px;
     height: 40px;

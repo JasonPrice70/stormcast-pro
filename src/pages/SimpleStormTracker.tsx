@@ -1851,7 +1851,7 @@ const SimpleStormTracker: React.FC = () => {
                     const categoryColor = storm.category >= 5 ? '#8B0000' : 
                                         storm.category >= 3 ? '#FF4500' : 
                                         storm.category >= 1 ? '#FFD700' : 
-                                        storm.classification.toLowerCase().includes('tropical storm') || storm.classification.toLowerCase() === 'ts' ? '#32CD32' : '#87CEEB';
+                                        storm.classification.toLowerCase().includes('tropical storm') || storm.classification.toLowerCase() === 'ts' ? '#4FC3F7' : '#87CEEB';
                     
                     // Function to get badge text for category indicator
                     const getBadgeText = (storm: any) => {
@@ -1874,50 +1874,53 @@ const SimpleStormTracker: React.FC = () => {
                           padding: '8px',
                           marginBottom: '8px',
                           borderRadius: '8px',
-                          border: isSelected ? '2px solid #4fc3f7' : '1px solid rgba(255, 255, 255, 0.3)',
+                          border: isSelected ? '2px solid #4FC3F7' : '1px solid rgba(255, 255, 255, 0.3)',
                           backgroundColor: isSelected ? 'rgba(79, 195, 247, 0.2)' : 'rgba(255, 255, 255, 0.1)',
                           cursor: 'pointer',
                           transition: 'all 0.2s ease'
                         }}
                       >
-                        {/* Tropical Atlantic Map Box */}
+                        {/* Storm Icon - Hurricane or Tropical Storm SVG */}
                         <div style={{
                           width: '64px',
                           height: '64px',
                           borderRadius: '8px',
-                          backgroundColor: '#e1f5fe',
-                          backgroundImage: `
-                            radial-gradient(circle at 30% 40%, rgba(139, 69, 19, 0.3) 8px, transparent 8px),
-                            radial-gradient(circle at 70% 20%, rgba(139, 69, 19, 0.2) 6px, transparent 6px),
-                            radial-gradient(circle at 80% 70%, rgba(139, 69, 19, 0.25) 4px, transparent 4px),
-                            radial-gradient(circle at 20% 80%, rgba(139, 69, 19, 0.2) 5px, transparent 5px),
-                            linear-gradient(120deg, #81d4fa 0%, #4fc3f7 50%, #29b6f6 100%)
-                          `,
+                          backgroundColor: isSelected ? 'rgba(79, 195, 247, 0.3)' : 'rgba(255, 255, 255, 0.1)',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          fontSize: '18px',
-                          fontWeight: 'bold',
-                          color: 'white',
-                          textShadow: '1px 1px 2px rgba(0,0,0,0.7)',
                           marginRight: '12px',
                           border: `2px solid ${categoryColor}`,
                           position: 'relative',
                           overflow: 'hidden'
                         }}>
-                          {/* Storm position indicator */}
+                          {/* SVG Icon based on storm type */}
                           <div style={{
-                            position: 'absolute',
-                            top: `${Math.max(10, Math.min(50, 60 - ((storm.position[0] - 10) / 30) * 50))}%`,
-                            left: `${Math.max(10, Math.min(50, 50 + ((storm.position[1] + 100) / 40) * 40))}%`,
-                            width: '8px',
-                            height: '8px',
-                            borderRadius: '50%',
-                            backgroundColor: categoryColor,
-                            border: '2px solid white',
-                            transform: 'translate(-50%, -50%)',
-                            animation: 'pulse 2s infinite'
-                          }} />
+                            width: '48px',
+                            height: '48px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}>
+                            {(() => {
+                              const isHurricane = storm.classification.toLowerCase().includes('hurricane') || 
+                                                storm.classification === 'HU' || 
+                                                (storm.category && storm.category >= 1);
+                              const iconPath = isHurricane ? '/HU.svg' : '/TS.svg';
+                              
+                              return (
+                                <img 
+                                  src={iconPath}
+                                  alt={isHurricane ? 'Hurricane' : 'Tropical Storm'}
+                                  style={{
+                                    width: '100%',
+                                    height: '100%',
+                                    filter: 'drop-shadow(1px 1px 2px rgba(0,0,0,0.3))'
+                                  }}
+                                />
+                              );
+                            })()}
+                          </div>
                           
                           {/* Category indicator */}
                           <div style={{
@@ -2198,7 +2201,7 @@ const SimpleStormTracker: React.FC = () => {
                   
                   {showWindSpeedProb && (
                     <div style={{ marginTop: '8px', padding: '6px', backgroundColor: 'rgba(255, 255, 255, 0.1)', borderRadius: '4px' }}>
-                      <div style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#4fc3f7' }}>
+                      <div style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#4FC3F7' }}>
                         Wind Probability Status
                       </div>
                       <div style={{ fontSize: '0.7rem', color: '#cccccc', marginTop: '2px' }}>
@@ -2238,13 +2241,13 @@ const SimpleStormTracker: React.FC = () => {
                     />
                     GEFS 
                     {gefs.loading && (
-                      <span style={{ display: 'flex', alignItems: 'center', marginLeft: '6px', fontSize: '0.7rem', color: '#4fc3f7' }}>
+                      <span style={{ display: 'flex', alignItems: 'center', marginLeft: '6px', fontSize: '0.7rem', color: '#4FC3F7' }}>
                         <div className="gefs-spinner"></div>
                         loading...
                       </span>
                     )}
                     {selectedStormId && gefs.tracks && gefs.tracks.modelsPresent && gefs.tracks.modelsPresent.length > 0 && (
-                      <span style={{ fontSize: '0.7rem', color: '#4fc3f7', marginLeft: '6px' }}>
+                      <span style={{ fontSize: '0.7rem', color: '#4FC3F7', marginLeft: '6px' }}>
                         ({gefs.tracks.modelsPresent.length} models)
                       </span>
                     )}
