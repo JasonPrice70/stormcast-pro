@@ -245,7 +245,8 @@ const SimpleStormTracker: React.FC = () => {
   }, [isControlPanelClosed]);
 
   const [fetchLiveTrackData, setFetchLiveTrackData] = useState(true); // Enable track data fetching by default
-  const [selectedStormId, setSelectedStormId] = useState<string | null>(null); // New state for selected storm  // Use live data hook only - fetch on mount by default
+  const [selectedStormId, setSelectedStormId] = useState<string | null>(null); // Primary selected storm for storm-specific layers
+  const [selectedStormIds, setSelectedStormIds] = useState<string[]>([]); // Multiple selected storms for map display
   const liveData = useNHCData({ 
     autoRefresh: false, // Disable auto-refresh - only call when user requests
     fetchOnMount: true, // Fetch on mount - load live data by default
@@ -281,9 +282,12 @@ const SimpleStormTracker: React.FC = () => {
     }
   }, [displayStorms, selectedStormId]);
 
-  // Get selected storm data
+  // Get selected storm data (primary for overlays) and which storms to show on map (multi-select)
   const selectedStorm = selectedStormId ? displayStorms.find(s => s.id === selectedStormId) : null;
-  const stormsToDisplay = selectedStormId ? (selectedStorm ? [selectedStorm] : []) : displayStorms;
+  const stormsToDisplay = selectedStormIds.length > 0
+    ? displayStorms.filter(s => selectedStormIds.includes(s.id))
+    : displayStorms;
+  const isAllStormsShown = selectedStormIds.length === 0 || selectedStormIds.length === displayStorms.length;
   
   // Use storm surge hook for the selected storm
   const stormSurge = useStormSurge(showStormSurge && selectedStormId ? selectedStormId : null);
@@ -291,8 +295,8 @@ const SimpleStormTracker: React.FC = () => {
   // Use peak storm surge hook for the selected storm
   const peakStormSurge = usePeakStormSurge(showPeakStormSurge && selectedStormId ? selectedStormId : null);
   
-  // Use wind speed probability hook when enabled and no specific storm is selected
-  const windSpeedProb = useWindSpeedProbability(showWindSpeedProb && !selectedStormId, windSpeedProbType);
+  // Use wind speed probability hook when enabled and all storms are shown (no filter or all selected)
+  const windSpeedProb = useWindSpeedProbability(showWindSpeedProb && isAllStormsShown, windSpeedProbType);
 
   // Use wind arrival hook for the selected storm
   const windArrival = useWindArrival(showWindArrival && selectedStormId !== null, selectedStormId, windArrivalType);
@@ -1209,8 +1213,8 @@ const SimpleStormTracker: React.FC = () => {
         })}
 
         {/* Wind Speed Probability Layer (34kt winds) */}
-        {/* Only show wind probability when all storms are displayed, not for individual storm selection */}
-        {showWindSpeedProb && !selectedStormId && windSpeedProb.probabilityData && windSpeedProb.probabilityData.features && windSpeedProb.probabilityData.features.map((feature: any, index: number) => {
+  {/* Show wind probability when all storms are displayed (no filter or all selected) */}
+  {showWindSpeedProb && isAllStormsShown && windSpeedProb.probabilityData && windSpeedProb.probabilityData.features && windSpeedProb.probabilityData.features.map((feature: any, index: number) => {
           if (feature.geometry && feature.geometry.type === 'Polygon') {
             const coordinates = feature.geometry.coordinates[0].map((coord: number[]) => [coord[1], coord[0]] as [number, number]);
             
@@ -1490,25 +1494,26 @@ const SimpleStormTracker: React.FC = () => {
       </MapContainer>
       
       {/* Wind Speed Probability Legend */}
-      {showWindSpeedProb && !selectedStormId && windSpeedProb.probabilityData && (
-        <div style={{
+  {showWindSpeedProb && isAllStormsShown && windSpeedProb.probabilityData && (
+        <div className="wind-speed-probability-legend" style={{
           position: 'absolute',
           bottom: '20px',
           left: '20px',
-          backgroundColor: 'rgba(255, 255, 255, 0.95)',
+          backgroundColor: 'rgba(0, 0, 0, 0.7)',
           padding: '10px',
           borderRadius: '6px',
           boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
           border: '1px solid #ddd',
           fontSize: '0.75rem',
           zIndex: 1000,
-          minWidth: '200px'
+          minWidth: '200px',
+          maxWidth: '220px'
         }}>
           <div style={{ 
             fontWeight: 'bold', 
             marginBottom: '6px', 
-            color: '#333',
-            borderBottom: '1px solid #eee',
+            color: '#ffffff',
+            borderBottom: '1px solid #555',
             paddingBottom: '3px',
             fontSize: '0.8rem'
           }}>
@@ -1523,9 +1528,10 @@ const SimpleStormTracker: React.FC = () => {
                 height: '12px',
                 backgroundColor: '#4d0000',
                 border: '1px solid #333',
-                borderRadius: '2px'
+                borderStyle: 'dashed',
+                flexShrink: 0
               }}></div>
-              <span>90%+ (Very High)</span>
+              <span style={{ color: '#ffffff' }}>90%+ (Very High)</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <div style={{
@@ -1533,9 +1539,10 @@ const SimpleStormTracker: React.FC = () => {
                 height: '12px',
                 backgroundColor: '#800000',
                 border: '1px solid #333',
-                borderRadius: '2px'
+                borderStyle: 'dashed',
+                flexShrink: 0
               }}></div>
-              <span>70-89% (High)</span>
+              <span style={{ color: '#ffffff' }}>70-89% (High)</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <div style={{
@@ -1543,9 +1550,10 @@ const SimpleStormTracker: React.FC = () => {
                 height: '12px',
                 backgroundColor: '#cc0000',
                 border: '1px solid #333',
-                borderRadius: '2px'
+                borderStyle: 'dashed',
+                flexShrink: 0
               }}></div>
-              <span>50-69% (Moderate)</span>
+              <span style={{ color: '#ffffff' }}>50-69% (Moderate)</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <div style={{
@@ -1553,9 +1561,10 @@ const SimpleStormTracker: React.FC = () => {
                 height: '12px',
                 backgroundColor: '#ff6600',
                 border: '1px solid #333',
-                borderRadius: '2px'
+                borderStyle: 'dashed',
+                flexShrink: 0
               }}></div>
-              <span>30-49% (Low-Mod)</span>
+              <span style={{ color: '#ffffff' }}>30-49% (Low-Mod)</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <div style={{
@@ -1563,9 +1572,10 @@ const SimpleStormTracker: React.FC = () => {
                 height: '12px',
                 backgroundColor: '#2196F3',
                 border: '1px solid #333',
-                borderRadius: '2px'
+                borderStyle: 'dashed',
+                flexShrink: 0
               }}></div>
-              <span>20-29% (Low)</span>
+              <span style={{ color: '#ffffff' }}>20-29% (Low)</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <div style={{
@@ -1573,9 +1583,10 @@ const SimpleStormTracker: React.FC = () => {
                 height: '12px',
                 backgroundColor: '#00aa00',
                 border: '1px solid #333',
-                borderRadius: '2px'
+                borderStyle: 'dashed',
+                flexShrink: 0
               }}></div>
-              <span>10-19% (Very Low)</span>
+              <span style={{ color: '#ffffff' }}>10-19% (Very Low)</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <div style={{
@@ -1583,18 +1594,19 @@ const SimpleStormTracker: React.FC = () => {
                 height: '12px',
                 backgroundColor: '#0066cc',
                 border: '1px solid #333',
-                borderRadius: '2px'
+                borderStyle: 'dashed',
+                flexShrink: 0
               }}></div>
-              <span>&lt;10% (Minimal)</span>
+              <span style={{ color: '#ffffff' }}>&lt;10% (Minimal)</span>
             </div>
           </div>
           
           <div style={{
             fontSize: '0.65rem',
-            color: '#666',
+            color: '#cccccc',
             marginTop: '6px',
             fontStyle: 'italic',
-            borderTop: '1px solid #eee',
+            borderTop: '1px solid #555',
             paddingTop: '4px'
           }}>
             {windSpeedProbType === '34kt' && 'Tropical storm force winds (39+ mph)'}
@@ -1610,7 +1622,7 @@ const SimpleStormTracker: React.FC = () => {
           position: 'absolute',
           bottom: '20px',
           left: '20px',
-          backgroundColor: 'rgba(255, 255, 255, 0.95)',
+          backgroundColor: 'rgba(0, 0, 0, 0.7)',
           padding: '10px',
           borderRadius: '6px',
           boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
@@ -1623,8 +1635,8 @@ const SimpleStormTracker: React.FC = () => {
           <div style={{ 
             fontWeight: 'bold', 
             marginBottom: '6px', 
-            color: '#333',
-            borderBottom: '1px solid #eee',
+            color: '#ffffff',
+            borderBottom: '1px solid #555',
             paddingBottom: '3px',
             fontSize: '0.8rem'
           }}>
@@ -1640,7 +1652,7 @@ const SimpleStormTracker: React.FC = () => {
             const maxHeight = Math.max(...features.map((f: any) => f.properties?.SURGE_FT || 0));
             
             return (
-              <div style={{ marginBottom: '8px', fontSize: '0.7rem', color: '#666' }}>
+              <div style={{ marginBottom: '8px', fontSize: '0.7rem', color: '#cccccc' }}>
                 <div><strong>{totalAreas}</strong> affected areas</div>
                 {extremeAreas > 0 && <div>🔴 <strong>{extremeAreas}</strong> extreme zones (10+ ft)</div>}
                 {highAreas > 0 && <div>🟠 <strong>{highAreas}</strong> high-impact zones (7-9 ft)</div>}
@@ -1660,7 +1672,7 @@ const SimpleStormTracker: React.FC = () => {
                 borderStyle: 'dashed',
                 flexShrink: 0
               }}></div>
-              <span>10+ ft above ground</span>
+              <span style={{ color: '#ffffff' }}>10+ ft above ground</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <div style={{
@@ -1671,7 +1683,7 @@ const SimpleStormTracker: React.FC = () => {
                 borderStyle: 'dashed',
                 flexShrink: 0
               }}></div>
-              <span>7-9 ft above ground</span>
+              <span style={{ color: '#ffffff' }}>7-9 ft above ground</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <div style={{
@@ -1682,7 +1694,7 @@ const SimpleStormTracker: React.FC = () => {
                 borderStyle: 'dashed',
                 flexShrink: 0
               }}></div>
-              <span>4-6 ft above ground</span>
+              <span style={{ color: '#ffffff' }}>4-6 ft above ground</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <div style={{
@@ -1693,7 +1705,7 @@ const SimpleStormTracker: React.FC = () => {
                 borderStyle: 'dashed',
                 flexShrink: 0
               }}></div>
-              <span>1-3 ft above ground</span>
+              <span style={{ color: '#ffffff' }}>1-3 ft above ground</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <div style={{
@@ -1704,12 +1716,12 @@ const SimpleStormTracker: React.FC = () => {
                 borderStyle: 'dashed',
                 flexShrink: 0
               }}></div>
-              <span>Less than 1 ft</span>
+              <span style={{ color: '#ffffff' }}>Less than 1 ft</span>
             </div>
           </div>
           <div style={{ 
             fontSize: '0.65rem', 
-            color: '#666', 
+            color: '#cccccc', 
             marginTop: '4px',
             fontStyle: 'italic'
           }}>
@@ -1842,12 +1854,31 @@ const SimpleStormTracker: React.FC = () => {
               {displayStorms.length > 0 && (
                 <div style={{ marginTop: '10px', padding: '8px 0', borderTop: '1px solid rgba(255, 255, 255, 0.2)' }}>
                   <div style={{ fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '8px', color: '#ffffff' }}>
-                    Select Storm
+                    Select Storms
                   </div>
+                  {/* Selection helpers */}
+                  {selectedStormIds.length > 0 && (
+                    <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                      <button
+                        onClick={() => setSelectedStormIds([])}
+                        style={{
+                          fontSize: '0.75rem',
+                          padding: '4px 8px',
+                          borderRadius: '6px',
+                          border: '1px solid rgba(255,255,255,0.3)',
+                          background: 'rgba(255,255,255,0.08)',
+                          color: '#fff',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Clear selection (show all)
+                      </button>
+                    </div>
+                  )}
                   
                   {/* Individual Storm Options */}
                   {displayStorms.map(storm => {
-                    const isSelected = selectedStormId === storm.id;
+                    const isSelected = selectedStormIds.includes(storm.id);
                     const categoryColor = storm.category >= 5 ? '#8B0000' : 
                                         storm.category >= 3 ? '#FF4500' : 
                                         storm.category >= 1 ? '#FFD700' : 
@@ -1867,7 +1898,23 @@ const SimpleStormTracker: React.FC = () => {
                       <div 
                         key={storm.id}
                         className={`storm-selector-box ${isSelected ? 'selected' : ''}`}
-                        onClick={() => setSelectedStormId(storm.id)}
+                        onClick={() => {
+                          setSelectedStormIds(prev => {
+                            if (prev.includes(storm.id)) {
+                              const next = prev.filter(id => id !== storm.id);
+                              // If removing the primary selection, set a new primary or clear
+                              if (selectedStormId === storm.id) {
+                                setSelectedStormId(next[0] ?? null);
+                              }
+                              return next;
+                            } else {
+                              const next = [...prev, storm.id];
+                              // Set this as the primary selection for storm-specific layers
+                              setSelectedStormId(storm.id);
+                              return next;
+                            }
+                          });
+                        }}
                         style={{
                           display: 'flex',
                           alignItems: 'center',
@@ -2084,16 +2131,16 @@ const SimpleStormTracker: React.FC = () => {
                     </div>
                   )}
 
-                  <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.8rem', cursor: selectedStormId ? 'not-allowed' : 'pointer', opacity: selectedStormId ? 0.6 : 1 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.8rem', cursor: isAllStormsShown ? 'pointer' : 'not-allowed', opacity: isAllStormsShown ? 1 : 0.6 }}>
                     <input
                       type="checkbox"
                       checked={showWindSpeedProb}
                       onChange={(e) => setShowWindSpeedProb(e.target.checked)}
-                      disabled={selectedStormId !== null}
+                      disabled={!isAllStormsShown}
                       style={{ marginRight: '6px' }}
                     />
-                    <span style={{ color: '#0066cc' }}></span> {windSpeedProbType} Wind Probability
-                    {selectedStormId ? (
+                    <span style={{ color: '#0066cc' }}></span> Wind Speed Probability
+                    {!isAllStormsShown ? (
                       <span style={{ fontSize: '0.7rem', color: '#aaaaaa', marginLeft: '5px' }}>
                         (Only available when viewing all storms)
                       </span>
@@ -2105,7 +2152,7 @@ const SimpleStormTracker: React.FC = () => {
                   </label>
                   
                   {/* Wind Speed Options - only show when wind speed probability is enabled */}
-                  {showWindSpeedProb && !selectedStormId && (
+                  {showWindSpeedProb && isAllStormsShown && (
                     <div style={{ marginLeft: '20px', marginTop: '5px' }}>
                       <div style={{ fontSize: '0.75rem', color: '#cccccc', marginBottom: '3px' }}>Wind Speed Options:</div>
                       <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
@@ -2213,7 +2260,9 @@ const SimpleStormTracker: React.FC = () => {
                         ) : windSpeedProb.available === false ? (
                           'No wind probability data available (typically only available during active storm threats)'
                         ) : windSpeedProb.probabilityData ? (
-                          `Showing ${windSpeedProb.probabilityData.features?.length || 0} probability zones for ${windSpeedProbType} winds`
+                          (windSpeedProb.probabilityData.features?.length || 0) > 0
+                            ? `Showing ${windSpeedProb.probabilityData.features.length} probability zones for ${windSpeedProbType} winds`
+                            : `No polygon probability zones found in latest ${windSpeedProbType} KMZ (product may be raster-only this cycle)`
                         ) : windSpeedProb.error ? (
                           `Error: ${windSpeedProb.error}`
                         ) : (

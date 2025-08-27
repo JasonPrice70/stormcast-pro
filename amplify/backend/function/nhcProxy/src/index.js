@@ -85,6 +85,48 @@ async function getLatestGribUrl(windSpeed = '34kt') {
 }
 
 /**
+ * Get the latest KMZ file URL for wind speed probability (34kt, 50kt, 64kt)
+ * Reads CurrentStorms.json and returns the first available KMZ URL.
+ */
+async function getLatestWspKmzUrl(windSpeed = '34kt') {
+  try {
+    const resp = await axios.get(`${NHC_BASE_URL}/CurrentStorms.json`, {
+      timeout: REQUEST_TIMEOUT,
+      headers: { 'Accept': 'application/json' }
+    });
+
+    const data = resp.data || {};
+    const storms = Array.isArray(data)
+      ? data
+      : Array.isArray(data.activeStorms)
+        ? data.activeStorms
+        : [];
+
+    const propMap = {
+      '34kt': 'kmzFile34kt',
+      '50kt': 'kmzFile50kt',
+      '64kt': 'kmzFile64kt'
+    };
+    const key = propMap[windSpeed] || propMap['34kt'];
+
+    for (const s of storms) {
+      const wsp = s && s.windSpeedProbabilitiesGIS;
+      const url = wsp && wsp[key];
+      if (typeof url === 'string' && url.startsWith('http')) {
+        console.log(`Found WSP KMZ (${windSpeed}) from CurrentStorms: ${url}`);
+        return url;
+      }
+    }
+
+    console.log(`No WSP KMZ URL found in CurrentStorms for ${windSpeed}`);
+    return null;
+  } catch (err) {
+    console.warn('Failed to get WSP KMZ URL from CurrentStorms:', err?.message || err);
+    return null;
+  }
+}
+
+/**
  * Parse KMZ file and extract track data as GeoJSON
  */
 async function parseKmzToTrackGeoJSON(kmzBuffer) {
@@ -930,8 +972,8 @@ async function parseKmzToWindProbGeoJSON(kmzBuffer, windSpeed = '34kt') {
           return reject(new Error('No KML file found in wind probability KMZ'));
         }
 
-        // Parse KML and extract wind probability data
-        extractWindProbFromKML(kmlContent, windSpeed)
+  // Parse KML and extract wind probability data
+  extractWindProbFromKML(kmlContent, windSpeed)
           .then(resolve)
           .catch(reject);
       });
@@ -1041,7 +1083,7 @@ async function extractWindProbFromKML(kmlContent, windSpeed = '34kt') {
     
     const features = [];
 
-    function findWindProbPolygons(obj) {
+  function findWindProbPolygons(obj) {
       if (!obj) return;
 
       // Look for placemarks with polygon data in folders
@@ -1069,7 +1111,7 @@ async function extractWindProbFromKML(kmlContent, windSpeed = '34kt') {
       if (obj.Placemark) {
         const placemarks = Array.isArray(obj.Placemark) ? obj.Placemark : [obj.Placemark];
         
-        placemarks.forEach(placemark => {
+  placemarks.forEach(placemark => {
           if (placemark.MultiGeometry && placemark.MultiGeometry.Polygon) {
             const polygons = Array.isArray(placemark.MultiGeometry.Polygon) ? 
               placemark.MultiGeometry.Polygon : [placemark.MultiGeometry.Polygon];
@@ -1083,6 +1125,7 @@ async function extractWindProbFromKML(kmlContent, windSpeed = '34kt') {
         });
       }
 
+
       // Recursively search in folders
       if (obj.Folder) {
         const folders = Array.isArray(obj.Folder) ? obj.Folder : [obj.Folder];
@@ -1093,6 +1136,8 @@ async function extractWindProbFromKML(kmlContent, windSpeed = '34kt') {
         findWindProbPolygons(obj.Document);
       }
     }
+
+  // GroundOverlay images are intentionally ignored; only polygon probability zones are parsed
     
     function processPolygon(polygon, placemark, polygonIndex) {
       if (polygon.outerBoundaryIs && 
@@ -1961,24 +2006,24 @@ exports.handler = async (event) => {
         break;
         
       case 'wind-speed-probability':
-        // Use the latest 34kt wind speed probability from GRIB2 FTP
-        nhcUrl = await getLatestGribUrl('34kt');
-        isKmzEndpoint = false;
-        isGribEndpoint = true;
+  // KMZ only – use NHC latest 34kt wind probability KMZ
+  nhcUrl = `${NHC_BASE_URL}/gis/forecast/archive/latest_wsp34knt120hr_5km.kmz`;
+  isKmzEndpoint = true;
+  isGribEndpoint = false;
         break;
         
       case 'wind-speed-probability-50kt':
-        // Use the latest 50kt wind speed probability from GRIB2 FTP
-        nhcUrl = await getLatestGribUrl('50kt');
-        isKmzEndpoint = false;
-        isGribEndpoint = true;
+  // KMZ only – use NHC latest 50kt wind probability KMZ
+  nhcUrl = `${NHC_BASE_URL}/gis/forecast/archive/latest_wsp50knt120hr_5km.kmz`;
+  isKmzEndpoint = true;
+  isGribEndpoint = false;
         break;
         
       case 'wind-speed-probability-64kt':
-        // Use the latest 64kt wind speed probability from GRIB2 FTP
-        nhcUrl = await getLatestGribUrl('64kt');
-        isKmzEndpoint = false;
-        isGribEndpoint = true;
+  // KMZ only – use NHC latest 64kt wind probability KMZ
+  nhcUrl = `${NHC_BASE_URL}/gis/forecast/archive/latest_wsp64knt120hr_5km.kmz`;
+  isKmzEndpoint = true;
+  isGribEndpoint = false;
         break;
         
       case 'wind-arrival-most-likely':
