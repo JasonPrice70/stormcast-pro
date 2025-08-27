@@ -36,12 +36,12 @@ body {
 }
 
 a {
-  color: #5e35b1;
+  color: #1976d2;
   text-decoration: none;
 }
 
 a:hover {
-  color: #4527a0;
+  color: #1565c0;
   text-decoration: underline;
 }
 
@@ -61,18 +61,18 @@ button {
   font-size: 1em;
   font-weight: 500;
   font-family: inherit;
-  background-color: #5e35b1;
+  background-color: #1976d2;
   color: white;
   cursor: pointer;
   transition: background-color 0.25s;
 }
 
 button:hover {
-  background-color: #4527a0;
+  background-color: #1565c0;
 }
 
 button:focus,
 button:focus-visible {
-  outline: 2px solid #5e35b1;
+  outline: 2px solid #1976d2;
   outline-offset: 2px;
 }
