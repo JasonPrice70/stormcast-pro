@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Polyline, CircleMarker, Polygon, Tooltip } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, CircleMarker, Polygon, Tooltip, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import './SimpleStormTracker.css';
@@ -16,6 +16,54 @@ L.Icon.Default.mergeOptions({
   iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
+
+// Map controller component for auto-zoom functionality
+interface MapControllerProps {
+  selectedStorm: any;
+  stormsToDisplay: any[];
+}
+
+const MapController: React.FC<MapControllerProps> = ({ selectedStorm, stormsToDisplay }) => {
+  const map = useMap();
+  
+  useEffect(() => {
+    if (selectedStorm) {
+      // Auto-center to selected storm (preserve current zoom level)
+      const [lat, lon] = selectedStorm.position;
+      
+      // Simply pan to the storm position without changing zoom
+      map.panTo([lat, lon], {
+        animate: true,
+        duration: 1.0
+      });
+    } else if (stormsToDisplay.length > 0) {
+      // If no specific storm selected but storms are available, center on the group
+      try {
+        const stormPositions = stormsToDisplay.map(storm => L.latLng(storm.position[0], storm.position[1]));
+        if (stormPositions.length === 1) {
+          // Single storm - center on it
+          const storm = stormsToDisplay[0];
+          map.panTo([storm.position[0], storm.position[1]], {
+            animate: true,
+            duration: 1.0
+          });
+        } else {
+          // Multiple storms - center on the geographic center of all storms
+          const bounds = L.latLngBounds(stormPositions);
+          const center = bounds.getCenter();
+          map.panTo([center.lat, center.lng], {
+            animate: true,
+            duration: 1.0
+          });
+        }
+      } catch (error) {
+        console.warn('Error centering on storms:', error);
+      }
+    }
+  }, [selectedStorm, stormsToDisplay, map]);
+  
+  return null;
+};
 
 // Format forecast time for labels (e.g., "6 PM MON")
 const formatForecastTime = (datetimeString: string) => {
@@ -356,6 +404,12 @@ const SimpleStormTracker: React.FC = () => {
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
         />
 
+        {/* Map Controller for auto-zoom functionality */}
+        <MapController 
+          selectedStorm={selectedStorm}
+          stormsToDisplay={stormsToDisplay}
+        />
+
         {/* Debug: Log storms to display */}
         {console.log('StormTracker DEBUG - stormsToDisplay:', stormsToDisplay.map(s => ({ name: s.name, category: s.category, classification: s.classification, position: s.position })))}
 
@@ -368,6 +422,16 @@ const SimpleStormTracker: React.FC = () => {
               position={storm.position}
               icon={createStormIcon(storm.category, storm.classification)}
               zIndexOffset={1000}
+              eventHandlers={{
+                click: () => {
+                  // Set this storm as the primary selected storm for auto-zoom and overlays
+                  setSelectedStormId(storm.id);
+                  // Also add to selected storms display list if not already there
+                  if (!selectedStormIds.includes(storm.id)) {
+                    setSelectedStormIds(prev => [...prev, storm.id]);
+                  }
+                }
+              }}
             >
             <Popup closeOnClick={true} autoClose={true}>
               <div className="storm-popup">
@@ -404,6 +468,9 @@ const SimpleStormTracker: React.FC = () => {
                     >
                       View Advisory
                     </a>
+                  </div>
+                  <div style={{ marginTop: '8px', fontSize: '0.8rem', color: '#666' }}>
+                    <em>Click marker to zoom and track this storm</em>
                   </div>
                 </div>
               </div>
@@ -2315,6 +2382,47 @@ const SimpleStormTracker: React.FC = () => {
                       </span>
                     ) : null}
                   </label>
+                  
+                  {/* GEFS Data Details */}
+                  {selectedStormId && gefs.tracks && (
+                    <div style={{ marginTop: '4px', fontSize: '0.7rem', color: '#999' }}>
+                      {/* Cycle Time */}
+                      {gefs.tracks.cycleTime && (
+                        <div>
+                          Cycle: {(() => {
+                            const cycle = gefs.tracks.cycleTime;
+                            const year = cycle.substring(0, 4);
+                            const month = cycle.substring(4, 6);
+                            const day = cycle.substring(6, 8);
+                            const hour = cycle.substring(8, 10);
+                            return `${year}-${month}-${day} ${hour}:00 UTC`;
+                          })()}
+                        </div>
+                      )}
+                      {/* Fetch Time */}
+                      {gefs.tracks.fetchTime && (
+                        <div>
+                          Updated: {gefs.tracks.fetchTime.toLocaleTimeString()}
+                          <button
+                            onClick={() => gefs.refresh && gefs.refresh()}
+                            style={{
+                              marginLeft: '8px',
+                              padding: '1px 4px',
+                              fontSize: '0.6rem',
+                              backgroundColor: 'rgba(79, 195, 247, 0.2)',
+                              border: '1px solid rgba(79, 195, 247, 0.5)',
+                              borderRadius: '3px',
+                              color: '#4FC3F7',
+                              cursor: 'pointer'
+                            }}
+                            title="Force refresh GEFS data"
+                          >
+                            ↻
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                   </div>
               {/*<div className="control-panel-buttons">
                 <button 

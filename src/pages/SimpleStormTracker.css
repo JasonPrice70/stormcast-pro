@@ -211,6 +211,30 @@
   transform: translateX(100%);
   transition: transform 0.3s ease-in-out;
   overflow-y: auto;
+  overflow-x: hidden;
+  /* Enhanced scrolling for mobile */
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+}
+
+/* Custom scrollbar for webkit browsers */
+.sliding-control-panel::-webkit-scrollbar {
+  width: 8px;
+}
+
+.sliding-control-panel::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+.sliding-control-panel::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+}
+
+.sliding-control-panel::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.5);
 }
 
 .sliding-control-panel.open {
@@ -226,6 +250,10 @@
   padding: 20px 20px 15px 20px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.2);
   background: rgba(0, 0, 0, 0.3);
+  /* Sticky header to ensure it stays visible when scrolling */
+  position: sticky;
+  top: 0;
+  z-index: 1001;
 }
 
 .control-panel-header {
@@ -241,6 +269,23 @@
   flex-direction: column;
   gap: 12px;
   color: #ffffff;
+  /* Ensure proper scrolling on mobile */
+  position: relative;
+}
+
+/* Scroll indicator gradient for mobile */
+@media (max-width: 768px) {
+  .control-panel-content::after {
+    content: '';
+    position: sticky;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 20px;
+    background: linear-gradient(transparent, rgba(0, 0, 0, 0.7));
+    pointer-events: none;
+    z-index: 10;
+  }
 }
 
 .control-panel-loading {
@@ -413,6 +458,26 @@
     border-radius: 0;
     border: none;
     transform: translateX(100%);
+    /* Ensure scrolling works properly on mobile */
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    /* Fix potential iOS scrolling issues */
+    position: fixed;
+    left: 0;
+    right: 0;
+    /* Additional mobile scroll optimizations */
+    scroll-behavior: smooth;
+    overscroll-behavior: contain;
+  }
+  
+  /* Ensure content area allows for proper scrolling */
+  .control-panel-content {
+    /* Add bottom padding to ensure last item is accessible */
+    padding-bottom: 40px;
+    /* Ensure content doesn't get cut off */
+    min-height: auto;
+    overflow: visible;
   }
   
   /* Position layer toggle button better for mobile */
@@ -447,6 +512,16 @@
   }
   
   /* Better spacing for storm selector on mobile */
+  .storm-selector-box {
+    margin-bottom: 10px !important;
+  }
+  
+  /* Ensure storm selector content doesn't overflow */
+  .storm-selector-box > div {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+  
   .control-panel-content select {
     padding: 10px;
     font-size: 0.9rem;

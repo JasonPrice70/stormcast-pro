@@ -389,10 +389,28 @@ exports.handler = async (event) => {
           }
 
           const parsed = parseAdeckGEFSTracks(raw);
+          
+          // Add cycle time info to response
+          const responseData = {
+            filename,
+            modelsPresent: parsed.modelsPresent,
+            tracks: parsed.tracks,
+            cycleTime: parsed.latestCycle // Directly assign the cycle timestamp
+          };
+          
+          // Log for debugging
+          console.log('GEFS A-deck response:', { 
+            filename, 
+            modelsCount: parsed.modelsPresent?.length || 0, 
+            tracksCount: parsed.tracks?.length || 0,
+            latestCycle: parsed.latestCycle,
+            cycleTime: responseData.cycleTime
+          });
+          
           return {
             statusCode: 200,
             headers: corsHeaders,
-            body: JSON.stringify({ success: true, data: { filename, ...parsed } })
+            body: JSON.stringify({ success: true, data: responseData })
           };
         } catch (err) {
           const status = err?.response?.status;
@@ -534,6 +552,7 @@ exports.handler = async (event) => {
         function parseAdeckGEFSTracks(text) {
           // Collect records per cycle time (yyyymmddhh)
           const lines = text.split(/\r?\n/).filter(l => l && l.includes(','));
+          console.log('GEFS: parseAdeckGEFSTracks called with', lines.length, 'lines');
           if (lines.length === 0) return { modelsPresent: [], tracks: [] };
 
           let latestCycle = null;
@@ -545,10 +564,14 @@ exports.handler = async (event) => {
             // Fields common in A-deck: 0-basin,1-cyclone,2-yyyymmddhh,3-technum?,4-techname,5-tau,6-lat,7-lon,8-vmax
             const cycle = parts[2];
             if (!/^[0-9]{10}$/.test(cycle)) continue;
-            if (!latestCycle || cycle > latestCycle) latestCycle = cycle;
+            if (!latestCycle || cycle > latestCycle) {
+              console.log('GEFS: New latest cycle found:', cycle, 'previous:', latestCycle);
+              latestCycle = cycle;
+            }
             records.push(parts);
           }
 
+          console.log('GEFS: Final latestCycle:', latestCycle, 'total records:', records.length);
           if (!latestCycle) return { modelsPresent: [], tracks: [] };
 
           // Filter to latest cycle
@@ -598,7 +621,11 @@ exports.handler = async (event) => {
           tracks.sort((a, b) => orderVal(a.modelId) - orderVal(b.modelId) || a.modelId.localeCompare(b.modelId));
           modelsPresent.sort((a, b) => orderVal(a) - orderVal(b) || a.localeCompare(b));
 
-          return { modelsPresent, tracks };
+          return { 
+            modelsPresent, 
+            tracks,
+            latestCycle // Include cycle timestamp in response
+          };
         }
 
         function parseATCFLat(token) {

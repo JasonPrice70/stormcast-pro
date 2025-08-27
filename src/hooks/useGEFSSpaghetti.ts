@@ -12,6 +12,8 @@ export const useGEFSSpaghetti = (enabled: boolean, stormId: string | null) => {
           modelId: string;
           points: Array<{ tau: number; lat: number; lon: number; vmax: number | null }>;
         }>;
+        cycleTime?: string; // Latest cycle timestamp
+        fetchTime?: Date; // When this data was fetched
       }
   >(null);
   const [loading, setLoading] = useState(false);
@@ -30,7 +32,12 @@ export const useGEFSSpaghetti = (enabled: boolean, stormId: string | null) => {
       const api = new NHCApiService();
       const data = await api.getGEFSAdeckTracks(stormId);
       if (data && data.tracks && data.tracks.length > 0) {
-        setTracks(data);
+        // Add fetch timestamp to track data freshness
+        const enrichedData = {
+          ...data,
+          fetchTime: new Date()
+        };
+        setTracks(enrichedData);
         setAvailable(true);
       } else {
         setTracks(null);

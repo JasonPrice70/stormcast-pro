@@ -97,11 +97,19 @@ class NHCApiService {
     filename: string;
     modelsPresent: string[];
     tracks: Array<{ modelId: string; points: Array<{ tau: number; lat: number; lon: number; vmax: number | null }> }>;
+    cycleTime?: string;
   } | null> {
     if (!stormId) return null;
     // Try Lambda first
     const data = await this.fetchWithLambdaFallback('gefs-adeck', { stormId });
-    if (data && (data.tracks || data.modelsPresent) && data.filename) return data;
+    if (data && (data.tracks || data.modelsPresent) && data.filename) {
+      // Extract cycle time from debug field if available
+      const cycleTime = data.debug?.latestCycle || data.cycleTime;
+      return {
+        ...data,
+        cycleTime
+      };
+    }
 
     // Fallback: fetch A-deck directly via CORS proxies and parse client-side
     try {
