@@ -141,7 +141,7 @@ const getIntensityColor = (stormType: string, styleCategory: string) => {
     case 'ex':
       return '#666666'; // Dark gray
     case 'fc':
-      return '#9966ff'; // Purple for forecast
+      return '#1976d2'; // Blue for forecast
     default:
       return '#cccccc'; // Light gray
   }
