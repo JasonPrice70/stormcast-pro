@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react'
 import NHCApiService from '../services/nhcApi'
 
-export interface HWRFWindField {
+export interface HMONWindField {
   center: [number, number]
   radius: number
   maxWinds: number
@@ -23,56 +23,12 @@ export interface HWRFWindField {
   }>
 }
 
-export interface HWRFData {
-  windFields: HWRFWindField[]
-}
-
-export const useHWRFData = () => {
-  const [hwrfData, setHWRFData] = useState<HWRFData | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  const fetchHWRFData = useCallback(async (stormId: string) => {
-    setIsLoading(true)
-    setError(null)
-    
-    try {
-      console.log('Fetching HWRF data for storm:', stormId)
-      const nhcApi = new NHCApiService()
-      const data = await nhcApi.fetchHWRFWindFields(stormId)
-      
-      if (data) {
-        setHWRFData(data)
-        console.log('HWRF data fetched successfully:', data.windFields.length, 'wind fields')
-      } else {
-        setHWRFData(null)
-        console.log('No HWRF data available for storm:', stormId)
-      }
-    } catch (err) {
-      console.error('Error fetching HWRF data:', err)
-      setError(err instanceof Error ? err.message : 'Failed to fetch HWRF data')
-      setHWRFData(null)
-    } finally {
-      setIsLoading(false)
-    }
-  }, [])
-
-  const clearData = useCallback(() => {
-    setHWRFData(null)
-    setError(null)
-  }, [])
-
-  return {
-    hwrfData,
-    isLoading,
-    error,
-    fetchHWRFData,
-    clearData
-  }
+export interface HMONData {
+  windFields: HMONWindField[]
 }
 
 export const useHMONData = () => {
-  const [hmonData, setHMONData] = useState<HWRFData | null>(null) // Reusing HWRFData interface as structure is the same
+  const [hmonData, setHMONData] = useState<HMONData | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -88,6 +44,7 @@ export const useHMONData = () => {
       if (data) {
         setHMONData(data)
         console.log('HMON data fetched successfully:', data.windFields.length, 'wind fields')
+        console.log('HMON model info:', data.windFields[0]?.model, 'cycle:', data.windFields[0]?.cycle)
       } else {
         setHMONData(null)
         console.log('No HMON data available for storm:', stormId)
@@ -101,16 +58,48 @@ export const useHMONData = () => {
     }
   }, [])
 
-  const clearData = useCallback(() => {
+  const clearHMONData = useCallback(() => {
     setHMONData(null)
     setError(null)
   }, [])
+
+  // Get the latest wind field data
+  const getLatestWindField = useCallback((): HMONWindField | null => {
+    if (!hmonData || !hmonData.windFields.length) return null
+    
+    // Return the most recent wind field (they should be sorted by time)
+    return hmonData.windFields[0]
+  }, [hmonData])
+
+  // Get wind field statistics
+  const getWindFieldStats = useCallback(() => {
+    const windField = getLatestWindField()
+    if (!windField) return null
+
+    const winds = windField.windField.map(point => point.windSpeed)
+    const pressures = windField.windField.map(point => point.pressure)
+
+    return {
+      maxWind: Math.max(...winds),
+      minWind: Math.min(...winds),
+      avgWind: winds.reduce((a, b) => a + b, 0) / winds.length,
+      maxPressure: Math.max(...pressures),
+      minPressure: Math.min(...pressures),
+      avgPressure: pressures.reduce((a, b) => a + b, 0) / pressures.length,
+      pointCount: winds.length,
+      model: windField.model || 'HMON',
+      cycle: windField.cycle || 'unknown',
+      forecastHour: windField.forecastHour || '00'
+    }
+  }, [getLatestWindField])
 
   return {
     hmonData,
     isLoading,
     error,
     fetchHMONData,
-    clearData
+    clearHMONData,
+    getLatestWindField,
+    getWindFieldStats
   }
 }
