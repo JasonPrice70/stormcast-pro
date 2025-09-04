@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Polyline, CircleMarker, Polygon, Tooltip } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, CircleMarker, Polygon, Tooltip, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import './SimpleStormTracker.css';
 import { useNHCData, useStormSurge, usePeakStormSurge, useWindSpeedProbability, useWindArrival } from '../hooks/useNHCData';
 import { useGEFSSpaghetti } from '../hooks/useGEFSSpaghetti';
+import WindSpeedLegend from '../components/WindSpeedLegend';
+import { useHWRFData, useHMONData } from '../hooks/useHWRFData';
 import SimpleHeader from '../components/SimpleHeader';
 import ExpandLessOutlinedIcon from '@mui/icons-material/ExpandLessOutlined';
 import LayersOutlinedIcon from '@mui/icons-material/LayersOutlined';
@@ -16,6 +18,54 @@ L.Icon.Default.mergeOptions({
   iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
+
+// Map controller component for auto-zoom functionality
+interface MapControllerProps {
+  selectedStorm: any;
+  stormsToDisplay: any[];
+}
+
+const MapController: React.FC<MapControllerProps> = ({ selectedStorm, stormsToDisplay }) => {
+  const map = useMap();
+  
+  useEffect(() => {
+    if (selectedStorm) {
+      // Auto-center to selected storm (preserve current zoom level)
+      const [lat, lon] = selectedStorm.position;
+      
+      // Simply pan to the storm position without changing zoom
+      map.panTo([lat, lon], {
+        animate: true,
+        duration: 1.0
+      });
+    } else if (stormsToDisplay.length > 0) {
+      // If no specific storm selected but storms are available, center on the group
+      try {
+        const stormPositions = stormsToDisplay.map(storm => L.latLng(storm.position[0], storm.position[1]));
+        if (stormPositions.length === 1) {
+          // Single storm - center on it
+          const storm = stormsToDisplay[0];
+          map.panTo([storm.position[0], storm.position[1]], {
+            animate: true,
+            duration: 1.0
+          });
+        } else {
+          // Multiple storms - center on the geographic center of all storms
+          const bounds = L.latLngBounds(stormPositions);
+          const center = bounds.getCenter();
+          map.panTo([center.lat, center.lng], {
+            animate: true,
+            duration: 1.0
+          });
+        }
+      } catch (error) {
+        console.warn('Error centering on storms:', error);
+      }
+    }
+  }, [selectedStorm, stormsToDisplay, map]);
+  
+  return null;
+};
 
 // Format forecast time for labels (e.g., "6 PM MON")
 const formatForecastTime = (datetimeString: string) => {
@@ -218,6 +268,17 @@ const SimpleStormTracker: React.FC = () => {
   const [showWindSpeedProb, setShowWindSpeedProb] = useState(false);
   const [windSpeedProbType, setWindSpeedProbType] = useState<'34kt' | '50kt' | '64kt'>('34kt');
   const [showGEFSSpaghetti, setShowGEFSSpaghetti] = useState(false);
+  
+  // Individual model track toggles
+  const [showOfficialTrack, setShowOfficialTrack] = useState(true);
+  const [showHWRF, setShowHWRF] = useState(false);
+  const [showHMON, setShowHMON] = useState(false);
+  const [showHAFS, setShowHAFS] = useState(true);
+  const [showGFS, setShowGFS] = useState(true);
+  const [showECMWF, setShowECMWF] = useState(true);
+  const [showGEFSEnsemble, setShowGEFSEnsemble] = useState(true);
+  const [showOtherModels, setShowOtherModels] = useState(false);
+  
   const [isControlPanelClosed, setIsControlPanelClosed] = useState(true);
   
   // Refs for click-outside detection
@@ -304,6 +365,23 @@ const SimpleStormTracker: React.FC = () => {
   // Use NOAA NOMADS spaghetti models hook when enabled and a storm is selected
   const gefs = useGEFSSpaghetti(showGEFSSpaghetti && !!selectedStormId, selectedStormId);
 
+  // Use HWRF and HMON wind field hooks when enabled and a storm is selected
+  const hwrf = useHWRFData();
+  const hmon = useHMONData();
+
+  // Fetch HWRF and HMON data when storm is selected and models are enabled
+  useEffect(() => {
+    if (selectedStormId && showHWRF && !hwrf.isLoading) {
+      hwrf.fetchHWRFData(selectedStormId);
+    }
+  }, [selectedStormId, showHWRF]);
+
+  useEffect(() => {
+    if (selectedStormId && showHMON && !hmon.isLoading) {
+      hmon.fetchHMONData(selectedStormId);
+    }
+  }, [selectedStormId, showHMON]);
+
 
   // Helper function to open CORS proxy access page
   const openCorsAccess = () => {
@@ -356,6 +434,12 @@ const SimpleStormTracker: React.FC = () => {
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
         />
 
+        {/* Map Controller for auto-zoom functionality */}
+        <MapController 
+          selectedStorm={selectedStorm}
+          stormsToDisplay={stormsToDisplay}
+        />
+
         {/* Debug: Log storms to display */}
         {console.log('StormTracker DEBUG - stormsToDisplay:', stormsToDisplay.map(s => ({ name: s.name, category: s.category, classification: s.classification, position: s.position })))}
 
@@ -368,6 +452,16 @@ const SimpleStormTracker: React.FC = () => {
               position={storm.position}
               icon={createStormIcon(storm.category, storm.classification)}
               zIndexOffset={1000}
+              eventHandlers={{
+                click: () => {
+                  // Set this storm as the primary selected storm for auto-zoom and overlays
+                  setSelectedStormId(storm.id);
+                  // Also add to selected storms display list if not already there
+                  if (!selectedStormIds.includes(storm.id)) {
+                    setSelectedStormIds(prev => [...prev, storm.id]);
+                  }
+                }
+              }}
             >
             <Popup closeOnClick={true} autoClose={true}>
               <div className="storm-popup">
@@ -404,6 +498,9 @@ const SimpleStormTracker: React.FC = () => {
                     >
                       View Advisory
                     </a>
+                  </div>
+                  <div style={{ marginTop: '8px', fontSize: '0.8rem', color: '#666' }}>
+                    <em>Click marker to zoom and track this storm</em>
                   </div>
                 </div>
               </div>
@@ -568,9 +665,50 @@ const SimpleStormTracker: React.FC = () => {
         })}
 
         {/* GEFS Spaghetti (A-deck proxy) */}
-        {showGEFSSpaghetti && selectedStormId && gefs.tracks && gefs.tracks.tracks && (
+        {showGEFSSpaghetti && selectedStormId && gefs.tracks && gefs.tracks.tracks && (() => {
+          // Debug: Log what models are present and which ones are GEFS ensemble members
+          if (gefs.tracks) {
+            console.log('GEFS Debug - Models present:', gefs.tracks.modelsPresent);
+            console.log('GEFS Debug - GEFS Ensemble members:', gefs.tracks.modelsPresent.filter(m => m.startsWith('AP')));
+            console.log('GEFS Debug - showGEFSEnsemble:', showGEFSEnsemble);
+            console.log('GEFS Debug - Total tracks:', gefs.tracks.tracks.length);
+          }
+          return (
           <React.Fragment>
-            {gefs.tracks.tracks.map((t, idx) => {
+            {gefs.tracks!.tracks.map((t, idx) => {
+              // Check if this model should be displayed based on toggles
+              const modelId = t.modelId;
+              let shouldShow = false;
+              
+              if ((modelId === 'OFCL' || modelId === 'OFCI') && showOfficialTrack) {
+                shouldShow = true;
+              } else if (modelId === 'HWRF' && showHWRF) {
+                shouldShow = true;
+              } else if (modelId === 'HMON' && showHMON) {
+                shouldShow = true;
+              } else if ((modelId === 'HAFS' || modelId === 'HAFA' || modelId === 'HAFB') && showHAFS) {
+                shouldShow = true;
+              } else if ((modelId === 'GFS' || modelId === 'GFSO') && showGFS) {
+                shouldShow = true;
+              } else if ((modelId === 'ECMW' || modelId === 'ECM2') && showECMWF) {
+                shouldShow = true;
+              } else if ((modelId === 'AEMI' || modelId === 'AEMN' || modelId === 'AEM2' || modelId === 'AC00' || modelId.startsWith('AP')) && showGEFSEnsemble) {
+                shouldShow = true;
+              } else if (showOtherModels) {
+                // Show other/miscellaneous models when "Other Models" is enabled
+                const knownModels = ['OFCL', 'OFCI', 'HWRF', 'HMON', 'HAFS', 'HAFA', 'HAFB', 'GFS', 'GFSO', 'ECMW', 'ECM2', 'AEMI', 'AEMN', 'AEM2', 'AC00'];
+                if (!knownModels.includes(modelId) && !modelId.startsWith('AP')) {
+                  shouldShow = true;
+                }
+              }
+              
+              // Debug: Log which models are being shown or hidden
+              if (modelId.startsWith('AP')) {
+                console.log(`GEFS Debug - ${modelId}: shouldShow=${shouldShow}, showGEFSEnsemble=${showGEFSEnsemble}`);
+              }
+              
+              if (!shouldShow) return null;
+              
               // Deduplicate repeated points that can appear in A-deck for the same tau
               const seen = new Set<string>();
               const deduped = t.points.filter((p: any) => {
@@ -583,23 +721,94 @@ const SimpleStormTracker: React.FC = () => {
                 .map((p: any) => [p.lat, p.lon] as [number, number])
                 .filter(([lat, lon]) => isFinite(lat) && isFinite(lon));
               if (positions.length < 2) return null;
-              const colors = ['#1976d2','#388e3c','#f57c00','#7b1fa2','#c2185b','#0097a7','#512da8','#00796b','#455a64','#8d6e63'];
-              const isMean = t.modelId === 'AEMI' || t.modelId === 'AEMN' || t.modelId === 'AEM2';
-              const color = isMean ? '#0d47a1' : colors[idx % colors.length];
-              const weight = isMean ? 3 : 1.5;
-              const opacity = isMean ? 0.95 : 0.6;
+              
+              // Enhanced model categorization and styling
+              let color, weight, opacity, dashArray;
+              
+              if (modelId === 'OFCL' || modelId === 'OFCI') {
+                // Official forecast - thick black line
+                color = '#000000';
+                weight = 4;
+                opacity = 1.0;
+                dashArray = undefined;
+              } else if (modelId === 'HWRF' || modelId === 'HMON') {
+                // High-resolution models - thick colored lines
+                color = modelId === 'HWRF' ? '#ff4444' : '#44ff44';
+                weight = 3;
+                opacity = 0.9;
+                dashArray = undefined;
+              } else if (modelId === 'HAFS' || modelId === 'HAFA' || modelId === 'HAFB') {
+                // HAFS models - thick blue lines
+                color = '#4444ff';
+                weight = 3;
+                opacity = 0.9;
+                dashArray = undefined;
+              } else if (modelId === 'GFS' || modelId === 'GFSO') {
+                // GFS - medium purple line
+                color = '#9c27b0';
+                weight = 2.5;
+                opacity = 0.8;
+                dashArray = undefined;
+              } else if (modelId === 'ECMW' || modelId === 'ECM2') {
+                // ECMWF - medium orange line
+                color = '#ff9800';
+                weight = 2.5;
+                opacity = 0.8;
+                dashArray = undefined;
+              } else if (modelId === 'AEMI' || modelId === 'AEMN' || modelId === 'AEM2') {
+                // GEFS ensemble mean - thick blue line
+                color = '#0d47a1';
+                weight = 3;
+                opacity = 0.95;
+                dashArray = undefined;
+              } else if (modelId === 'AC00') {
+                // GEFS control - medium line
+                color = '#1976d2';
+                weight = 2;
+                opacity = 0.8;
+                dashArray = undefined;
+              } else if (modelId.startsWith('AP')) {
+                // GEFS perturbations - thin lines
+                const colors = ['#42a5f5','#66bb6a','#ffa726','#ab47bc','#ec407a','#26c6da','#7e57c2','#4db6ac','#78909c','#a1887f'];
+                color = colors[idx % colors.length];
+                weight = 1.5;
+                opacity = 0.6;
+                dashArray = undefined;
+              } else {
+                // Other models - default styling
+                const colors = ['#1976d2','#388e3c','#f57c00','#7b1fa2','#c2185b','#0097a7','#512da8','#00796b','#455a64','#8d6e63'];
+                color = colors[idx % colors.length];
+                weight = 2;
+                opacity = 0.7;
+                dashArray = undefined;
+              }
+              
               return (
                 <Polyline
-                  key={`gefs-${t.modelId}-${idx}`}
+                  key={`model-${t.modelId}-${idx}`}
                   positions={positions}
-                  pathOptions={{ color, weight, opacity }}
+                  pathOptions={{ color, weight, opacity, dashArray }}
                 >
-                  <Tooltip sticky>{t.modelId}</Tooltip>
+                  <Tooltip sticky>
+                    <div>
+                      <strong>{t.modelId}</strong>
+                      {modelId === 'OFCL' && <div style={{fontSize: '0.8em', color: '#666'}}>Official NHC Forecast</div>}
+                      {modelId === 'HWRF' && <div style={{fontSize: '0.8em', color: '#666'}}>Hurricane Weather Research & Forecasting</div>}
+                      {modelId === 'HMON' && <div style={{fontSize: '0.8em', color: '#666'}}>Hurricane Multi-scale Ocean-coupled</div>}
+                      {(modelId === 'HAFS' || modelId === 'HAFA' || modelId === 'HAFB') && <div style={{fontSize: '0.8em', color: '#666'}}>Hurricane Analysis & Forecast System</div>}
+                      {(modelId === 'GFS' || modelId === 'GFSO') && <div style={{fontSize: '0.8em', color: '#666'}}>Global Forecast System</div>}
+                      {(modelId === 'ECMW' || modelId === 'ECM2') && <div style={{fontSize: '0.8em', color: '#666'}}>European Centre Model</div>}
+                      {(modelId === 'AEMI' || modelId === 'AEMN') && <div style={{fontSize: '0.8em', color: '#666'}}>GEFS Ensemble Mean</div>}
+                      {modelId === 'AC00' && <div style={{fontSize: '0.8em', color: '#666'}}>GEFS Control Run</div>}
+                      {modelId.startsWith('AP') && <div style={{fontSize: '0.8em', color: '#666'}}>GEFS Perturbation {modelId.substring(2)}</div>}
+                    </div>
+                  </Tooltip>
                 </Polyline>
               );
             })}
           </React.Fragment>
-        )}
+          );
+        })()}
 
         {/* Render forecast tracks from KMZ data or forecast data */}
         {showForecastTracks && stormsToDisplay.map((storm) => {
@@ -1491,7 +1700,150 @@ const SimpleStormTracker: React.FC = () => {
           });
         })()}
 
+        {/* HWRF Wind Field Layer - Enhanced Contour Display */}
+        {showHWRF && selectedStormId && hwrf.hwrfData && hwrf.hwrfData.windFields && hwrf.hwrfData.windFields.map((windField, index) => (
+          <React.Fragment key={`hwrf-windfield-${index}`}>
+            {/* Render contour polygons if available */}
+            {windField.contours && windField.contours.map((contour, contourIndex) => (
+              <Polygon
+                key={`hwrf-contour-${index}-${contourIndex}`}
+                positions={contour.polygon}
+                color={contour.color}
+                fillColor={contour.color}
+                fillOpacity={0.35}
+                weight={1}
+                opacity={0.8}
+              >
+                <Tooltip>
+                  <div>
+                    <strong>HWRF Wind Contour</strong><br/>
+                    Wind Speed: {contour.windSpeed}+ kt<br/>
+                    Model Center: {windField.center[0].toFixed(2)}, {windField.center[1].toFixed(2)}<br/>
+                    Max Winds: {windField.maxWinds} kt
+                  </div>
+                </Tooltip>
+              </Polygon>
+            ))}
+            
+            {/* Center marker for HWRF */}
+            <CircleMarker
+              center={windField.center}
+              radius={6}
+              color="#FF0000"
+              fillColor="#FF0000"
+              fillOpacity={0.9}
+              weight={2}
+            >
+              <Tooltip>
+                <div>
+                  <strong>HWRF Model Center</strong><br/>
+                  Max Winds: {windField.maxWinds} kt<br/>
+                  Radius: {Math.round(windField.radius)} km
+                </div>
+              </Tooltip>
+            </CircleMarker>
+            
+            {/* Fallback to point display if no contours */}
+            {!windField.contours && windField.windField.map((point, pointIndex) => (
+              <CircleMarker
+                key={`hwrf-point-${index}-${pointIndex}`}
+                center={[point.lat, point.lon]}
+                radius={Math.max(1, point.windSpeed / 20)}
+                color="#ff4444"
+                fillColor="#ff4444"
+                fillOpacity={Math.min(0.8, point.windSpeed / 100)}
+                weight={0}
+              >
+                <Tooltip>
+                  <div>
+                    <strong>HWRF Wind Field</strong><br/>
+                    Wind Speed: {point.windSpeed} kt<br/>
+                    Pressure: {point.pressure} mb<br/>
+                    Time: {new Date(point.time).toLocaleString()}
+                  </div>
+                </Tooltip>
+              </CircleMarker>
+            ))}
+          </React.Fragment>
+        ))}
+
+        {/* HMON Wind Field Layer - Enhanced Contour Display */}
+        {showHMON && selectedStormId && hmon.hmonData && hmon.hmonData.windFields && hmon.hmonData.windFields.map((windField, index) => (
+          <React.Fragment key={`hmon-windfield-${index}`}>
+            {/* Render contour polygons if available */}
+            {windField.contours && windField.contours.map((contour, contourIndex) => (
+              <Polygon
+                key={`hmon-contour-${index}-${contourIndex}`}
+                positions={contour.polygon}
+                color={contour.color}
+                fillColor={contour.color}
+                fillOpacity={0.35}
+                weight={1}
+                opacity={0.8}
+              >
+                <Tooltip>
+                  <div>
+                    <strong>HMON Wind Contour</strong><br/>
+                    Wind Speed: {contour.windSpeed}+ kt<br/>
+                    Model Center: {windField.center[0].toFixed(2)}, {windField.center[1].toFixed(2)}<br/>
+                    Max Winds: {windField.maxWinds} kt
+                  </div>
+                </Tooltip>
+              </Polygon>
+            ))}
+            
+            {/* Center marker for HMON */}
+            <CircleMarker
+              center={windField.center}
+              radius={6}
+              color="#8B4513"
+              fillColor="#8B4513"
+              fillOpacity={0.9}
+              weight={2}
+            >
+              <Tooltip>
+                <div>
+                  <strong>HMON Model Center</strong><br/>
+                  Max Winds: {windField.maxWinds} kt<br/>
+                  Radius: {Math.round(windField.radius)} km
+                </div>
+              </Tooltip>
+            </CircleMarker>
+            
+            {/* Fallback to point display if no contours */}
+            {!windField.contours && windField.windField.map((point, pointIndex) => (
+              <CircleMarker
+                key={`hmon-point-${index}-${pointIndex}`}
+                center={[point.lat, point.lon]}
+                radius={Math.max(1, point.windSpeed / 20)}
+                color="#44ff44"
+                fillColor="#44ff44"
+                fillOpacity={Math.min(0.8, point.windSpeed / 100)}
+                weight={0}
+              >
+                <Tooltip>
+                  <div>
+                    <strong>HMON Wind Field</strong><br/>
+                    Wind Speed: {point.windSpeed} kt<br/>
+                    Pressure: {point.pressure} mb<br/>
+                    Time: {new Date(point.time).toLocaleString()}
+                  </div>
+                </Tooltip>
+              </CircleMarker>
+            ))}
+          </React.Fragment>
+        ))}
+
       </MapContainer>
+      
+      {/* Wind Speed Legend for HWRF/HMON */}
+      <WindSpeedLegend 
+        visible={!!(
+          (showHWRF && hwrf.hwrfData?.windFields && hwrf.hwrfData.windFields.length > 0) || 
+          (showHMON && hmon.hmonData?.windFields && hmon.hmonData.windFields.length > 0)
+        )}
+        modelType={showHWRF && hwrf.hwrfData?.windFields && hwrf.hwrfData.windFields.length > 0 ? 'HWRF' : 'HMON'}
+      />
       
       {/* Wind Speed Probability Legend */}
   {showWindSpeedProb && isAllStormsShown && windSpeedProb.probabilityData && (
@@ -2272,49 +2624,309 @@ const SimpleStormTracker: React.FC = () => {
                     </div>
                   )}
               </div>
+              
+              {/* Hurricane Models Section */}
               <div style={{ marginTop: '10px', padding: '8px 0', borderTop: '1px solid rgba(255, 255, 255, 0.2)' }}>
-              <div style={{ fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '5px', color: '#ffffff' }}>
-                  Spaghetti Models
-                  {/*<div style={{ fontSize: '0.7rem', fontWeight: 'normal', color: '#666', marginTop: '2px' }}>
-                    Real-time NHC forecast & historical data
-                  </div>*/}
+                <div style={{ fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '5px', color: '#ffffff' }}>
+                  Hurricane Models
+                  <div style={{ fontSize: '0.7rem', fontWeight: 'normal', color: '#999', marginTop: '2px' }}>
+                    High-resolution hurricane-specific models
+                  </div>
                 </div>
-                  {/* GEFS Spaghetti - standalone layer toggle */}
-                  <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.8rem', cursor: selectedStormId ? 'pointer' : 'not-allowed', opacity: selectedStormId ? 1 : 0.6 }}>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginLeft: '10px' }}>
+                  {/* HWRF - Always show as wind field option */}
+                  <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.75rem', cursor: 'pointer' }}>
                     <input
                       type="checkbox"
-                      checked={showGEFSSpaghetti}
-                      onChange={(e) => setShowGEFSSpaghetti(e.target.checked)}
-                      disabled={!selectedStormId}
-                      style={{ marginRight: '6px' }}
+                      checked={showHWRF}
+                      onChange={(e) => setShowHWRF(e.target.checked)}
+                      style={{ marginRight: '6px', transform: 'scale(0.9)' }}
                     />
-                    GEFS 
-                    {gefs.loading && (
+                    <span style={{ color: '#ffffff', backgroundColor: '#ff4444', padding: '1px 4px', borderRadius: '2px', marginRight: '4px', fontSize: '0.7rem', fontWeight: 'bold' }}>
+                      HWRF
+                    </span>
+                    Hurricane Weather Research & Forecasting
+                    {gefs.tracks && gefs.tracks.modelsPresent && gefs.tracks.modelsPresent.includes('HWRF') ? ' (Track)' : ' (Wind Field)'}
+                    {hwrf.isLoading && (
                       <span style={{ display: 'flex', alignItems: 'center', marginLeft: '6px', fontSize: '0.7rem', color: '#4FC3F7' }}>
                         <div className="gefs-spinner"></div>
-                        loading...
                       </span>
                     )}
-                    {selectedStormId && gefs.tracks && gefs.tracks.modelsPresent && gefs.tracks.modelsPresent.length > 0 && (
-                      <span style={{ fontSize: '0.7rem', color: '#4FC3F7', marginLeft: '6px' }}>
-                        ({gefs.tracks.modelsPresent.length} models)
-                      </span>
-                    )}
-                    {gefs.error && (
+                    {hwrf.error && (
                       <span style={{ fontSize: '0.7rem', color: '#d32f2f', marginLeft: '6px' }}>
-                        {gefs.error}
+                        Error
                       </span>
                     )}
-                    {!selectedStormId ? (
-                      <span style={{ fontSize: '0.7rem', color: '#aaaaaa', marginLeft: '5px' }}>
-                        (Select a storm)
-                      </span>
-                    ) : gefs.available === false ? (
-                      <span style={{ fontSize: '0.7rem', color: '#aaaaaa', marginLeft: '5px' }}>
-                        (No data found)
-                      </span>
-                    ) : null}
                   </label>
+                  
+                  {/* HMON - Always show as wind field option */}
+                  <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.75rem', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={showHMON}
+                      onChange={(e) => setShowHMON(e.target.checked)}
+                      style={{ marginRight: '6px', transform: 'scale(0.9)' }}
+                    />
+                    <span style={{ color: '#ffffff', backgroundColor: '#44ff44', padding: '1px 4px', borderRadius: '2px', marginRight: '4px', fontSize: '0.7rem', fontWeight: 'bold' }}>
+                      HMON
+                    </span>
+                    Hurricane Multi-scale Ocean-coupled
+                    {gefs.tracks && gefs.tracks.modelsPresent && gefs.tracks.modelsPresent.includes('HMON') ? ' (Track)' : ' (Wind Field)'}
+                    {hmon.isLoading && (
+                      <span style={{ display: 'flex', alignItems: 'center', marginLeft: '6px', fontSize: '0.7rem', color: '#4FC3F7' }}>
+                        <div className="gefs-spinner"></div>
+                      </span>
+                    )}
+                    {hmon.error && (
+                      <span style={{ fontSize: '0.7rem', color: '#d32f2f', marginLeft: '6px' }}>
+                        Error
+                      </span>
+                    )}
+                  </label>
+                </div>
+              </div>
+              
+              <div style={{ marginTop: '10px', padding: '8px 0', borderTop: '1px solid rgba(255, 255, 255, 0.2)' }}>
+              <div style={{ fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '5px', color: '#ffffff' }}>
+                  Model Tracks
+                  <div style={{ fontSize: '0.7rem', fontWeight: 'normal', color: '#999', marginTop: '2px' }}>
+                    Individual model controls
+                  </div>
+                </div>
+                
+                {/* Master toggle for all models */}
+                <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.8rem', cursor: selectedStormId ? 'pointer' : 'not-allowed', opacity: selectedStormId ? 1 : 0.6, marginBottom: '8px' }}>
+                  <input
+                    type="checkbox"
+                    checked={showGEFSSpaghetti}
+                    onChange={(e) => setShowGEFSSpaghetti(e.target.checked)}
+                    disabled={!selectedStormId}
+                    style={{ marginRight: '6px' }}
+                  />
+                  <strong>Enable Model Display</strong>
+                  {gefs.loading && (
+                    <span style={{ display: 'flex', alignItems: 'center', marginLeft: '6px', fontSize: '0.7rem', color: '#4FC3F7' }}>
+                      <div className="gefs-spinner"></div>
+                      loading...
+                    </span>
+                  )}
+                  {selectedStormId && gefs.tracks && gefs.tracks.modelsPresent && gefs.tracks.modelsPresent.length > 0 && (
+                    <span style={{ fontSize: '0.7rem', color: '#4FC3F7', marginLeft: '6px' }}>
+                      ({gefs.tracks.modelsPresent.length} models available)
+                    </span>
+                  )}
+                  {gefs.error && (
+                    <span style={{ fontSize: '0.7rem', color: '#d32f2f', marginLeft: '6px' }}>
+                      {gefs.error}
+                    </span>
+                  )}
+                  {!selectedStormId ? (
+                    <span style={{ fontSize: '0.7rem', color: '#aaaaaa', marginLeft: '5px' }}>
+                      (Select a storm)
+                    </span>
+                  ) : gefs.available === false ? (
+                    <span style={{ fontSize: '0.7rem', color: '#aaaaaa', marginLeft: '5px' }}>
+                      (No data found)
+                    </span>
+                  ) : null}
+                </label>
+
+                {/* Individual Model Toggles */}
+                {showGEFSSpaghetti && selectedStormId && gefs.tracks && gefs.tracks.modelsPresent && (
+                  <div style={{ marginLeft: '20px' }}>
+                    
+                    {/* Quick Actions */}
+                    <div style={{ marginBottom: '8px', display: 'flex', gap: '8px' }}>
+                      <button
+                        onClick={() => {
+                          setShowOfficialTrack(true);
+                          setShowHAFS(true);
+                          setShowGFS(true);
+                          setShowECMWF(true);
+                          setShowGEFSEnsemble(true);
+                          setShowOtherModels(true);
+                        }}
+                        style={{
+                          fontSize: '0.65rem',
+                          padding: '2px 6px',
+                          backgroundColor: 'rgba(76, 175, 80, 0.2)',
+                          border: '1px solid rgba(76, 175, 80, 0.5)',
+                          borderRadius: '3px',
+                          color: '#4caf50',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Select All
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowOfficialTrack(false);
+                          setShowHAFS(false);
+                          setShowGFS(false);
+                          setShowECMWF(false);
+                          setShowGEFSEnsemble(false);
+                          setShowOtherModels(false);
+                        }}
+                        style={{
+                          fontSize: '0.65rem',
+                          padding: '2px 6px',
+                          backgroundColor: 'rgba(244, 67, 54, 0.2)',
+                          border: '1px solid rgba(244, 67, 54, 0.5)',
+                          borderRadius: '3px',
+                          color: '#f44336',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Clear All
+                      </button>
+                    </div>
+                    
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    
+                    {/* Official Forecast */}
+                    {gefs.tracks.modelsPresent.some((m: string) => m === 'OFCL' || m === 'OFCI') && (
+                      <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.75rem', cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={showOfficialTrack}
+                          onChange={(e) => setShowOfficialTrack(e.target.checked)}
+                          style={{ marginRight: '6px', transform: 'scale(0.9)' }}
+                        />
+                        <span style={{ color: '#000000', backgroundColor: '#ffffff', padding: '1px 4px', borderRadius: '2px', marginRight: '4px', fontSize: '0.7rem', fontWeight: 'bold' }}>
+                          OFCL
+                        </span>
+                        Official NHC Forecast
+                      </label>
+                    )}
+                    
+                    {/* HAFS */}
+                    {gefs.tracks.modelsPresent.some((m: string) => m === 'HAFS' || m === 'HAFA' || m === 'HAFB') && (
+                      <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.75rem', cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={showHAFS}
+                          onChange={(e) => setShowHAFS(e.target.checked)}
+                          style={{ marginRight: '6px', transform: 'scale(0.9)' }}
+                        />
+                        <span style={{ color: '#ffffff', backgroundColor: '#4444ff', padding: '1px 4px', borderRadius: '2px', marginRight: '4px', fontSize: '0.7rem', fontWeight: 'bold' }}>
+                          HAFS
+                        </span>
+                        Hurricane Analysis & Forecast System
+                      </label>
+                    )}
+                    
+                    {/* GFS */}
+                    {gefs.tracks.modelsPresent.some((m: string) => m === 'GFS' || m === 'GFSO') && (
+                      <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.75rem', cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={showGFS}
+                          onChange={(e) => setShowGFS(e.target.checked)}
+                          style={{ marginRight: '6px', transform: 'scale(0.9)' }}
+                        />
+                        <span style={{ color: '#ffffff', backgroundColor: '#9c27b0', padding: '1px 4px', borderRadius: '2px', marginRight: '4px', fontSize: '0.7rem', fontWeight: 'bold' }}>
+                          GFS
+                        </span>
+                        Global Forecast System
+                      </label>
+                    )}
+                    
+                    {/* ECMWF */}
+                    {gefs.tracks.modelsPresent.some((m: string) => m === 'ECMW' || m === 'ECM2') && (
+                      <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.75rem', cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={showECMWF}
+                          onChange={(e) => setShowECMWF(e.target.checked)}
+                          style={{ marginRight: '6px', transform: 'scale(0.9)' }}
+                        />
+                        <span style={{ color: '#ffffff', backgroundColor: '#ff9800', padding: '1px 4px', borderRadius: '2px', marginRight: '4px', fontSize: '0.7rem', fontWeight: 'bold' }}>
+                          ECMWF
+                        </span>
+                        European Centre Model
+                      </label>
+                    )}
+                    
+                    {/* GEFS Ensemble */}
+                    {gefs.tracks.modelsPresent.some((m: string) => m === 'AEMI' || m === 'AEMN' || m === 'AC00' || m.startsWith('AP')) && (
+                      <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.75rem', cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={showGEFSEnsemble}
+                          onChange={(e) => setShowGEFSEnsemble(e.target.checked)}
+                          style={{ marginRight: '6px', transform: 'scale(0.9)' }}
+                        />
+                        <span style={{ color: '#ffffff', backgroundColor: '#0d47a1', padding: '1px 4px', borderRadius: '2px', marginRight: '4px', fontSize: '0.7rem', fontWeight: 'bold' }}>
+                          GEFS
+                        </span>
+                        GEFS Ensemble ({gefs.tracks.modelsPresent.filter((m: string) => m === 'AEMI' || m === 'AEMN' || m === 'AC00' || m.startsWith('AP')).length} members)
+                      </label>
+                    )}
+                    
+                    {/* Other Models */}
+                    {(() => {
+                      const knownModels = ['OFCL', 'OFCI', 'HWRF', 'HMON', 'HAFS', 'HAFA', 'HAFB', 'GFS', 'GFSO', 'ECMW', 'ECM2', 'AEMI', 'AEMN', 'AEM2', 'AC00'];
+                      const otherModels = gefs.tracks.modelsPresent.filter((m: string) => !knownModels.includes(m) && !m.startsWith('AP'));
+                      return otherModels.length > 0 ? (
+                        <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.75rem', cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked={showOtherModels}
+                            onChange={(e) => setShowOtherModels(e.target.checked)}
+                            style={{ marginRight: '6px', transform: 'scale(0.9)' }}
+                          />
+                          <span style={{ color: '#ffffff', backgroundColor: '#666666', padding: '1px 4px', borderRadius: '2px', marginRight: '4px', fontSize: '0.7rem', fontWeight: 'bold' }}>
+                            OTHER
+                          </span>
+                          Other Models ({otherModels.join(', ')})
+                        </label>
+                      ) : null;
+                    })()}
+                    </div>
+                  </div>
+                )}
+                  
+                  {/* Model Data Details */}
+                  {selectedStormId && gefs.tracks && (
+                    <div style={{ marginTop: '8px', fontSize: '0.7rem', color: '#999', borderTop: '1px solid rgba(255, 255, 255, 0.1)', paddingTop: '6px' }}>
+                      {/* Cycle Time */}
+                      {gefs.tracks.cycleTime && (
+                        <div>
+                          Cycle: {(() => {
+                            const cycle = gefs.tracks.cycleTime;
+                            const year = cycle.substring(0, 4);
+                            const month = cycle.substring(4, 6);
+                            const day = cycle.substring(6, 8);
+                            const hour = cycle.substring(8, 10);
+                            return `${year}-${month}-${day} ${hour}:00 UTC`;
+                          })()}
+                        </div>
+                      )}
+                      {/* Fetch Time */}
+                      {gefs.tracks.fetchTime && (
+                        <div>
+                          Updated: {gefs.tracks.fetchTime.toLocaleTimeString()}
+                          <button
+                            onClick={() => gefs.refresh && gefs.refresh()}
+                            style={{
+                              marginLeft: '8px',
+                              padding: '1px 4px',
+                              fontSize: '0.6rem',
+                              backgroundColor: 'rgba(79, 195, 247, 0.2)',
+                              border: '1px solid rgba(79, 195, 247, 0.5)',
+                              borderRadius: '3px',
+                              color: '#4FC3F7',
+                              cursor: 'pointer'
+                            }}
+                            title="Force refresh model data"
+                          >
+                            ↻
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                   </div>
               {/*<div className="control-panel-buttons">
                 <button 
