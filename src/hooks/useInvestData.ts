@@ -50,7 +50,7 @@ export const useInvestData = (options: UseInvestDataOptions = {}): UseInvestData
           id: 'AL91',
           basin: 'atlantic' as const,
           name: 'Invest AL91 (Demo)',
-          description: 'A broad area of low pressure associated with a tropical wave is producing disorganized showers and thunderstorms over the eastern tropical Atlantic. Environmental conditions are favorable for development.',
+          description: 'A broad area of low pressure associated with a tropical wave is producing a concentrated but still disorganized area of showers and thunderstorms over the eastern tropical Atlantic. Environmental conditions are favorable for development of this system, and a tropical depression is likely to form by this weekend as it moves slowly westward at 5 to 10 mph across the central tropical Atlantic. This system is likely to be near the Lesser Antilles by the middle to latter part of next week, and interests there should continue to monitor its progress. Upper-level winds are expected to become more conducive for development over the next few days.',
           location: 'Eastern Tropical Atlantic',
           position: [12.5, -45.2] as [number, number],
           formationChance48hr: 60,

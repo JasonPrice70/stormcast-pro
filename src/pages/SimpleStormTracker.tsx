@@ -24,13 +24,16 @@ L.Icon.Default.mergeOptions({
 interface MapControllerProps {
   selectedStorm: any;
   stormsToDisplay: any[];
+  selectedInvest: any;
+  lastSelectionType: 'storm' | 'invest' | null;
 }
 
-const MapController: React.FC<MapControllerProps> = ({ selectedStorm, stormsToDisplay }) => {
+const MapController: React.FC<MapControllerProps> = ({ selectedStorm, stormsToDisplay, selectedInvest, lastSelectionType }) => {
   const map = useMap();
   
   useEffect(() => {
-    if (selectedStorm) {
+    // Prioritize based on what was selected most recently
+    if (lastSelectionType === 'storm' && selectedStorm) {
       // Auto-center to selected storm (preserve current zoom level)
       const [lat, lon] = selectedStorm.position;
       
@@ -39,7 +42,16 @@ const MapController: React.FC<MapControllerProps> = ({ selectedStorm, stormsToDi
         animate: true,
         duration: 1.0
       });
-    } else if (stormsToDisplay.length > 0) {
+    } else if (lastSelectionType === 'invest' && selectedInvest) {
+      // Auto-center to selected invest (preserve current zoom level)
+      const [lat, lon] = selectedInvest.position;
+      
+      // Simply pan to the invest position without changing zoom
+      map.panTo([lat, lon], {
+        animate: true,
+        duration: 1.0
+      });
+    } else if (!selectedStorm && !selectedInvest && stormsToDisplay.length > 0) {
       // If no specific storm selected but storms are available, center on the group
       try {
         const stormPositions = stormsToDisplay.map(storm => L.latLng(storm.position[0], storm.position[1]));
@@ -63,7 +75,7 @@ const MapController: React.FC<MapControllerProps> = ({ selectedStorm, stormsToDi
         console.warn('Error centering on storms:', error);
       }
     }
-  }, [selectedStorm, stormsToDisplay, map]);
+  }, [selectedInvest, selectedStorm, stormsToDisplay, lastSelectionType, map]);
   
   return null;
 };
@@ -329,6 +341,9 @@ const SimpleStormTracker: React.FC = () => {
   const [fetchLiveTrackData, setFetchLiveTrackData] = useState(true); // Enable track data fetching by default
   const [selectedStormId, setSelectedStormId] = useState<string | null>(null); // Primary selected storm for storm-specific layers
   const [selectedStormIds, setSelectedStormIds] = useState<string[]>([]); // Multiple selected storms for map display
+  const [selectedInvestId, setSelectedInvestId] = useState<string | null>(null); // Selected invest for map centering
+  const [expandedDescriptions, setExpandedDescriptions] = useState<Set<string>>(new Set()); // Track which invest descriptions are expanded
+  const [lastSelectionType, setLastSelectionType] = useState<'storm' | 'invest' | null>(null); // Track what was selected last
   const liveData = useNHCData({ 
     autoRefresh: false, // Disable auto-refresh - only call when user requests
     fetchOnMount: true, // Fetch on mount - load live data by default
@@ -371,8 +386,24 @@ const SimpleStormTracker: React.FC = () => {
     }
   }, [displayStorms, selectedStormId]);
 
+  // Clean up expanded descriptions when invest data changes
+  useEffect(() => {
+    // Keep only expanded descriptions for invests that still exist
+    const currentInvestIds = new Set(invests.map(i => i.id));
+    setExpandedDescriptions(prev => {
+      const filtered = new Set<string>();
+      prev.forEach(id => {
+        if (currentInvestIds.has(id)) {
+          filtered.add(id);
+        }
+      });
+      return filtered;
+    });
+  }, [invests]);
+
   // Get selected storm data (primary for overlays) and which storms to show on map (multi-select)
   const selectedStorm = selectedStormId ? displayStorms.find(s => s.id === selectedStormId) : null;
+  const selectedInvest = selectedInvestId ? invests.find(i => i.id === selectedInvestId) : null;
   const stormsToDisplay = selectedStormIds.length > 0
     ? displayStorms.filter(s => selectedStormIds.includes(s.id))
     : displayStorms;
@@ -466,6 +497,8 @@ const SimpleStormTracker: React.FC = () => {
         <MapController 
           selectedStorm={selectedStorm}
           stormsToDisplay={stormsToDisplay}
+          selectedInvest={selectedInvest}
+          lastSelectionType={lastSelectionType}
         />
 
         {/* Debug: Log storms to display */}
@@ -558,12 +591,65 @@ const SimpleStormTracker: React.FC = () => {
               >
                 <Popup>
                   <div className="invest-popup">
-                    <h3>{invest.name}</h3>
-                    <p><strong>Basin:</strong> {invest.basin.toUpperCase()}</p>
-                    <p><strong>Location:</strong> {invest.location}</p>
-                    <p><strong>48hr chance:</strong> {invest.formationChance48hr}%</p>
-                    <p><strong>7-day chance:</strong> {invest.formationChance7day}%</p>
-                    <p><strong>Description:</strong> {invest.description.substring(0, 150)}...</p>
+                    <div className="invest-popup-header">
+                      <h3 className="invest-popup-title">{invest.name}</h3>
+                      <span className="invest-popup-basin">{invest.basin.toUpperCase()}</span>
+                    </div>
+                    <div className="invest-popup-content">
+                      <div className="invest-popup-field">
+                        <span className="field-label">Location:</span>
+                        <span className="field-value">{invest.location}</span>
+                      </div>
+                      <div className="invest-popup-formation-chances">
+                        <div className="formation-chance-item">
+                          <span className="chance-label">Formation chance (next 48 hours):</span>
+                          <span className={`chance-value ${invest.formationChance48hr >= 60 ? 'high' : invest.formationChance48hr >= 30 ? 'medium' : 'low'}`}>
+                            {invest.formationChance48hr}%
+                          </span>
+                        </div>
+                        <div className="formation-chance-item">
+                          <span className="chance-label">Formation chance (next 7 days):</span>
+                          <span className={`chance-value ${invest.formationChance7day >= 60 ? 'high' : invest.formationChance7day >= 30 ? 'medium' : 'low'}`}>
+                            {invest.formationChance7day}%
+                          </span>
+                        </div>
+                      </div>
+                      <div className="invest-popup-description">
+                        <span className="field-label">Outlook:</span>
+                        {(() => {
+                          const isExpanded = expandedDescriptions.has(invest.id);
+                          const shouldTruncate = invest.description.length > 200;
+                          const displayText = isExpanded || !shouldTruncate 
+                            ? invest.description 
+                            : invest.description.substring(0, 200) + '...';
+                          
+                          return (
+                            <div>
+                              <p className="description-text">{displayText}</p>
+                              {shouldTruncate && (
+                                <button
+                                  className="read-more-btn"
+                                  onClick={(e) => {
+                                    e.stopPropagation(); // Prevent popup from closing
+                                    setExpandedDescriptions(prev => {
+                                      const newSet = new Set(prev);
+                                      if (isExpanded) {
+                                        newSet.delete(invest.id);
+                                      } else {
+                                        newSet.add(invest.id);
+                                      }
+                                      return newSet;
+                                    });
+                                  }}
+                                >
+                                  {isExpanded ? 'Read less' : 'Read more'}
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    </div>
                   </div>
                 </Popup>
               </Marker>
@@ -2285,7 +2371,11 @@ const SimpleStormTracker: React.FC = () => {
                   {selectedStormIds.length > 0 && (
                     <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
                       <button
-                        onClick={() => setSelectedStormIds([])}
+                        onClick={() => {
+                          setSelectedStormIds([]);
+                          setSelectedStormId(null);
+                          setLastSelectionType(null);
+                        }}
                         style={{
                           fontSize: '0.75rem',
                           padding: '4px 8px',
@@ -2330,12 +2420,20 @@ const SimpleStormTracker: React.FC = () => {
                               // If removing the primary selection, set a new primary or clear
                               if (selectedStormId === storm.id) {
                                 setSelectedStormId(next[0] ?? null);
+                                // If no storms left selected, clear the selection type
+                                if (next.length === 0) {
+                                  setLastSelectionType(null);
+                                }
                               }
                               return next;
                             } else {
                               const next = [...prev, storm.id];
                               // Set this as the primary selection for storm-specific layers
                               setSelectedStormId(storm.id);
+                              // Clear invest selection when selecting a storm
+                              setSelectedInvestId(null);
+                              // Set this as a storm selection
+                              setLastSelectionType('storm');
                               return next;
                             }
                           });
@@ -2476,18 +2574,39 @@ const SimpleStormTracker: React.FC = () => {
                                          maxChance >= 40 ? '#FF8C00' : // Medium (orange) 
                                          '#FFD700'; // Low (yellow)
                       
+                      const isSelected = selectedInvestId === invest.id;
+                      
                       return (
                         <div 
                           key={invest.id}
-                          className="storm-selector-box"
+                          className={`storm-selector-box ${isSelected ? 'selected' : ''}`}
+                          onClick={() => {
+                            if (selectedInvestId === invest.id) {
+                              // Deselect if clicking the same invest
+                              setSelectedInvestId(null);
+                              // Clear any storm selection too
+                              setSelectedStormId(null);
+                              setSelectedStormIds([]);
+                              // Clear selection type
+                              setLastSelectionType(null);
+                            } else {
+                              // Select this invest and center map on it
+                              setSelectedInvestId(invest.id);
+                              // Clear storm selections when selecting an invest
+                              setSelectedStormId(null);
+                              setSelectedStormIds([]);
+                              // Set this as an invest selection
+                              setLastSelectionType('invest');
+                            }
+                          }}
                           style={{
                             display: 'flex',
                             alignItems: 'center',
                             padding: '8px',
                             borderRadius: '8px',
-                            border: '1px solid rgba(255, 255, 255, 0.3)',
-                            backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                            cursor: 'default'
+                            border: isSelected ? '2px solid #FF8C00' : '1px solid rgba(255, 255, 255, 0.3)',
+                            backgroundColor: isSelected ? 'rgba(255, 140, 0, 0.2)' : 'rgba(255, 255, 255, 0.1)',
+                            cursor: 'pointer'
                           }}
                         >
                           {/* Invest Icon */}
