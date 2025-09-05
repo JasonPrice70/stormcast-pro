@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { NHCActiveStorms, NHCStorm, ProcessedStorm, StormForecastPoint, StormHistoricalPoint } from '../types/nhc'
+import { NHCActiveStorms, NHCStorm, ProcessedStorm, StormForecastPoint, StormHistoricalPoint, TropicalWeatherOutlook, InvestArea } from '../types/nhc'
 
 // NHC API endpoints
 const NHC_BASE_URL = 'https://www.nhc.noaa.gov'
@@ -1937,6 +1937,313 @@ class NHCApiService {
     }
     
     return polygon
+  }
+
+  /**
+   * Get tropical weather outlook and invest areas for all basins
+   */
+  async getTropicalWeatherOutlook(): Promise<TropicalWeatherOutlook[]> {
+    const outlooks: TropicalWeatherOutlook[] = []
+    
+    // Fetch for each basin
+    const basins: Array<'atlantic' | 'epacific' | 'cpacific'> = ['atlantic', 'epacific', 'cpacific']
+    
+    for (const basin of basins) {
+      try {
+        const outlook = await this.getTropicalWeatherOutlookForBasin(basin)
+        if (outlook) {
+          outlooks.push(outlook)
+        }
+      } catch (error) {
+        console.warn(`Failed to fetch outlook for ${basin}:`, error)
+      }
+    }
+    
+    return outlooks
+  }
+
+  /**
+   * Get tropical weather outlook for a specific basin
+   */
+  async getTropicalWeatherOutlookForBasin(basin: 'atlantic' | 'epacific' | 'cpacific'): Promise<TropicalWeatherOutlook | null> {
+    try {
+      // Try Lambda endpoint first
+      const data = await this.fetchWithLambdaFallback('outlook', { basin })
+      if (data && data.investAreas) {
+        return data
+      }
+
+      // Fallback: fetch text outlook and parse invest areas
+      const textOutlook = await this.fetchTropicalWeatherOutlookText(basin)
+      if (textOutlook) {
+        return this.parseTropicalWeatherOutlook(textOutlook, basin)
+      }
+      
+      return null
+    } catch (error) {
+      console.error(`Error fetching tropical weather outlook for ${basin}:`, error)
+      return null
+    }
+  }
+
+  /**
+   * Fetch the text version of tropical weather outlook
+   */
+  private async fetchTropicalWeatherOutlookText(basin: 'atlantic' | 'epacific' | 'cpacific'): Promise<string | null> {
+    const outlookUrls = {
+      atlantic: `${NHC_BASE_URL}/text/MIATWOAT.shtml`,
+      epacific: `${NHC_BASE_URL}/text/MIATWOED.shtml`, 
+      cpacific: `${NHC_BASE_URL}/text/HFOTWOCP.shtml`
+    }
+
+    const url = outlookUrls[basin]
+    
+    // Try CORS proxies
+    for (const proxy of CORS_PROXIES) {
+      try {
+        const response = await axios.get(`${proxy}${url}`, {
+          timeout: 10000,
+          headers: {
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+          }
+        })
+
+        let text = response.data
+        
+        // Handle allorigins format
+        if (typeof text === 'object' && text.contents) {
+          text = text.contents
+        }
+
+        if (typeof text === 'string' && text.includes('Tropical Weather Outlook')) {
+          return text
+        }
+      } catch (error) {
+        console.warn(`Failed to fetch outlook text with proxy ${proxy}:`, error)
+      }
+    }
+
+    return null
+  }
+
+  /**
+   * Parse tropical weather outlook text to extract invest areas
+   */
+  private parseTropicalWeatherOutlook(text: string, basin: 'atlantic' | 'epacific' | 'cpacific'): TropicalWeatherOutlook {
+    console.log(`🔍 Parsing tropical weather outlook for ${basin}...`)
+    console.log(`📄 Text length: ${text.length} characters`)
+    console.log(`📝 First 500 characters:`, text.substring(0, 500))
+    
+    const investAreas: InvestArea[] = []
+    
+    // Extract last update time
+    const timeMatch = text.match(/(\d{1,2}:\d{2} [AP]M [A-Z]{3,4}) .* (\w+ \d{1,2} \d{4})/i)
+    const lastUpdate = timeMatch ? new Date(`${timeMatch[2]} ${timeMatch[1]}`) : new Date()
+
+    console.log(`⏰ Extracted time: ${lastUpdate}`)
+
+    // Look for specific invest areas by ID pattern (e.g., AL91)
+    const directInvestPattern = /(?:Tropical\s+(?:Atlantic|Pacific)|(?:Eastern|Central|Western)\s+(?:Atlantic|Pacific))\s*\(([A-Z]{2}\d+)\):\s*([\s\S]*?)(?=(?:(?:Tropical\s+(?:Atlantic|Pacific)|(?:Eastern|Central|Western)\s+(?:Atlantic|Pacific))\s*\([A-Z]{2}\d+\):|$))/gi
+    
+    console.log(`🔎 Using direct invest pattern for specific IDs like AL91`)
+    
+    let directMatch
+    while ((directMatch = directInvestPattern.exec(text)) !== null) {
+      console.log(`🎯 Direct invest match found:`, { id: directMatch[1], contentLength: directMatch[2].length })
+      
+      const [fullMatch, investId, content] = directMatch
+      const area = fullMatch.split(':')[0].replace(/\([^)]*\)/, '').trim() // Extract area name without ID
+      
+      // Extract description (everything before first *)
+      const description = content.split('*')[0].trim()
+      
+      // Extract formation chances with flexible pattern for dots
+      const chance48Pattern = /Formation chance through 48 hours[.\s]*\w*[.\s]*(\d+)\s*percent/i
+      const chance7Pattern = /Formation chance through 7 days[.\s]*\w*[.\s]*(\d+)\s*percent/i
+      
+      const chance48Match = content.match(chance48Pattern)
+      const chance7Match = content.match(chance7Pattern)
+      
+      const chance48hr = chance48Match ? parseInt(chance48Match[1]) : 0
+      const chance7day = chance7Match ? parseInt(chance7Match[1]) : 0
+      
+      console.log(`📊 Formation chances for ${investId}: 48hr=${chance48hr}%, 7day=${chance7day}%`)
+      
+      // Extract coordinates if available
+      const position = this.extractCoordinatesFromText(description) || this.getDefaultInvestPosition(area, basin)
+      
+      const investArea = {
+        id: investId,
+        basin,
+        name: `Invest ${investId}`,
+        description: description,
+        location: area,
+        position,
+        formationChance48hr: chance48hr,
+        formationChance7day: chance7day,
+        lastUpdate,
+        hasGraphics: false
+      }
+      
+      console.log(`🌀 Created invest area from direct pattern:`, investArea)
+      investAreas.push(investArea)
+    }
+
+    // Look for invest areas in numbered format (fallback)
+    const investPattern = /(\d+)\.\s*([^:]+):\s*([^*]+)\*\s*Formation chance[^*]*\*\s*Formation chance through 48 hours?[^.]*\.+([^%]*%)\.?\s*\*\s*Formation chance through 7 days?[^.]*\.+([^%]*%)/gi
+    
+    console.log(`🔎 Using regex pattern:`, investPattern)
+    
+    // Also try a simpler pattern to see what we can find
+    const simplePattern = /(\d+)\.\s*([^:]+):/g
+    const simpleMatches = []
+    let simpleMatch
+    while ((simpleMatch = simplePattern.exec(text)) !== null) {
+      simpleMatches.push({
+        number: simpleMatch[1],
+        area: simpleMatch[2],
+        fullMatch: simpleMatch[0]
+      })
+    }
+    console.log(`🔍 Simple pattern matches:`, simpleMatches)
+    
+    // Look for formation chance patterns
+    const formationPattern = /formation chance.*?(\d+)\s*percent/gi
+    const formationMatches = []
+    let formationMatch
+    while ((formationMatch = formationPattern.exec(text)) !== null) {
+      formationMatches.push({
+        text: formationMatch[0],
+        percentage: formationMatch[1]
+      })
+    }
+    console.log(`📊 Formation chance matches:`, formationMatches)
+    
+    let match
+    let matchCount = 0
+    while ((match = investPattern.exec(text)) !== null) {
+      matchCount++
+      console.log(`🎯 Match ${matchCount}:`, match)
+      
+      const [, number, area, description, chance48hr, chance7day] = match
+      
+      // Extract coordinates if available
+      const position = this.extractCoordinatesFromText(description)
+      
+      // Parse formation chances
+      const chance48 = parseInt(chance48hr.replace('%', '').trim()) || 0
+      const chance7 = parseInt(chance7day.replace('%', '').trim()) || 0
+      
+      // Generate invest ID (AL90, AL91, etc. for Atlantic)
+      const basinPrefix = basin === 'atlantic' ? 'AL' : basin === 'epacific' ? 'EP' : 'CP'
+      const investId = `${basinPrefix}${90 + investAreas.length}`
+      
+      const investArea = {
+        id: investId,
+        basin,
+        name: `Invest ${investId}`,
+        description: description.trim(),
+        location: area.trim(),
+        position: position || [0, 0], // Default if no coordinates found
+        formationChance48hr: chance48,
+        formationChance7day: chance7,
+        lastUpdate,
+        hasGraphics: false // We'll check for graphics separately
+      }
+      
+      console.log(`🌀 Created invest area:`, investArea)
+      investAreas.push(investArea)
+    }
+
+    console.log(`✅ Total invest areas parsed: ${investAreas.length}`)
+
+    return {
+      basin,
+      lastUpdate,
+      textProduct: text,
+      investAreas
+    }
+  }
+
+  /**
+   * Extract latitude/longitude coordinates from outlook text
+   */
+  private extractCoordinatesFromText(text: string): [number, number] | null {
+    // Look for various coordinate formats
+    const patterns = [
+      /(\d+\.?\d*)\s*[degrees°]?\s*N\s*and\s*(\d+\.?\d*)\s*[degrees°]?\s*W/i,
+      /(\d+\.?\d*)\s*[degrees°]?\s*North\s*[,\s]+(\d+\.?\d*)\s*[degrees°]?\s*West/i,
+      /near\s*(\d+\.?\d*)\s*[degrees°]?\s*N[,\s]*(\d+\.?\d*)\s*[degrees°]?\s*W/i
+    ]
+
+    for (const pattern of patterns) {
+      const match = text.match(pattern)
+      if (match) {
+        const lat = parseFloat(match[1])
+        const lon = -parseFloat(match[2]) // West is negative
+        if (!isNaN(lat) && !isNaN(lon)) {
+          return [lat, lon]
+        }
+      }
+    }
+
+    return null
+  }
+
+  /**
+   * Get default position for invest areas based on typical locations
+   */
+  private getDefaultInvestPosition(area: string, basin: 'atlantic' | 'epacific' | 'cpacific'): [number, number] {
+    const areaLower = area.toLowerCase()
+    
+    // Atlantic basin positions
+    if (basin === 'atlantic') {
+      if (areaLower.includes('eastern') || areaLower.includes('tropical atlantic')) {
+        return [15.0, -45.0] // Eastern Atlantic (typical AL90/91 area)
+      }
+      if (areaLower.includes('central')) {
+        return [15.0, -60.0] // Central Atlantic
+      }
+      if (areaLower.includes('western') || areaLower.includes('gulf')) {
+        return [25.0, -85.0] // Gulf of Mexico/Western Atlantic
+      }
+      if (areaLower.includes('caribbean')) {
+        return [15.0, -75.0] // Caribbean
+      }
+      return [20.0, -50.0] // Default Atlantic position
+    }
+    
+    // Eastern Pacific positions
+    if (basin === 'epacific') {
+      if (areaLower.includes('eastern')) {
+        return [15.0, -110.0] // Eastern Pacific
+      }
+      if (areaLower.includes('central')) {
+        return [15.0, -125.0] // Central Pacific
+      }
+      return [15.0, -115.0] // Default Eastern Pacific
+    }
+    
+    // Central Pacific positions
+    if (basin === 'cpacific') {
+      return [15.0, -155.0] // Central Pacific
+    }
+    
+    return [20.0, -50.0] // Fallback position
+  }
+
+  /**
+   * Get invest areas for display on map
+   */
+  async getInvestAreas(): Promise<InvestArea[]> {
+    const outlooks = await this.getTropicalWeatherOutlook()
+    const allInvests: InvestArea[] = []
+    
+    for (const outlook of outlooks) {
+      allInvests.push(...outlook.investAreas)
+    }
+    
+    return allInvests
   }
 }
 

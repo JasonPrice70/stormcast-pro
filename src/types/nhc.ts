@@ -116,3 +116,25 @@ export interface ProcessedStorm {
   trackUrl: string
   coneUrl: string
 }
+
+// Types for Invest Areas (Tropical Weather Outlook)
+export interface InvestArea {
+  id: string
+  basin: 'atlantic' | 'epacific' | 'cpacific'
+  name: string
+  description: string
+  location: string
+  position: [number, number] // lat, lon
+  formationChance48hr: number // percentage
+  formationChance7day: number // percentage
+  lastUpdate: Date
+  hasGraphics: boolean
+  shapeData?: any // GIS shape data if available
+}
+
+export interface TropicalWeatherOutlook {
+  basin: 'atlantic' | 'epacific' | 'cpacific'
+  lastUpdate: Date
+  textProduct: string
+  investAreas: InvestArea[]
+}
