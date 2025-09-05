@@ -7,7 +7,7 @@ const About = () => {
       <SimpleHeader />
       <div className="container" style={{ padding: '40px 20px' }}>
         <div className="hero">
-          <h1>About Hurricane Command Center</h1>
+          <h1>About Cyclotrak</h1>
           <p>Professional Hurricane & Tropical Cyclone Tracking Platform</p>
         </div>
 
@@ -15,7 +15,7 @@ const About = () => {
           <section className="storm-info">
             <h2>Mission Statement</h2>
             <p>
-              Hurricane Command Center is dedicated to providing accurate, real-time hurricane and tropical cyclone 
+              Cyclotrak is dedicated to providing accurate, real-time hurricane and tropical cyclone 
               tracking information to help communities, emergency responders, and researchers stay 
               informed about developing weather threats.
             </p>
@@ -64,7 +64,7 @@ const About = () => {
           <section className="storm-info">
             <h2>Contact Information</h2>
             <p>
-              For questions, feedback, or technical support regarding Hurricane Command Center, please reach out:
+              For questions, feedback, or technical support regarding Cyclotrak, please reach out:
             </p>
             <div className="contact-info">
               <p>
@@ -78,7 +78,7 @@ const About = () => {
                 </a>
               </p>
               <p style={{ marginTop: '10px', fontSize: '0.9rem', color: '#666' }}>
-                We welcome your feedback and suggestions to help improve Hurricane Command Center's storm tracking capabilities.
+                We welcome your feedback and suggestions to help improve Cyclotrak's storm tracking capabilities.
               </p>
             </div>
           </section>

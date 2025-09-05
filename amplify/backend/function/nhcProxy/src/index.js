@@ -791,7 +791,7 @@ async function extractSurgeFromKML(kmlContent) {
 }
 
 /**
- * Parse A-deck text and extract GEFS-related tracks for the latest cycle.
+ * Parse A-deck text and extract operational model tracks (including GEFS ensemble, GFS, ECMWF, etc.) for the latest cycle.
  * Returns { modelsPresent: string[], tracks: [{ modelId, points: [{ tau, lat, lon, vmax }] }] }
  */
 function parseAdeckGEFSTracks(text) {
@@ -815,17 +815,21 @@ function parseAdeckGEFSTracks(text) {
   if (!latestCycle) return { modelsPresent: [], tracks: [] };
 
   const sortedCycles = Array.from(allCycles).sort().reverse();
-  const gefsRegex = /^A(EMN|EMI|C00|P\d{2})$/i;
+  
+  // Enhanced regex to include operational hurricane models plus GEFS ensemble
+  const operationalModels = /^(A(EMN|EMI|C00|P\d{2})|HWRF|HWRI|HWF2|HMON|HM0N|HAFS|HAFA|HAFB|GFS[A-Z]?|GFSO|ECMW|ECM2|EMXI|CMC|CMCI|NVGM|NAM|OFCL|OFCI|CARQ|SHIP|LGEM|DSHP|UKM[A-Z]?|UKMO|CTL[A-Z]?|TVCN|FSSE|MMSE|CTCI|CTCX)$/i;
+  
   let targetCycle = latestCycle;
   let latest = records.filter(p => p[2] === targetCycle);
   
-  // Check if we have ensemble members in the latest cycle
+  // Check if we have ensemble members in the latest cycle (for GEFS specific logic)
+  const gefsRegex = /^A(EMN|EMI|C00|P\d{2})$/i;
   const ensembleInLatest = latest.filter(p => {
     const tech = (p[4] || '').toUpperCase();
     return gefsRegex.test(tech) && (tech === 'AC00' || tech.startsWith('AP'));
   });
   
-  // If no ensemble members in latest cycle, try the previous cycle
+  // If no ensemble members in latest cycle, try the previous cycle for GEFS data
   if (ensembleInLatest.length === 0 && sortedCycles.length > 1) {
     targetCycle = sortedCycles[1]; // Previous cycle
     latest = records.filter(p => p[2] === targetCycle);
@@ -838,7 +842,7 @@ function parseAdeckGEFSTracks(text) {
     allCycles: sortedCycles,
     totalRecords: records.length,
     latestRecords: latest.length,
-    gefsInTargetCycle: [],
+    modelsInTargetCycle: [],
     ensembleInLatest: ensembleInLatest.length,
     invalidCoords: [],
     processedModels: []
@@ -846,8 +850,8 @@ function parseAdeckGEFSTracks(text) {
 
   for (const p of latest) {
     const tech = (p[4] || '').toUpperCase();
-    if (gefsRegex.test(tech)) {
-      debugInfo.gefsInTargetCycle.push(tech);
+    if (operationalModels.test(tech)) {
+      debugInfo.modelsInTargetCycle.push(tech);
       const tau = parseInt(p[5] || '0', 10);
       const lat = parseATCFLat(p[6] || '');
       const lon = parseATCFLon(p[7] || '');
@@ -882,9 +886,21 @@ function parseAdeckGEFSTracks(text) {
     }
   }
 
-  const orderVal = (m) => (m === 'AEMN' || m === 'AEMI' ? 0 : m === 'AC00' ? 1 : 2);
-  tracks.sort((a, b) => orderVal(a.modelId) - orderVal(b.modelId) || a.modelId.localeCompare(b.modelId));
-  modelsPresent.sort((a, b) => orderVal(a) - orderVal(b) || a.localeCompare(b));
+  // Enhanced sorting: Official forecast first, then operational models, then GEFS ensemble
+  const getModelPriority = (m) => {
+    if (m === 'OFCL' || m === 'OFCI') return 0;     // Official forecast highest priority
+    if (m === 'HWRF' || m === 'HMON') return 1;      // High-res models second
+    if (m === 'HAFS' || m === 'HAFA' || m === 'HAFB') return 2; // HAFS models
+    if (m === 'GFS' || m === 'GFSO') return 3;       // GFS
+    if (m === 'ECMW' || m === 'ECM2') return 4;      // ECMWF
+    if (m === 'AEMN' || m === 'AEMI') return 5;      // GEFS ensemble mean
+    if (m === 'AC00') return 6;                      // GEFS control
+    if (m.startsWith('AP')) return 7;                // GEFS perturbations
+    return 8;                                        // Other models
+  };
+  
+  tracks.sort((a, b) => getModelPriority(a.modelId) - getModelPriority(b.modelId) || a.modelId.localeCompare(b.modelId));
+  modelsPresent.sort((a, b) => getModelPriority(a) - getModelPriority(b) || a.localeCompare(b));
   
   return { modelsPresent, tracks, debug: debugInfo };
 }

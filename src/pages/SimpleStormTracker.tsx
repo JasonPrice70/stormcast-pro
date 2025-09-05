@@ -312,6 +312,10 @@ const SimpleStormTracker: React.FC = () => {
   const [showGEFSEnsemble, setShowGEFSEnsemble] = useState(true);
   const [showOtherModels, setShowOtherModels] = useState(false);
   
+  // Individual model windfield toggles
+  const [showHWRFWindfield, setShowHWRFWindfield] = useState(false);
+  const [showHMONWindfield, setShowHMONWindfield] = useState(false);
+  
   const [isControlPanelClosed, setIsControlPanelClosed] = useState(true);
   
   // Refs for click-outside detection
@@ -430,16 +434,16 @@ const SimpleStormTracker: React.FC = () => {
 
   // Fetch HWRF and HMON data when storm is selected and models are enabled
   useEffect(() => {
-    if (selectedStormId && showHWRF && !hwrf.isLoading) {
+    if (selectedStormId && (showHWRF || showHWRFWindfield) && !hwrf.isLoading) {
       hwrf.fetchHWRFData(selectedStormId);
     }
-  }, [selectedStormId, showHWRF]);
+  }, [selectedStormId, showHWRF, showHWRFWindfield]);
 
   useEffect(() => {
-    if (selectedStormId && showHMON && !hmon.isLoading) {
+    if (selectedStormId && (showHMON || showHMONWindfield) && !hmon.isLoading) {
       hmon.fetchHMONData(selectedStormId);
     }
-  }, [selectedStormId, showHMON]);
+  }, [selectedStormId, showHMON, showHMONWindfield]);
 
 
   // Helper function to open CORS proxy access page
@@ -892,7 +896,7 @@ const SimpleStormTracker: React.FC = () => {
                 dashArray = undefined;
               } else if (modelId === 'HWRF' || modelId === 'HMON') {
                 // High-resolution models - thick colored lines
-                color = modelId === 'HWRF' ? '#ff4444' : '#44ff44';
+                color = modelId === 'HWRF' ? '#ff4444' : '#4682b4';
                 weight = 3;
                 opacity = 0.9;
                 dashArray = undefined;
@@ -1860,7 +1864,7 @@ const SimpleStormTracker: React.FC = () => {
         })()}
 
         {/* HWRF Wind Field Layer - Enhanced Contour Display */}
-        {showHWRF && selectedStormId && hwrf.hwrfData && hwrf.hwrfData.windFields && hwrf.hwrfData.windFields.map((windField, index) => (
+        {showHWRFWindfield && selectedStormId && hwrf.hwrfData && hwrf.hwrfData.windFields && hwrf.hwrfData.windFields.map((windField, index) => (
           <React.Fragment key={`hwrf-windfield-${index}`}>
             {/* Render contour polygons if available */}
             {windField.contours && windField.contours.map((contour, contourIndex) => (
@@ -1927,7 +1931,7 @@ const SimpleStormTracker: React.FC = () => {
         ))}
 
         {/* HMON Wind Field Layer - Enhanced Contour Display */}
-        {showHMON && selectedStormId && hmon.hmonData && hmon.hmonData.windFields && hmon.hmonData.windFields.map((windField, index) => (
+        {showHMONWindfield && selectedStormId && hmon.hmonData && hmon.hmonData.windFields && hmon.hmonData.windFields.map((windField, index) => (
           <React.Fragment key={`hmon-windfield-${index}`}>
             {/* Render contour polygons if available */}
             {windField.contours && windField.contours.map((contour, contourIndex) => (
@@ -1975,8 +1979,8 @@ const SimpleStormTracker: React.FC = () => {
                 key={`hmon-point-${index}-${pointIndex}`}
                 center={[point.lat, point.lon]}
                 radius={Math.max(1, point.windSpeed / 20)}
-                color="#44ff44"
-                fillColor="#44ff44"
+                color="#4682b4"
+                fillColor="#4682b4"
                 fillOpacity={Math.min(0.8, point.windSpeed / 100)}
                 weight={0}
               >
@@ -1998,10 +2002,10 @@ const SimpleStormTracker: React.FC = () => {
       {/* Wind Speed Legend for HWRF/HMON */}
       <WindSpeedLegend 
         visible={!!(
-          (showHWRF && hwrf.hwrfData?.windFields && hwrf.hwrfData.windFields.length > 0) || 
-          (showHMON && hmon.hmonData?.windFields && hmon.hmonData.windFields.length > 0)
+          (showHWRFWindfield && hwrf.hwrfData?.windFields && hwrf.hwrfData.windFields.length > 0) || 
+          (showHMONWindfield && hmon.hmonData?.windFields && hmon.hmonData.windFields.length > 0)
         )}
-        modelType={showHWRF && hwrf.hwrfData?.windFields && hwrf.hwrfData.windFields.length > 0 ? 'HWRF' : 'HMON'}
+        modelType={showHWRFWindfield && hwrf.hwrfData?.windFields && hwrf.hwrfData.windFields.length > 0 ? 'HWRF' : 'HMON'}
       />
       
       {/* Wind Speed Probability Legend */}
@@ -2958,19 +2962,18 @@ const SimpleStormTracker: React.FC = () => {
                 </div>
                 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginLeft: '10px' }}>
-                  {/* HWRF - Always show as wind field option */}
+                  {/* HWRF Windfield Toggle */}
                   <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.75rem', cursor: 'pointer' }}>
                     <input
                       type="checkbox"
-                      checked={showHWRF}
-                      onChange={(e) => setShowHWRF(e.target.checked)}
+                      checked={showHWRFWindfield}
+                      onChange={(e) => setShowHWRFWindfield(e.target.checked)}
                       style={{ marginRight: '6px', transform: 'scale(0.9)' }}
                     />
                     <span style={{ color: '#ffffff', backgroundColor: '#ff4444', padding: '1px 4px', borderRadius: '2px', marginRight: '4px', fontSize: '0.7rem', fontWeight: 'bold' }}>
                       HWRF
                     </span>
-                    Hurricane Weather Research & Forecasting
-                    {gefs.tracks && gefs.tracks.modelsPresent && gefs.tracks.modelsPresent.includes('HWRF') ? ' (Track)' : ' (Wind Field)'}
+                    Wind Field
                     {hwrf.isLoading && (
                       <span style={{ display: 'flex', alignItems: 'center', marginLeft: '6px', fontSize: '0.7rem', color: '#4FC3F7' }}>
                         <div className="gefs-spinner"></div>
@@ -2983,19 +2986,18 @@ const SimpleStormTracker: React.FC = () => {
                     )}
                   </label>
                   
-                  {/* HMON - Always show as wind field option */}
+                  {/* HMON Windfield Toggle */}
                   <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.75rem', cursor: 'pointer' }}>
                     <input
                       type="checkbox"
-                      checked={showHMON}
-                      onChange={(e) => setShowHMON(e.target.checked)}
+                      checked={showHMONWindfield}
+                      onChange={(e) => setShowHMONWindfield(e.target.checked)}
                       style={{ marginRight: '6px', transform: 'scale(0.9)' }}
                     />
-                    <span style={{ color: '#ffffff', backgroundColor: '#44ff44', padding: '1px 4px', borderRadius: '2px', marginRight: '4px', fontSize: '0.7rem', fontWeight: 'bold' }}>
+                    <span style={{ color: '#ffffff', backgroundColor: '#4682b4', padding: '1px 4px', borderRadius: '2px', marginRight: '4px', fontSize: '0.7rem', fontWeight: 'bold' }}>
                       HMON
                     </span>
-                    Hurricane Multi-scale Ocean-coupled
-                    {gefs.tracks && gefs.tracks.modelsPresent && gefs.tracks.modelsPresent.includes('HMON') ? ' (Track)' : ' (Wind Field)'}
+                    Wind Field
                     {hmon.isLoading && (
                       <span style={{ display: 'flex', alignItems: 'center', marginLeft: '6px', fontSize: '0.7rem', color: '#4FC3F7' }}>
                         <div className="gefs-spinner"></div>
@@ -3069,6 +3071,8 @@ const SimpleStormTracker: React.FC = () => {
                           setShowECMWF(true);
                           setShowGEFSEnsemble(true);
                           setShowOtherModels(true);
+                          setShowHWRF(true);
+                          setShowHMON(true);
                         }}
                         style={{
                           fontSize: '0.65rem',
@@ -3090,6 +3094,8 @@ const SimpleStormTracker: React.FC = () => {
                           setShowECMWF(false);
                           setShowGEFSEnsemble(false);
                           setShowOtherModels(false);
+                          setShowHWRF(false);
+                          setShowHMON(false);
                         }}
                         style={{
                           fontSize: '0.65rem',
@@ -3184,6 +3190,38 @@ const SimpleStormTracker: React.FC = () => {
                           GEFS
                         </span>
                         GEFS Ensemble ({gefs.tracks.modelsPresent.filter((m: string) => m === 'AEMI' || m === 'AEMN' || m === 'AC00' || m.startsWith('AP')).length} members)
+                      </label>
+                    )}
+                    
+                    {/* HWRF Track */}
+                    {gefs.tracks.modelsPresent.some((m: string) => m === 'HWRF') && (
+                      <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.75rem', cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={showHWRF}
+                          onChange={(e) => setShowHWRF(e.target.checked)}
+                          style={{ marginRight: '6px', transform: 'scale(0.9)' }}
+                        />
+                        <span style={{ color: '#ffffff', backgroundColor: '#ff4444', padding: '1px 4px', borderRadius: '2px', marginRight: '4px', fontSize: '0.7rem', fontWeight: 'bold' }}>
+                          HWRF
+                        </span>
+                        Hurricane Weather Research & Forecasting
+                      </label>
+                    )}
+                    
+                    {/* HMON Track */}
+                    {gefs.tracks.modelsPresent.some((m: string) => m === 'HMON') && (
+                      <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.75rem', cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={showHMON}
+                          onChange={(e) => setShowHMON(e.target.checked)}
+                          style={{ marginRight: '6px', transform: 'scale(0.9)' }}
+                        />
+                        <span style={{ color: '#ffffff', backgroundColor: '#4682b4', padding: '1px 4px', borderRadius: '2px', marginRight: '4px', fontSize: '0.7rem', fontWeight: 'bold' }}>
+                          HMON
+                        </span>
+                        Hurricane Multi-scale Ocean-coupled
                       </label>
                     )}
                     
