@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Invest Data</title>
+</head>
+<body>
+    <h1>Testing Invest Data Fetch</h1>
+    <button onclick="testInvestData()">Test Invest Data</button>
+    <div id="output"></div>
+
+    <script>
+        async function testInvestData() {
+            const output = document.getElementById('output');
+            output.innerHTML = '<p>Testing invest data fetch...</p>';
+            
+            try {
+                // Test direct URL fetch with CORS proxy
+                const proxyUrl = 'https://api.allorigins.win/get?url=';
+                const nhcUrl = 'https://www.nhc.noaa.gov/text/MIATWOAT.shtml';
+                
+                console.log('Fetching from:', proxyUrl + encodeURIComponent(nhcUrl));
+                
+                const response = await fetch(proxyUrl + encodeURIComponent(nhcUrl));
+                const data = await response.json();
+                
+                console.log('Response received:', data);
+                
+                if (data.contents) {
+                    const text = data.contents;
+                    console.log('NHC Text length:', text.length);
+                    console.log('First 500 chars:', text.substring(0, 500));
+                    
+                    // Look for AL91 or any numbered items
+                    const lines = text.split('\n');
+                    const relevantLines = lines.filter(line => 
+                        line.includes('AL91') || 
+                        line.includes('formation') ||
+                        line.match(/^\d+\./) ||
+                        line.includes('Atlantic') ||
+                        line.includes('percent')
+                    );
+                    
+                    console.log('Relevant lines:', relevantLines);
+                    
+                    output.innerHTML = `
+                        <h3>NHC Text Analysis</h3>
+                        <p><strong>Text length:</strong> ${text.length} characters</p>
+                        <p><strong>Contains AL91:</strong> ${text.includes('AL91')}</p>
+                        <p><strong>Contains "formation":</strong> ${text.includes('formation')}</p>
+                        <p><strong>Contains "percent":</strong> ${text.includes('percent')}</p>
+                        <h4>Relevant Lines:</h4>
+                        <pre>${relevantLines.join('\n')}</pre>
+                        <h4>Full Text (first 1000 chars):</h4>
+                        <pre>${text.substring(0, 1000)}</pre>
+                    `;
+                } else {
+                    output.innerHTML = '<p>No contents in response</p>';
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                output.innerHTML = `<p>Error: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>

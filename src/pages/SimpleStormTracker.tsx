@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Polyline, CircleMarker, Polygon, Tooltip, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, CircleMarker, Polygon, Tooltip, useMap, Circle } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import './SimpleStormTracker.css';
 import { useNHCData, useStormSurge, usePeakStormSurge, useWindSpeedProbability, useWindArrival } from '../hooks/useNHCData';
+import { useInvestData } from '../hooks/useInvestData';
 import { useGEFSSpaghetti } from '../hooks/useGEFSSpaghetti';
 import WindSpeedLegend from '../components/WindSpeedLegend';
 import { useHWRFData, useHMONData } from '../hooks/useHWRFData';
@@ -166,6 +167,25 @@ const createStormIcon = (category: any, classification: string) => {
   }
 };
 
+// Create invest icon based on formation probability
+const createInvestIcon = (formationChance: number) => {
+  const getColor = () => {
+    if (formationChance >= 70) return '#FF8C00'; // High chance - Orange
+    if (formationChance >= 40) return '#FFD700'; // Medium chance - Gold
+    if (formationChance >= 20) return '#FFFF99'; // Low chance - Light Yellow
+    return '#E6E6FA'; // Very low chance - Light Purple
+  };
+
+  const color = getColor();
+  
+  return L.divIcon({
+    html: `<div class="invest-icon" style="background: ${color}; border: 2px solid #333; border-radius: 50%; width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: bold; color: #333;">I</div>`,
+    className: '',
+    iconSize: [16, 16],
+    iconAnchor: [8, 8]
+  });
+};
+
 // Get color for track point intensity markers
 const getIntensityColor = (stormType: string, styleCategory: string) => {
   switch (styleCategory) {
@@ -268,6 +288,7 @@ const SimpleStormTracker: React.FC = () => {
   const [showWindSpeedProb, setShowWindSpeedProb] = useState(false);
   const [windSpeedProbType, setWindSpeedProbType] = useState<'34kt' | '50kt' | '64kt'>('34kt');
   const [showGEFSSpaghetti, setShowGEFSSpaghetti] = useState(false);
+  const [showInvests, setShowInvests] = useState(true); // New: Show invest areas
   
   // Individual model track toggles
   const [showOfficialTrack, setShowOfficialTrack] = useState(true);
@@ -313,6 +334,13 @@ const SimpleStormTracker: React.FC = () => {
     fetchOnMount: true, // Fetch on mount - load live data by default
     useProxy: true, // Enable CORS proxy for development
     fetchTrackData: fetchLiveTrackData // Control track data fetching
+  });
+
+  // Invest data hook
+  const { invests, loading: investLoading, error: investError } = useInvestData({
+    autoRefresh: false,
+    fetchOnMount: true,
+    useProxy: true
   });
 
   // Choose which data source to use
@@ -506,6 +534,51 @@ const SimpleStormTracker: React.FC = () => {
               </div>
             </Popup>
           </Marker>
+          );
+        })}
+
+        {/* Render invest areas */}
+        {showInvests && invests.map((invest) => {
+          console.log('🗺️ Rendering invest:', invest.id, 'Position:', invest.position, 'Show invests:', showInvests)
+          
+          // Only show invests with valid positions
+          if (!invest.position || (invest.position[0] === 0 && invest.position[1] === 0)) {
+            console.log('❌ Skipping invest with invalid position:', invest.id, invest.position)
+            return null;
+          }
+          
+          console.log('✅ Rendering invest marker for:', invest.id, 'at position:', invest.position)
+          
+          return (
+            <React.Fragment key={invest.id}>
+              <Marker
+                position={invest.position}
+                icon={createInvestIcon(invest.formationChance7day)}
+                zIndexOffset={500}
+              >
+                <Popup>
+                  <div className="invest-popup">
+                    <h3>{invest.name}</h3>
+                    <p><strong>Basin:</strong> {invest.basin.toUpperCase()}</p>
+                    <p><strong>Location:</strong> {invest.location}</p>
+                    <p><strong>48hr chance:</strong> {invest.formationChance48hr}%</p>
+                    <p><strong>7-day chance:</strong> {invest.formationChance7day}%</p>
+                    <p><strong>Description:</strong> {invest.description.substring(0, 150)}...</p>
+                  </div>
+                </Popup>
+              </Marker>
+              
+              {/* Add a subtle circle to show general area */}
+              <Circle
+                center={invest.position}
+                radius={100000} // 100km radius
+                color={invest.formationChance7day >= 70 ? '#FF8C00' : invest.formationChance7day >= 40 ? '#FFD700' : '#FFFF99'}
+                fillColor={invest.formationChance7day >= 70 ? '#FF8C00' : invest.formationChance7day >= 40 ? '#FFD700' : '#FFFF99'}
+                fillOpacity={0.05}
+                weight={1}
+                opacity={0.2}
+              />
+            </React.Fragment>
           );
         })}
 
@@ -2362,6 +2435,137 @@ const SimpleStormTracker: React.FC = () => {
                   )}
                 </div>
               )}
+              
+              {/* Invest Areas Section */}
+              <div style={{ marginTop: '10px', padding: '8px 0', borderTop: '1px solid rgba(255, 255, 255, 0.2)' }}>
+                <div style={{ fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '5px', color: '#ffffff' }}>
+                  Areas of Interest
+                  <div style={{ fontSize: '0.7rem', fontWeight: 'normal', color: '#cccccc', marginTop: '2px' }}>
+                    Tropical development areas being monitored
+                  </div>
+                </div>
+                
+                {/* Global invest toggle */}
+                <div style={{ marginBottom: '8px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.8rem', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={showInvests}
+                      onChange={(e) => setShowInvests(e.target.checked)}
+                      style={{ marginRight: '6px' }}
+                    />
+                    Show All Invest Areas ({invests.length})
+                    {investLoading && (
+                      <div className="loading-spinner" style={{ marginLeft: '8px', transform: 'scale(0.6)' }}></div>
+                    )}
+                    {investError && (
+                      <span style={{ fontSize: '0.7rem', color: '#d32f2f', marginLeft: '6px' }}>
+                        Error
+                      </span>
+                    )}
+                  </label>
+                </div>
+
+                {/* Individual Invest Cards */}
+                {showInvests && invests.length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {invests.map(invest => {
+                      // Determine color based on formation chances
+                      const maxChance = Math.max(invest.formationChance48hr, invest.formationChance7day);
+                      const investColor = maxChance >= 70 ? '#FF6B35' : // High (orange-red)
+                                         maxChance >= 40 ? '#FF8C00' : // Medium (orange) 
+                                         '#FFD700'; // Low (yellow)
+                      
+                      return (
+                        <div 
+                          key={invest.id}
+                          className="storm-selector-box"
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            padding: '8px',
+                            borderRadius: '8px',
+                            border: '1px solid rgba(255, 255, 255, 0.3)',
+                            backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                            cursor: 'default'
+                          }}
+                        >
+                          {/* Invest Icon */}
+                          <div style={{
+                            position: 'relative',
+                            width: '32px',
+                            height: '32px',
+                            marginRight: '12px',
+                            flexShrink: 0
+                          }}>
+                            {/* Main invest icon circle */}
+                            <div style={{
+                              width: '100%',
+                              height: '100%',
+                              backgroundColor: investColor,
+                              border: '2px solid #333',
+                              borderRadius: '50%',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '14px',
+                              fontWeight: 'bold',
+                              color: '#333'
+                            }}>
+                              I
+                            </div>
+                            
+                            {/* Formation chance indicator */}
+                            <div style={{
+                              position: 'absolute',
+                              bottom: '-2px',
+                              right: '-2px',
+                              backgroundColor: maxChance >= 70 ? '#8B0000' : 
+                                             maxChance >= 40 ? '#FF4500' : '#DAA520',
+                              color: 'white',
+                              fontSize: '9px',
+                              fontWeight: 'bold',
+                              padding: '1px 3px',
+                              borderRadius: '3px',
+                              minWidth: '16px',
+                              textAlign: 'center',
+                              border: '1px solid #333'
+                            }}>
+                              {maxChance}%
+                            </div>
+                          </div>
+                          
+                          {/* Invest Info */}
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#ffffff' }}>
+                              {invest.name || `Invest ${invest.id}`}
+                            </div>
+                            <div style={{ fontSize: '0.75rem', color: '#cccccc', marginTop: '2px' }}>
+                              {invest.location || invest.basin}
+                            </div>
+                            <div style={{ fontSize: '0.7rem', color: '#aaaaaa', marginTop: '1px' }}>
+                              48hr: {invest.formationChance48hr}% • 7-day: {invest.formationChance7day}%
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                
+                {/* Show message when no invests or hidden */}
+                {!showInvests && invests.length > 0 && (
+                  <div style={{ fontSize: '0.7rem', color: '#cccccc', fontStyle: 'italic' }}>
+                    {invests.length} invest area{invests.length !== 1 ? 's' : ''} hidden
+                  </div>
+                )}
+                
+                {showInvests && invests.length === 0 && !investLoading && (
+                  <div style={{ fontSize: '0.7rem', color: '#cccccc', fontStyle: 'italic' }}>
+                    No active invest areas
+                  </div>
+                )}
+              </div>
               
               {/* Path Visibility Controls */}
               <div style={{ marginTop: '10px', padding: '8px 0', borderTop: '1px solid rgba(255, 255, 255, 0.2)' }}>

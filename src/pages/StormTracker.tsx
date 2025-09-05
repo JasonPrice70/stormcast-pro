@@ -1,16 +1,22 @@
 import { useState } from 'react'
-import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Popup, Polyline, Circle } from 'react-leaflet'
 import { Icon } from 'leaflet'
 import { useNHCData } from '../hooks/useNHCData'
-import { ProcessedStorm } from '../types/nhc'
+import { useInvestData } from '../hooks/useInvestData'
+import { ProcessedStorm, InvestArea } from '../types/nhc'
 import 'leaflet/dist/leaflet.css'
 import './StormTracker.css'
 
 const StormTracker = () => {
   const [selectedStorm, setSelectedStorm] = useState<ProcessedStorm | null>(null)
+  const [selectedInvest, setSelectedInvest] = useState<InvestArea | null>(null)
+  const [showInvests, setShowInvests] = useState<boolean>(true)
   
   // Use the NHC data hook
   const { storms, loading, error, lastUpdated, refresh } = useNHCData()
+  
+  // Use the invest data hook
+  const { invests, loading: investLoading, error: investError, lastUpdated: investLastUpdated, refresh: refreshInvests } = useInvestData()
 
   // Create custom storm icons based on category/intensity
   const createStormIcon = (storm: ProcessedStorm) => {
@@ -43,6 +49,35 @@ const StormTracker = () => {
     })
   }
 
+  // Create custom invest icons based on formation chances
+  const createInvestIcon = (invest: InvestArea) => {
+    const getColor = () => {
+      if (invest.formationChance7day >= 70) return '#FF8C00' // High chance - Orange
+      if (invest.formationChance7day >= 40) return '#FFD700' // Medium chance - Gold
+      if (invest.formationChance7day >= 20) return '#FFFF99' // Low chance - Light Yellow
+      return '#E6E6FA' // Very low chance - Light Purple
+    }
+
+    const color = getColor()
+    
+    // Create SVG icon with "I" for Invest
+    const svgIcon = `
+      <svg width="20" height="20" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="10" cy="10" r="8" fill="${color}" stroke="#000" stroke-width="1" opacity="0.8"/>
+        <text x="10" y="14" text-anchor="middle" font-size="12" font-weight="bold" fill="#000">
+          I
+        </text>
+      </svg>
+    `
+    
+    return new Icon({
+      iconUrl: `data:image/svg+xml;base64,${btoa(svgIcon)}`,
+      iconSize: [20, 20],
+      iconAnchor: [10, 10],
+      popupAnchor: [0, -10]
+    })
+  }
+
   // Create forecast track line
   const createForecastTrack = (storm: ProcessedStorm) => {
     if (!storm.forecast || storm.forecast.length === 0) return null
@@ -63,18 +98,18 @@ const StormTracker = () => {
     )
   }
 
-  if (loading) {
+  if (loading || investLoading) {
     return (
       <div className="storm-tracker">
         <div className="loading-container">
-          <h2>Loading Storm Data...</h2>
+          <h2>Loading {loading ? 'Storm' : ''} {investLoading ? 'Invest' : ''} Data...</h2>
           <div className="loading-spinner"></div>
         </div>
       </div>
     )
   }
 
-  if (error) {
+  if (error && !storms.length) {
     return (
       <div className="storm-tracker">
         <div className="error-container">
@@ -93,13 +128,36 @@ const StormTracker = () => {
       <div className="tracker-header">
         <h1>Active Storm Tracker</h1>
         <div className="tracker-controls">
-          <div className="last-updated">
-            Last Updated: {lastUpdated ? new Date(lastUpdated).toLocaleString() : 'Never'}
+          <div className="data-info">
+            <div className="last-updated">
+              Storms Updated: {lastUpdated ? new Date(lastUpdated).toLocaleString() : 'Never'}
+            </div>
+            {investLastUpdated && (
+              <div className="last-updated">
+                Invests Updated: {new Date(investLastUpdated).toLocaleString()}
+              </div>
+            )}
           </div>
-          <button onClick={refresh} className="refresh-button">
-            Refresh Data
-          </button>
+          <div className="control-buttons">
+            <label className="invest-toggle">
+              <input
+                type="checkbox"
+                checked={showInvests}
+                onChange={(e) => setShowInvests(e.target.checked)}
+              />
+              Show Invest Areas ({invests.length})
+            </label>
+            <button onClick={() => { refresh(); refreshInvests(); }} className="refresh-button">
+              Refresh All Data
+            </button>
+          </div>
         </div>
+        {(error || investError) && (
+          <div className="error-banner">
+            {error && <div className="error-message">⚠️ Storm Data: {error}</div>}
+            {investError && <div className="error-message">⚠️ Invest Data: {investError}</div>}
+          </div>
+        )}
       </div>
 
       <div className="tracker-content">
@@ -139,42 +197,124 @@ const StormTracker = () => {
                 {createForecastTrack(storm)}
               </div>
             ))}
+
+            {/* Render invest areas if enabled */}
+            {showInvests && invests.map((invest) => {
+              // Only show invests with valid positions
+              if (!invest.position || invest.position[0] === 0 && invest.position[1] === 0) {
+                return null;
+              }
+              
+              return (
+                <div key={invest.id}>
+                  <Marker
+                    position={invest.position}
+                    icon={createInvestIcon(invest)}
+                    eventHandlers={{
+                      click: () => setSelectedInvest(invest)
+                    }}
+                  >
+                    <Popup>
+                      <div className="invest-popup">
+                        <h3>{invest.name}</h3>
+                        <p><strong>Basin:</strong> {invest.basin.toUpperCase()}</p>
+                        <p><strong>Location:</strong> {invest.location}</p>
+                        <p><strong>48-hour chance:</strong> {invest.formationChance48hr}%</p>
+                        <p><strong>7-day chance:</strong> {invest.formationChance7day}%</p>
+                        <p><strong>Description:</strong> {invest.description}</p>
+                        <p><strong>Coordinates:</strong> {invest.position[0].toFixed(1)}°N, {Math.abs(invest.position[1]).toFixed(1)}°W</p>
+                      </div>
+                    </Popup>
+                  </Marker>
+                  
+                  {/* Add a circle to show general area of interest */}
+                  <Circle
+                    center={invest.position}
+                    radius={200000} // 200km radius
+                    color={invest.formationChance7day >= 70 ? '#FF8C00' : invest.formationChance7day >= 40 ? '#FFD700' : '#FFFF99'}
+                    fillColor={invest.formationChance7day >= 70 ? '#FF8C00' : invest.formationChance7day >= 40 ? '#FFD700' : '#FFFF99'}
+                    fillOpacity={0.1}
+                    weight={1}
+                    opacity={0.3}
+                  />
+                </div>
+              );
+            })}
           </MapContainer>
         </div>
 
         <div className="storm-list">
-          <h3>Active Storms ({storms.length})</h3>
-          {storms.length === 0 ? (
-            <p className="no-storms">No active storms at this time.</p>
-          ) : (
-            <div className="storm-cards">
-              {storms.map((storm) => (
-                <div
-                  key={storm.id}
-                  className={`storm-card ${selectedStorm?.id === storm.id ? 'selected' : ''}`}
-                  onClick={() => setSelectedStorm(storm)}
-                >
-                  <div className="storm-header">
-                    <h4>{storm.name}</h4>
-                    <span className={`category-badge category-${storm.category || 0}`}>
-                      {storm.category ? `Cat ${storm.category}` : 'TS'}
-                    </span>
-                  </div>
-                  
-                  <div className="storm-details">
-                    <p><strong>Classification:</strong> {storm.classification}</p>
-                    <p><strong>Max Winds:</strong> {storm.maxWinds} mph</p>
-                    <p><strong>Pressure:</strong> {storm.pressure} mb</p>
-                    <p><strong>Movement:</strong> {storm.movement}</p>
-                  </div>
-                  
-                  {storm.forecast && storm.forecast.length > 0 && (
-                    <div className="forecast-summary">
-                      <p><strong>Forecast Points:</strong> {storm.forecast.length}</p>
+          <div className="list-section">
+            <h3>Active Storms ({storms.length})</h3>
+            {storms.length === 0 ? (
+              <p className="no-storms">No active storms at this time.</p>
+            ) : (
+              <div className="storm-cards">
+                {storms.map((storm) => (
+                  <div
+                    key={storm.id}
+                    className={`storm-card ${selectedStorm?.id === storm.id ? 'selected' : ''}`}
+                    onClick={() => setSelectedStorm(storm)}
+                  >
+                    <div className="storm-header">
+                      <h4>{storm.name}</h4>
+                      <span className={`category-badge category-${storm.category || 0}`}>
+                        {storm.category ? `Cat ${storm.category}` : 'TS'}
+                      </span>
                     </div>
-                  )}
+                    
+                    <div className="storm-details">
+                      <p><strong>Classification:</strong> {storm.classification}</p>
+                      <p><strong>Max Winds:</strong> {storm.maxWinds} mph</p>
+                      <p><strong>Pressure:</strong> {storm.pressure} mb</p>
+                      <p><strong>Movement:</strong> {storm.movement}</p>
+                    </div>
+                    
+                    {storm.forecast && storm.forecast.length > 0 && (
+                      <div className="forecast-summary">
+                        <p><strong>Forecast Points:</strong> {storm.forecast.length}</p>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {showInvests && (
+            <div className="list-section">
+              <h3>Invest Areas ({invests.length})</h3>
+              {invests.length === 0 ? (
+                <p className="no-storms">No active invest areas at this time.</p>
+              ) : (
+                <div className="invest-cards">
+                  {invests.map((invest) => (
+                    <div
+                      key={invest.id}
+                      className={`invest-card ${selectedInvest?.id === invest.id ? 'selected' : ''}`}
+                      onClick={() => setSelectedInvest(invest)}
+                    >
+                      <div className="invest-header">
+                        <h4>{invest.name}</h4>
+                        <span className={`formation-badge ${invest.formationChance7day >= 70 ? 'high' : invest.formationChance7day >= 40 ? 'medium' : 'low'}`}>
+                          {invest.formationChance7day}% (7-day)
+                        </span>
+                      </div>
+                      
+                      <div className="invest-details">
+                        <p><strong>Basin:</strong> {invest.basin.toUpperCase()}</p>
+                        <p><strong>Location:</strong> {invest.location}</p>
+                        <p><strong>48hr Chance:</strong> {invest.formationChance48hr}%</p>
+                        <p><strong>7-day Chance:</strong> {invest.formationChance7day}%</p>
+                      </div>
+                      
+                      <div className="invest-description">
+                        <p><strong>Description:</strong> {invest.description.substring(0, 100)}...</p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              )}
             </div>
           )}
         </div>
@@ -215,6 +355,58 @@ const StormTracker = () => {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {selectedInvest && (
+        <div className="invest-details-panel">
+          <div className="panel-header">
+            <h3>{selectedInvest.name} - Formation Outlook</h3>
+            <button onClick={() => setSelectedInvest(null)} className="close-button">×</button>
+          </div>
+          
+          <div className="panel-content">
+            <div className="detail-section">
+              <h4>Formation Probability</h4>
+              <div className="detail-grid">
+                <div><strong>48-Hour Chance:</strong> {selectedInvest.formationChance48hr}%</div>
+                <div><strong>7-Day Chance:</strong> {selectedInvest.formationChance7day}%</div>
+                <div><strong>Basin:</strong> {selectedInvest.basin.toUpperCase()}</div>
+                <div><strong>Location:</strong> {selectedInvest.location}</div>
+                <div><strong>Coordinates:</strong> {selectedInvest.position[0].toFixed(2)}°N, {Math.abs(selectedInvest.position[1]).toFixed(2)}°W</div>
+                <div><strong>Last Update:</strong> {selectedInvest.lastUpdate.toLocaleString()}</div>
+              </div>
+            </div>
+            
+            <div className="detail-section">
+              <h4>Description</h4>
+              <div className="invest-description-full">
+                <p>{selectedInvest.description}</p>
+              </div>
+            </div>
+
+            <div className="detail-section">
+              <h4>Formation Chances Explained</h4>
+              <div className="formation-explanation">
+                <div className="chance-level">
+                  <span className="chance-indicator high"></span>
+                  <strong>High (70%+):</strong> Conditions very favorable for development
+                </div>
+                <div className="chance-level">
+                  <span className="chance-indicator medium"></span>
+                  <strong>Medium (40-69%):</strong> Some potential for development
+                </div>
+                <div className="chance-level">
+                  <span className="chance-indicator low"></span>
+                  <strong>Low (20-39%):</strong> Limited potential for development
+                </div>
+                <div className="chance-level">
+                  <span className="chance-indicator very-low"></span>
+                  <strong>Very Low (0-19%):</strong> Development unlikely
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
