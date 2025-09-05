@@ -196,8 +196,13 @@ class NHCApiService {
           throw new Error('Lambda response indicates failure');
         }
       } catch (error) {
-        console.warn(`Lambda request failed for ${endpoint}:`, error);
-        console.log('Falling back to CORS proxies...');
+        // Lambda endpoints may not be available in all environments - this is expected
+        if (axios.isAxiosError(error) && error.response?.status === 400) {
+          console.log(`Lambda endpoint not available for ${endpoint}, using fallback method`);
+        } else {
+          console.warn(`Lambda request failed for ${endpoint}:`, error);
+        }
+        console.log('Using CORS proxy fallback...');
       }
     } else {
       console.log('Lambda API not configured, using CORS proxies directly');

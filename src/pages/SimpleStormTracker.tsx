@@ -381,29 +381,9 @@ const SimpleStormTracker: React.FC = () => {
   
   const [isControlPanelClosed, setIsControlPanelClosed] = useState(true);
   
-  // Refs for click-outside detection
+  // Refs for layer button
   const layerButtonRef = useRef<HTMLButtonElement>(null);
   const controlPanelRef = useRef<HTMLDivElement>(null);
-
-  // Click-outside effect to close panel
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        !isControlPanelClosed &&
-        layerButtonRef.current &&
-        controlPanelRef.current &&
-        !layerButtonRef.current.contains(event.target as Node) &&
-        !controlPanelRef.current.contains(event.target as Node)
-      ) {
-        setIsControlPanelClosed(true);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isControlPanelClosed]);
 
   const [fetchLiveTrackData, setFetchLiveTrackData] = useState(true); // Enable track data fetching by default
   const [selectedStormId, setSelectedStormId] = useState<string | null>(null); // Primary selected storm for storm-specific layers
@@ -542,7 +522,7 @@ const SimpleStormTracker: React.FC = () => {
   };
 
   return (
-    <div className="simple-storm-tracker">
+    <div className={`simple-storm-tracker ${!isControlPanelClosed ? 'panel-open' : ''}`}>
       {/* Header positioned on top of map */}
       <SimpleHeader />
       
@@ -3066,10 +3046,10 @@ const SimpleStormTracker: React.FC = () => {
                   )}
               </div>
               
-              {/* Hurricane Models Section */}
+              {/* Hurricane Wind Fields Section */}
               <div style={{ marginTop: '10px', padding: '8px 0', borderTop: '1px solid rgba(255, 255, 255, 0.2)' }}>
                 <div style={{ fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '5px', color: '#ffffff' }}>
-                  Hurricane Models
+                  Hurricane Wind Fields
                   <div style={{ fontSize: '0.7rem', fontWeight: 'normal', color: '#999', marginTop: '2px' }}>
                     High-resolution hurricane-specific models
                   </div>
