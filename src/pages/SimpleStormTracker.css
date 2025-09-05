@@ -6,6 +6,23 @@
   100% { transform: rotate(360deg); }
 }
 
+/* Spinning animation for hurricane and tropical storm icons */
+@keyframes storm-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(-360deg); }
+}
+
+.spinning-hurricane-icon svg,
+.spinning-tropical-storm-icon svg {
+  animation: storm-spin 4s linear infinite;
+  transform-origin: center;
+}
+
+.spinning-hurricane-icon,
+.spinning-tropical-storm-icon {
+  position: relative;
+}
+
 /* Storm Selector Box Styles */
 .storm-selector-box {
   transition: all 0.2s ease;
@@ -86,9 +103,18 @@
 
 /* Map Container - takes full space */
 .map-wrapper {
-  height: 100%;
+  height: 100vh;
   width: 100%;
   position: relative;
+  transition: width 0.3s ease-in-out;
+}
+
+/* Responsive adjustments for mobile */
+@media (max-width: 768px) {
+  /* Adjust layer button on mobile when panel is open */
+  .simple-storm-tracker.panel-open .layer-toggle-btn {
+    right: 20px;
+  }
 }
 
 .simple-storm-tracker .leaflet-container {
@@ -336,6 +362,11 @@
   transition: all 0.3s ease;
 }
 
+/* Adjust layer button position when panel is open */
+.simple-storm-tracker.panel-open .layer-toggle-btn {
+  right: 320px;
+}
+
 .layer-toggle-btn:hover {
   background: rgba(255, 255, 255, 1);
   border-color: #bdbdbd;
@@ -346,15 +377,15 @@
 /* Sliding Control Panel */
 .sliding-control-panel {
   position: fixed;
-  top: 110px;
+  top: 91px;
   right: 0;
-  height: calc(100vh - 110px);
+  height: calc(100vh - 90px);
   width: 300px;
   background: rgba(0, 0, 0, 0.7);
   backdrop-filter: blur(10px);
   border: 1px solid #e0e0e0;
   border-right: none;
-  border-radius: 8px 0 0 8px;
+  border-radius: 0;
   box-shadow: -2px 0 20px rgba(0, 0, 0, 0.15);
   z-index: 1000;
   transform: translateX(100%);

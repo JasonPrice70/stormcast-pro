@@ -4,6 +4,7 @@ import { Icon } from 'leaflet'
 import { useNHCData } from '../hooks/useNHCData'
 import { useInvestData } from '../hooks/useInvestData'
 import { ProcessedStorm, InvestArea } from '../types/nhc'
+import { formatWindSpeed } from '../utils/windSpeed'
 import 'leaflet/dist/leaflet.css'
 import './StormTracker.css'
 
@@ -186,7 +187,7 @@ const StormTracker = () => {
                       <h3>{storm.name}</h3>
                       <p><strong>Status:</strong> {storm.classification}</p>
                       <p><strong>Category:</strong> {storm.category || 'Tropical Storm'}</p>
-                      <p><strong>Max Winds:</strong> {storm.maxWinds} mph</p>
+                      <p><strong>Max Winds:</strong> {formatWindSpeed(storm.maxWinds)}</p>
                       <p><strong>Pressure:</strong> {storm.pressure} mb</p>
                       <p><strong>Movement:</strong> {storm.movement}</p>
                       <p><strong>Location:</strong> {storm.position[0].toFixed(1)}°N, {Math.abs(storm.position[1]).toFixed(1)}°W</p>
@@ -265,7 +266,7 @@ const StormTracker = () => {
                     
                     <div className="storm-details">
                       <p><strong>Classification:</strong> {storm.classification}</p>
-                      <p><strong>Max Winds:</strong> {storm.maxWinds} mph</p>
+                      <p><strong>Max Winds:</strong> {formatWindSpeed(storm.maxWinds)}</p>
                       <p><strong>Pressure:</strong> {storm.pressure} mb</p>
                       <p><strong>Movement:</strong> {storm.movement}</p>
                     </div>
@@ -333,7 +334,7 @@ const StormTracker = () => {
               <div className="detail-grid">
                 <div><strong>Classification:</strong> {selectedStorm.classification}</div>
                 <div><strong>Category:</strong> {selectedStorm.category || 'Tropical Storm'}</div>
-                <div><strong>Max Winds:</strong> {selectedStorm.maxWinds} mph</div>
+                <div><strong>Max Winds:</strong> {formatWindSpeed(selectedStorm.maxWinds)}</div>
                 <div><strong>Central Pressure:</strong> {selectedStorm.pressure} mb</div>
                 <div><strong>Movement:</strong> {selectedStorm.movement}</div>
                 <div><strong>Location:</strong> {selectedStorm.position[0].toFixed(2)}°N, {Math.abs(selectedStorm.position[1]).toFixed(2)}°W</div>
@@ -348,7 +349,7 @@ const StormTracker = () => {
                     <div key={index} className="forecast-point">
                       <div><strong>+{point.forecastHour}h:</strong></div>
                       <div>Position: {point.latitude.toFixed(1)}°N, {Math.abs(point.longitude).toFixed(1)}°W</div>
-                      <div>Winds: {point.maxWinds} mph</div>
+                      <div>Winds: {formatWindSpeed(point.maxWinds)}</div>
                       <div>Pressure: {point.pressure} mb</div>
                     </div>
                   ))}
