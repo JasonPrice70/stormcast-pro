@@ -13,10 +13,7 @@
 }
 
 .spinning-hurricane-icon svg,
-.spinning-tropical/* Adjust layer button position when panel is open */
-.simple-storm-tracker.panel-open .layer-toggle-btn {
-  right: 320px;
-}on svg {
+.spinning-tropical-storm-icon svg {
   animation: storm-spin 4s linear infinite;
   transform-origin: center;
 }
