@@ -36,7 +36,7 @@ const SimpleHeader = () => {
             </button>
             
             <div className="header-text">
-              <h1>Hurricane Command Center</h1>
+              <h1>Cyclotrak</h1>
               <p>Hurricane & Tropical Cyclone Tracking</p>
             </div>
           </div>
