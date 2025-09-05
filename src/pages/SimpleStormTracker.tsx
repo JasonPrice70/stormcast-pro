@@ -145,7 +145,7 @@ const createStormIcon = (category: any, classification: string) => {
     const categoryNumber = category && category > 0 && category <= 5 ? category : '';
     const hurricaneIcon = `
       <div class="spinning-hurricane-icon" style="position: relative; width: 48px; height: 48px;">
-        <svg width="48" height="48" viewBox="0 0 455.13 639.78" style="filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.5));">
+        <svg width="48" height="48" viewBox="0 0 455.13 639.78" style="filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.5)); animation: storm-spin 4s linear infinite; transform-origin: center;">
           <path fill="#ed1c24" d="M404.75,422.16C344.9,540.18,188.17,639.96.11,639.78c-5.6-.02,200.47-113.65,132.59-152.82C40.8,433.89,6.14,314.27,52.78,218.95,108.63,104.8,263.52-5.63,454.97.22c6.5.2-194.96,116.53-130.14,153.95,91.89,53.05,127.92,173.36,79.92,267.99Z"/>
         </svg>
         ${categoryNumber ? `<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; font-weight: bold; font-size: 18px; text-shadow: 1px 1px 2px rgba(0,0,0,0.8); pointer-events: none; z-index: 10;">${categoryNumber}</div>` : ''}
@@ -161,7 +161,7 @@ const createStormIcon = (category: any, classification: string) => {
     // Custom Tropical Storm SVG icon
     const tropicalStormIcon = `
       <div class="spinning-tropical-storm-icon" style="position: relative; width: 48px; height: 48px;">
-        <svg width="48" height="48" viewBox="0 0 455.13 639.77" style="filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.5));">
+        <svg width="48" height="48" viewBox="0 0 455.13 639.77" style="filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.5)); animation: storm-spin 4s linear infinite; transform-origin: center;">
           <path fill="#ed1c24" d="M404.75,422.16c48-94.64,11.98-214.94-79.92-268C260.02,116.74,461.48.41,454.98.22,263.52-5.63,108.63,104.79,52.78,218.95c-46.64,95.32-11.99,214.94,79.92,268.01C200.59,526.14-5.5,639.76.11,639.77c188.06.18,344.79-99.59,404.64-217.61ZM176.68,410.53c-49.67-28.68-66.69-92.18-38.01-141.86,28.68-49.67,92.18-66.69,141.86-38.01,49.68,28.68,66.69,92.18,38.01,141.85-28.68,49.68-92.17,66.69-141.86,38.01Z"/>
         </svg>
       </div>
