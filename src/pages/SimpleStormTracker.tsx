@@ -125,19 +125,30 @@ const formatForecastTime = (datetimeString: string) => {
 const createStormIcon = (category: any, classification: string) => {
   const isHurricane = classification.toLowerCase().includes('hurricane') || classification === 'HU';
   const isTropicalStorm = classification.toLowerCase().includes('tropical storm') || classification === 'TS';
+  const isTropicalDepression = classification.toLowerCase().includes('tropical depression') || 
+                              classification.toLowerCase().includes('depression') || 
+                              classification === 'TD';
+  const isPostTropical = classification.toLowerCase().includes('post-tropical') ||
+                        classification.toLowerCase().includes('extratropical') ||
+                        classification === 'EX' ||
+                        classification === 'PC' ||
+                        classification === 'EC' ||
+                        classification === 'PTC';
   
   // Debug logging to see what's happening with the classification
-  console.log('createStormIcon called with:', { category, classification, isHurricane, isTropicalStorm });
+  console.log('=== STORM ICON DEBUG ===');
+  console.log('createStormIcon called with:', { category, classification, isHurricane, isTropicalStorm, isTropicalDepression, isPostTropical });
+  console.log('=======================');
   
   if (isHurricane) {
     // Custom Hurricane SVG icon with category number
     const categoryNumber = category && category > 0 && category <= 5 ? category : '';
     const hurricaneIcon = `
-      <div style="position: relative; width: 48px; height: 48px;">
+      <div class="spinning-hurricane-icon" style="position: relative; width: 48px; height: 48px;">
         <svg width="48" height="48" viewBox="0 0 455.13 639.78" style="filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.5));">
           <path fill="#ed1c24" d="M404.75,422.16C344.9,540.18,188.17,639.96.11,639.78c-5.6-.02,200.47-113.65,132.59-152.82C40.8,433.89,6.14,314.27,52.78,218.95,108.63,104.8,263.52-5.63,454.97.22c6.5.2-194.96,116.53-130.14,153.95,91.89,53.05,127.92,173.36,79.92,267.99Z"/>
         </svg>
-        ${categoryNumber ? `<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; font-weight: bold; font-size: 18px; text-shadow: 1px 1px 2px rgba(0,0,0,0.8); pointer-events: none;">${categoryNumber}</div>` : ''}
+        ${categoryNumber ? `<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; font-weight: bold; font-size: 18px; text-shadow: 1px 1px 2px rgba(0,0,0,0.8); pointer-events: none; z-index: 10;">${categoryNumber}</div>` : ''}
       </div>
     `;
     return L.divIcon({
@@ -149,15 +160,68 @@ const createStormIcon = (category: any, classification: string) => {
   } else if (isTropicalStorm) {
     // Custom Tropical Storm SVG icon
     const tropicalStormIcon = `
-      <svg width="48" height="48" viewBox="0 0 455.13 639.77" style="filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.5));">
-        <path fill="#ed1c24" d="M404.75,422.16c48-94.64,11.98-214.94-79.92-268C260.02,116.74,461.48.41,454.98.22,263.52-5.63,108.63,104.79,52.78,218.95c-46.64,95.32-11.99,214.94,79.92,268.01C200.59,526.14-5.5,639.76.11,639.77c188.06.18,344.79-99.59,404.64-217.61ZM176.68,410.53c-49.67-28.68-66.69-92.18-38.01-141.86,28.68-49.67,92.18-66.69,141.86-38.01,49.68,28.68,66.69,92.18,38.01,141.85-28.68,49.68-92.17,66.69-141.86,38.01Z"/>
-      </svg>
+      <div class="spinning-tropical-storm-icon" style="position: relative; width: 48px; height: 48px;">
+        <svg width="48" height="48" viewBox="0 0 455.13 639.77" style="filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.5));">
+          <path fill="#ed1c24" d="M404.75,422.16c48-94.64,11.98-214.94-79.92-268C260.02,116.74,461.48.41,454.98.22,263.52-5.63,108.63,104.79,52.78,218.95c-46.64,95.32-11.99,214.94,79.92,268.01C200.59,526.14-5.5,639.76.11,639.77c188.06.18,344.79-99.59,404.64-217.61ZM176.68,410.53c-49.67-28.68-66.69-92.18-38.01-141.86,28.68-49.67,92.18-66.69,141.86-38.01,49.68,28.68,66.69,92.18,38.01,141.85-28.68,49.68-92.17,66.69-141.86,38.01Z"/>
+        </svg>
+      </div>
     `;
     return L.divIcon({
       html: tropicalStormIcon,
       className: '',
       iconSize: [48, 48],
       iconAnchor: [24, 24]
+    });
+  } else if (isPostTropical) {
+    // Red circle with X for post-tropical cyclones
+    const postTropicalIcon = `
+      <div style="
+        width: 24px; 
+        height: 24px; 
+        border-radius: 50%; 
+        background-color: transparent; 
+        border: 2px solid #dc3545; 
+        display: flex; 
+        align-items: center; 
+        justify-content: center; 
+        box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+      ">
+        <span style="
+          color: #dc3545; 
+          font-size: 18px; 
+          font-weight: bold; 
+          font-family: monospace; 
+          line-height: 1;
+        ">×</span>
+      </div>
+    `;
+    return L.divIcon({
+      html: postTropicalIcon,
+      className: '',
+      iconSize: [24, 24],
+      iconAnchor: [12, 12]
+    });
+  } else if (isTropicalDepression) {
+    // Transparent circle with red border for tropical depressions
+    const tropicalDepressionIcon = `
+      <div style="
+        width: 24px; 
+        height: 24px; 
+        border-radius: 50%; 
+        background-color: transparent; 
+        border: 2px solid #dc3545; 
+        display: flex; 
+        align-items: center; 
+        justify-content: center; 
+        box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+      ">
+      </div>
+    `;
+    return L.divIcon({
+      html: tropicalDepressionIcon,
+      className: '',
+      iconSize: [24, 24],
+      iconAnchor: [12, 12]
     });
   } else {
     // Fallback to original design for other storm types
@@ -2479,19 +2543,70 @@ const SimpleStormTracker: React.FC = () => {
                               const isHurricane = storm.classification.toLowerCase().includes('hurricane') || 
                                                 storm.classification === 'HU' || 
                                                 (storm.category && storm.category >= 1);
-                              const iconPath = isHurricane ? '/HU.svg' : '/TS.svg';
+                              const isTropicalDepression = storm.classification.toLowerCase().includes('tropical depression') ||
+                                                         storm.classification.toLowerCase().includes('depression') ||
+                                                         storm.classification === 'TD';
+                              const isPostTropical = storm.classification.toLowerCase().includes('post-tropical') ||
+                                                    storm.classification.toLowerCase().includes('extratropical') ||
+                                                    storm.classification === 'EX' ||
+                                                    storm.classification === 'PC' ||
+                                                    storm.classification === 'EC' ||
+                                                    storm.classification === 'PTC';
                               
-                              return (
-                                <img 
-                                  src={iconPath}
-                                  alt={isHurricane ? 'Hurricane' : 'Tropical Storm'}
-                                  style={{
-                                    width: '100%',
-                                    height: '100%',
-                                    filter: 'drop-shadow(1px 1px 2px rgba(0,0,0,0.3))'
-                                  }}
-                                />
-                              );
+                              if (isPostTropical) {
+                                // Red circle with red X for post-tropical cyclones
+                                return (
+                                  <div style={{
+                                    width: '48px',
+                                    height: '48px',
+                                    borderRadius: '50%',
+                                    backgroundColor: 'transparent',
+                                    border: '2px solid #dc3545',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    boxShadow: '0 2px 4px rgba(0,0,0,0.3)'
+                                  }}>
+                                    <span style={{
+                                      color: '#dc3545',
+                                      fontSize: '32px',
+                                      fontWeight: 'bold',
+                                      fontFamily: 'monospace',
+                                      lineHeight: '1'
+                                    }}>×</span>
+                                  </div>
+                                );
+                              } else if (isTropicalDepression) {
+                                // Transparent circle with red border for tropical depressions
+                                return (
+                                  <div style={{
+                                    width: '48px',
+                                    height: '48px',
+                                    borderRadius: '50%',
+                                    backgroundColor: 'transparent',
+                                    border: '2px solid #dc3545',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    boxShadow: '0 2px 4px rgba(0,0,0,0.3)'
+                                  }}>
+                                  </div>
+                                );
+                              } else {
+                                const iconPath = isHurricane ? '/HU.svg' : '/TS.svg';
+                                
+                                return (
+                                  <img 
+                                    src={iconPath}
+                                    alt={isHurricane ? 'Hurricane' : 'Tropical Storm'}
+                                    style={{
+                                      width: '100%',
+                                      height: '100%',
+                                      filter: 'drop-shadow(1px 1px 2px rgba(0,0,0,0.3))'
+                                    }}
+                                  />
+                                );
+                              }
                             })()}
                           </div>
                           

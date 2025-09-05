@@ -792,6 +792,7 @@ class NHCApiService {
       const processedStorms = await Promise.all(
         storms.map(async (storm, index) => {
           console.log(`Processing storm ${index + 1}:`, storm);
+          console.log(`Storm ${storm.name} classification: "${storm.classification}"`);
           
           // Provide defaults for missing fields
           const processedStorm: ProcessedStorm = {

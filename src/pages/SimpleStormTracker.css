@@ -6,6 +6,23 @@
   100% { transform: rotate(360deg); }
 }
 
+/* Spinning animation for hurricane and tropical storm icons */
+@keyframes storm-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(-360deg); }
+}
+
+.spinning-hurricane-icon svg,
+.spinning-tropical-storm-icon svg {
+  animation: storm-spin 4s linear infinite;
+  transform-origin: center;
+}
+
+.spinning-hurricane-icon,
+.spinning-tropical-storm-icon {
+  position: relative;
+}
+
 /* Storm Selector Box Styles */
 .storm-selector-box {
   transition: all 0.2s ease;
