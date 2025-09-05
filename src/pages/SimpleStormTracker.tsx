@@ -11,6 +11,7 @@ import { useHWRFData, useHMONData } from '../hooks/useHWRFData';
 import SimpleHeader from '../components/SimpleHeader';
 import ExpandLessOutlinedIcon from '@mui/icons-material/ExpandLessOutlined';
 import LayersOutlinedIcon from '@mui/icons-material/LayersOutlined';
+import { formatWindSpeed, getIntensityCategoryFromKnots } from '../utils/windSpeed';
 
 // Fix for default markers in React Leaflet
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -278,15 +279,13 @@ const getForecastIntensityColor = (stormType: string, styleCategory: string) => 
 
 // Get intensity category from wind speed (in knots or mph)
 const getIntensityCategoryFromWinds = (windSpeed: number, isKnots: boolean = true): string => {
-  const knotSpeed = isKnots ? windSpeed : windSpeed * 0.868976; // Convert mph to knots if needed
-  
-  if (knotSpeed < 34) return 'TD';
-  else if (knotSpeed < 64) return 'TS';
-  else if (knotSpeed < 83) return '1';
-  else if (knotSpeed < 96) return '2';
-  else if (knotSpeed < 113) return '3';
-  else if (knotSpeed < 137) return '4';
-  else return '5';
+  if (isKnots) {
+    return getIntensityCategoryFromKnots(windSpeed);
+  } else {
+    // Convert mph to knots first, then get category
+    const knotSpeed = windSpeed * 0.868976; // Convert mph to knots
+    return getIntensityCategoryFromKnots(knotSpeed);
+  }
 };
 
 const SimpleStormTracker: React.FC = () => {
@@ -543,7 +542,7 @@ const SimpleStormTracker: React.FC = () => {
                     <strong>Category:</strong> {storm.category > 0 ? storm.category : 'N/A'}
                   </p>
                   <p className="storm-popup-field storm-popup-winds">
-                    <strong>Max Winds:</strong> {storm.maxWinds} mph
+                    <strong>Max Winds:</strong> {formatWindSpeed(storm.maxWinds)}
                   </p>
                   <p className="storm-popup-field">
                     <strong>Pressure:</strong> {storm.pressure} mb
@@ -813,7 +812,7 @@ const SimpleStormTracker: React.FC = () => {
                           <strong>{storm.name} - Historical Position</strong><br />
                           <strong>Time:</strong> {new Date(point.dateTime).toLocaleString()}<br />
                           <strong>Intensity:</strong> {category}<br />
-                          <strong>Max Winds:</strong> {point.maxWinds} mph<br />
+                          <strong>Max Winds:</strong> {formatWindSpeed(point.maxWinds)}<br />
                           <strong>Pressure:</strong> {point.pressure} mb
                         </div>
                       </Popup>
@@ -1165,7 +1164,7 @@ const SimpleStormTracker: React.FC = () => {
                           <strong>Time:</strong> {new Date(point.dateTime).toLocaleString()}<br />
                           <strong>Forecast Hour:</strong> +{point.forecastHour}h<br />
                           <strong>Forecast Intensity:</strong> {category}<br />
-                          <strong>Max Winds:</strong> {point.maxWinds} mph<br />
+                          <strong>Max Winds:</strong> {formatWindSpeed(point.maxWinds)}<br />
                           <strong>Pressure:</strong> {point.pressure} mb
                         </div>
                       </Popup>
