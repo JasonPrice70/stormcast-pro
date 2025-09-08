@@ -43,23 +43,8 @@ export const useInvestData = (options: UseInvestDataOptions = {}): UseInvestData
       console.log('📊 Invest areas received:', investAreas)
       console.log('📈 Number of invest areas:', investAreas.length)
       
-      // If no real invest areas found, add a demo one for testing
       if (investAreas.length === 0) {
-        console.log('🧪 No real invest areas found, adding demo AL91 for testing...')
-        const demoInvest = {
-          id: 'AL91',
-          basin: 'atlantic' as const,
-          name: 'Invest AL91 (Demo)',
-          description: 'A broad area of low pressure associated with a tropical wave is producing a concentrated but still disorganized area of showers and thunderstorms over the eastern tropical Atlantic. Environmental conditions are favorable for development of this system, and a tropical depression is likely to form by this weekend as it moves slowly westward at 5 to 10 mph across the central tropical Atlantic. This system is likely to be near the Lesser Antilles by the middle to latter part of next week, and interests there should continue to monitor its progress. Upper-level winds are expected to become more conducive for development over the next few days.',
-          location: 'Eastern Tropical Atlantic',
-          position: [12.5, -45.2] as [number, number],
-          formationChance48hr: 60,
-          formationChance7day: 90,
-          lastUpdate: new Date(),
-          hasGraphics: false
-        }
-        investAreas.push(demoInvest)
-        console.log('✨ Added demo invest:', demoInvest)
+        console.log('ℹ️ No active invest areas found. This is normal when there is no tropical development expected.')
       }
       
       if (investAreas.length > 0) {
@@ -87,13 +72,13 @@ export const useInvestData = (options: UseInvestDataOptions = {}): UseInvestData
       
       // Provide user-friendly error messages
       if (errorMessage.includes('CORS proxy access denied (403)')) {
-        setError('🔒 CORS proxy access required to fetch invest data. Visit the CORS demo page to request access.')
+        setError('🔒 CORS proxy access required to fetch live invest data. If no invests are shown, either there are no active tropical developments OR you need CORS access.')
       } else if (errorMessage.includes('timeout') || errorMessage.includes('Connection timeout')) {
-        setError('⏱️ Connection timeout while fetching invest data. Click "Get CORS Access" and try again.')
+        setError('⏱️ Connection timeout while fetching invest data. This may indicate CORS proxy issues OR no active tropical developments. Try "Get CORS Access" if needed.')
       } else if (errorMessage.includes('Network Error') || errorMessage.includes('ERR_NETWORK')) {
-        setError('📡 Network connection issue while fetching invest data. Check your connection and CORS access.')
+        setError('📡 Network connection issue while fetching invest data. Check your connection or try requesting CORS access.')
       } else {
-        setError(`⚠️ ${errorMessage}`)
+        setError(`⚠️ Unable to fetch live invest data: ${errorMessage}. If no invests shown, there may be no active tropical developments.`)
       }
       
       // Keep previous data on error instead of clearing
