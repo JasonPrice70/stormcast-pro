@@ -33,7 +33,7 @@ const MapController: React.FC<MapControllerProps> = ({ selectedStorm, stormsToDi
   const map = useMap();
   
   useEffect(() => {
-    // Prioritize based on what was selected most recently
+    // Only pan when a user explicitly selects a storm or invest
     if (lastSelectionType === 'storm' && selectedStorm) {
       // Auto-center to selected storm (preserve current zoom level)
       const [lat, lon] = selectedStorm.position;
@@ -52,31 +52,10 @@ const MapController: React.FC<MapControllerProps> = ({ selectedStorm, stormsToDi
         animate: true,
         duration: 1.0
       });
-    } else if (!selectedStorm && !selectedInvest && stormsToDisplay.length > 0) {
-      // If no specific storm selected but storms are available, center on the group
-      try {
-        const stormPositions = stormsToDisplay.map(storm => L.latLng(storm.position[0], storm.position[1]));
-        if (stormPositions.length === 1) {
-          // Single storm - center on it
-          const storm = stormsToDisplay[0];
-          map.panTo([storm.position[0], storm.position[1]], {
-            animate: true,
-            duration: 1.0
-          });
-        } else {
-          // Multiple storms - center on the geographic center of all storms
-          const bounds = L.latLngBounds(stormPositions);
-          const center = bounds.getCenter();
-          map.panTo([center.lat, center.lng], {
-            animate: true,
-            duration: 1.0
-          });
-        }
-      } catch (error) {
-        console.warn('Error centering on storms:', error);
-      }
     }
-  }, [selectedInvest, selectedStorm, stormsToDisplay, lastSelectionType, map]);
+    // Removed automatic centering on storms when none are selected
+    // This allows the map to stay centered on Florida initially
+  }, [selectedInvest, selectedStorm, lastSelectionType, map]);
   
   return null;
 };
@@ -529,8 +508,8 @@ const SimpleStormTracker: React.FC = () => {
       {/* Map Container */}
       <div className="map-wrapper">
         <MapContainer 
-          center={[26.0, -82.0]} 
-          zoom={5} 
+          center={[27.8, -81.7]} 
+          zoom={6} 
           style={{ height: '100%', width: '100%' }}
           scrollWheelZoom={true}
           zoomControl={true}
