@@ -8,7 +8,6 @@ import { useInvestData } from '../hooks/useInvestData';
 import { useGEFSSpaghetti } from '../hooks/useGEFSSpaghetti';
 import WindSpeedLegend from '../components/WindSpeedLegend';
 import { useHWRFData, useHMONData } from '../hooks/useHWRFData';
-import SimpleHeader from '../components/SimpleHeader';
 import ExpandLessOutlinedIcon from '@mui/icons-material/ExpandLessOutlined';
 import LayersOutlinedIcon from '@mui/icons-material/LayersOutlined';
 import { formatWindSpeed, getIntensityCategoryFromKnots } from '../utils/windSpeed';
@@ -500,10 +499,141 @@ const SimpleStormTracker: React.FC = () => {
     return storm.classification; // Fallback to original classification
   };
 
+  // State for hamburger menu and stats panel
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isStatsPanelOpen, setIsStatsPanelOpen] = useState(false);
+  const [isStatsPanelPinned, setIsStatsPanelPinned] = useState(false);
+
+  const toggleMenu = () => {
+    setIsMenuOpen(!isMenuOpen);
+  };
+
+  const closeMenu = () => {
+    setIsMenuOpen(false);
+  };
+
+  const toggleStatsPanel = () => {
+    setIsStatsPanelOpen(!isStatsPanelOpen);
+  };
+
+  const toggleStatsPinned = () => {
+    setIsStatsPanelPinned(!isStatsPanelPinned);
+  };
+
   return (
     <div className={`simple-storm-tracker ${!isControlPanelClosed ? 'panel-open' : ''}`}>
-      {/* Header positioned on top of map */}
-      <SimpleHeader />
+      {/* Hamburger Menu Button - Top Left */}
+      <button 
+        className={`hamburger-menu-btn ${isMenuOpen ? 'active' : ''}`}
+        onClick={toggleMenu}
+        aria-label="Toggle navigation menu"
+      >
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+
+      {/* Menu Overlay */}
+      <div className={`menu-overlay ${isMenuOpen ? 'active' : ''}`} onClick={closeMenu}></div>
+      
+      {/* Slide-out Navigation Menu */}
+      <nav className={`slide-menu ${isMenuOpen ? 'active' : ''}`}>
+        <div className="slide-menu-header">
+          <h3>Navigation</h3>
+          <button className="hamburger-close" onClick={closeMenu}>
+            ×
+          </button>
+        </div>
+        
+        <ul className="slide-menu-items">
+          <li>
+            <a href="/" onClick={closeMenu}>
+              🏠 Home
+            </a>
+          </li>
+          <li>
+            <a href="/tracker" className="active" onClick={closeMenu}>
+              🌀 Tracker
+            </a>
+          </li>
+          <li>
+            <a href="/forecast" onClick={closeMenu}>
+              📊 Forecast
+            </a>
+          </li>
+          <li>
+            <a href="/about" onClick={closeMenu}>
+              ℹ️ About
+            </a>
+          </li>
+        </ul>
+      </nav>
+
+      {/* Stats Pulldown Panel */}
+      <div className={`stats-panel ${isStatsPanelOpen ? 'open' : ''} ${isStatsPanelPinned ? 'pinned' : ''}`}>
+        <div className="stats-panel-content">
+          {/* Storm stats content */}
+          {selectedStorm ? (
+            <div className="storm-stats-container">
+              {/* Primary Storm Information */}
+              <div className="storm-primary-info">
+                <div className="storm-name-section">
+                  <h4 className="storm-name">{selectedStorm.name}</h4>
+                  <div className="storm-classification">
+                    {getFullIntensityName(selectedStorm)}
+                  </div>
+                  <div className="storm-strength">
+                    <span className="wind-speed">{formatWindSpeed(selectedStorm.maxWinds)}</span>
+                    <span className="pressure">{selectedStorm.pressure} mb</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Operational Metrics */}
+              <div className="operational-metrics">
+                <div className="metric-item">
+                  <div className="metric-label">CMH</div>
+                  <div className="metric-value">265,433</div>
+                </div>
+                
+                <div className="metric-item">
+                  <div className="metric-label">Customers Impacted</div>
+                  <div className="metric-value">115,856</div>
+                </div>
+                
+                <div className="metric-item">
+                  <div className="metric-label">Staging Sites</div>
+                  <div className="metric-value">25</div>
+                </div>
+                
+                <div className="metric-item">
+                  <div className="metric-label">Number of Resources</div>
+                  <div className="metric-value">85,100</div>
+                </div>
+                
+                <div className="metric-item">
+                  <div className="metric-label">Restoration ETA</div>
+                  <div className="metric-value">2 DAYS</div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="stats-placeholder">
+              <p>Select a storm to view statistics</p>
+            </div>
+          )}
+        </div>
+        
+        <div className="stats-panel-header" onClick={toggleStatsPanel}>
+          <div className="stats-header-content">
+            <ExpandLessOutlinedIcon 
+              className="stats-caret-icon"
+              style={{ transform: isStatsPanelOpen ? 'rotate(180deg)' : 'rotate(0deg)' }} 
+            />
+            <span className="stats-header-text">Storm Stats</span>
+          </div>
+        </div>
+      </div>
       
       {/* Map Container */}
       <div className="map-wrapper">

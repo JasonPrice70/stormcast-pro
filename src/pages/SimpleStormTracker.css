@@ -1,5 +1,391 @@
 /* Simple Storm Tracker Styles */
 
+/* Hamburger Menu Button */
+.hamburger-menu-btn {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  width: 48px;
+  height: 48px;
+  background: rgba(0, 0, 0, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  cursor: pointer;
+  z-index: 2001;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  transition: all 0.3s ease;
+}
+
+.hamburger-menu-btn:hover {
+  background: rgba(0, 0, 0, 0.8);
+  border-color: rgba(255, 255, 255, 0.4);
+  transform: scale(1.05);
+}
+
+.hamburger-menu-btn span {
+  display: block;
+  width: 20px;
+  height: 2px;
+  background: white;
+  border-radius: 1px;
+  transition: all 0.3s ease;
+}
+
+.hamburger-menu-btn.active span:nth-child(1) {
+  transform: rotate(45deg) translate(5px, 5px);
+}
+
+.hamburger-menu-btn.active span:nth-child(2) {
+  opacity: 0;
+}
+
+.hamburger-menu-btn.active span:nth-child(3) {
+  transform: rotate(-45deg) translate(7px, -6px);
+}
+
+/* Menu Overlay */
+.menu-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1999;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.3s ease;
+}
+
+.menu-overlay.active {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Slide-out Navigation Menu */
+.slide-menu {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 280px;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(10px);
+  border-right: 1px solid rgba(255, 255, 255, 0.2);
+  z-index: 2000;
+  transform: translateX(-100%);
+  transition: transform 0.3s ease;
+  overflow-y: auto;
+}
+
+.slide-menu.active {
+  transform: translateX(0);
+}
+
+.slide-menu-header {
+  padding: 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.slide-menu-header h3 {
+  color: white;
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.hamburger-close {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  transition: background 0.2s ease;
+}
+
+.hamburger-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.slide-menu-items {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.slide-menu-items li {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.slide-menu-items a {
+  display: block;
+  padding: 16px 20px;
+  color: white;
+  text-decoration: none;
+  font-size: 1rem;
+  transition: background 0.2s ease;
+}
+
+.slide-menu-items a:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.slide-menu-items a.active {
+  background: rgba(79, 195, 247, 0.2);
+  border-right: 3px solid #4FC3F7;
+}
+
+/* Stats Panel */
+.stats-panel {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  transform: none;
+  width: 100%;
+  max-width: none;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-top: none;
+  border-left: none;
+  border-right: none;
+  border-radius: 0 0 8px 8px;
+  z-index: 1500;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.stats-panel:not(.open):not(.pinned) {
+  transform: translateY(calc(-100% + 64px));
+}
+
+.stats-panel.open,
+.stats-panel.pinned {
+  transform: translateY(0);
+}
+
+.stats-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+  cursor: pointer;
+  transition: background 0.2s ease;
+  min-height: 32px;
+  height: 64px;
+  flex-shrink: 0;
+  order: 2;
+}
+
+.stats-panel-header:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.stats-header-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stats-caret-icon {
+  color: white !important;
+  font-size: 1.4rem !important;
+  transition: transform 0.3s ease;
+}
+
+.stats-header-text {
+  color: white;
+  font-size: 1.1rem;
+  font-weight: 500;
+  margin: 0;
+  white-space: nowrap;
+}
+
+.stats-panel-header h3 {
+  color: white;
+  margin: 0;
+  font-size: 1rem;
+  flex: 1;
+  text-align: center;
+}
+
+.stats-toggle-btn {
+  background: none;
+  border: none;
+  color: white;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stats-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.stats-toggle-btn svg {
+  transition: transform 0.3s ease;
+}
+
+.stats-panel-content {
+  padding: 16px;
+  overflow-y: auto;
+  transition: all 0.3s ease;
+  flex: 1;
+  order: 1;
+}
+
+.stats-placeholder {
+  text-align: center;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.stats-placeholder p {
+  margin: 8px 0;
+  font-size: 0.9rem;
+}
+
+/* Storm Stats Container */
+.storm-stats-container {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 24px;
+  padding: 0 80px 0 100px;
+}
+
+/* Primary Storm Information */
+.storm-primary-info {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  padding: 16px 20px;
+  border-left: 4px solid #4FC3F7;
+  flex-shrink: 0;
+  width: 240px;
+  height: 100px;
+  display: flex;
+  align-items: center;
+}
+
+.storm-name-section {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+}
+
+.storm-name {
+  color: white;
+  font-size: 1.1rem;
+  font-weight: bold;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.storm-classification {
+  color: #4FC3F7;
+  font-size: 0.8rem;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.storm-strength {
+  display: flex;
+  gap: 12px;
+  margin-top: 3px;
+}
+
+.wind-speed {
+  color: #ff6b6b;
+  font-weight: bold;
+  font-size: 0.8rem;
+}
+
+.pressure {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.8rem;
+}
+
+/* Operational Metrics */
+.operational-metrics {
+  display: flex;
+  flex: 1;
+  gap: 16px;
+  overflow-x: auto;
+}
+
+.metric-item {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  padding: 16px 12px;
+  text-align: center;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: background 0.2s ease;
+  flex-shrink: 0;
+  width: 200px;
+  height: 100px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.metric-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.metric-label {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.8rem;
+  margin-bottom: 4px;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  line-height: 1.2;
+}
+
+.metric-value {
+  color: white;
+  font-size: 1.8rem;
+  font-weight: bold;
+  line-height: 1.2;
+}
+
+/* Additional responsive adjustments for very small screens */
+@media (max-width: 360px) {
+  .storm-stats-container {
+    padding: 0 8px;
+  }
+  
+  .metric-item {
+    min-width: 70px;
+    padding: 4px 6px;
+  }
+  
+  .metric-label {
+    font-size: 0.6rem;
+  }
+  
+  .metric-value {
+    font-size: 0.75rem;
+  }
+}
+
 /* Spinner animation */
 @keyframes spin {
   0% { transform: rotate(0deg); }
@@ -114,6 +500,74 @@
   /* Adjust layer button on mobile when panel is open */
   .simple-storm-tracker.panel-open .layer-toggle-btn {
     right: 20px;
+  }
+
+  /* Stats panel responsive adjustments */
+  .stats-panel {
+    width: 100%;
+    left: 0;
+    top: 0;
+    transform: none;
+    border-radius: 0 0 8px 8px;
+    border-left: none;
+    border-right: none;
+    height: 160px;
+  }
+
+  .stats-panel:not(.open):not(.pinned) {
+    transform: translateY(calc(-100% + 64px));
+  }
+
+  .stats-panel.open,
+  .stats-panel.pinned {
+    transform: translateY(0);
+  }
+
+  /* Mobile horizontal layout adjustments */
+  .storm-stats-container {
+    flex-direction: column;
+    gap: 12px;
+    padding: 0 12px;
+  }
+
+  .storm-primary-info {
+    width: 100%;
+    height: auto;
+    min-height: 80px;
+  }
+
+  .operational-metrics {
+    flex-direction: row;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+
+  .metric-item {
+    min-width: 120px;
+    width: 120px;
+    height: 80px;
+    padding: 8px 12px;
+  }
+
+  .metric-label {
+    font-size: 0.65rem;
+  }
+
+  .metric-value {
+    font-size: 0.8rem;
+  }
+
+  /* Hamburger and navigation adjustments */
+  .hamburger-menu-btn {
+    top: 15px;
+    left: 15px;
+    width: 42px;
+    height: 42px;
+  }
+
+  .slide-menu {
+    width: 100vw;
   }
 }
 
@@ -345,7 +799,7 @@
 /* Layer Toggle Button */
 .layer-toggle-btn {
   position: fixed;
-  top: 120px;
+  top: 20px;
   right: 20px;
   width: 36px;
   height: 36px;
@@ -354,7 +808,7 @@
   border-radius: 8px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
   cursor: pointer;
-  z-index: 1001;
+  z-index: 1501;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -377,9 +831,9 @@
 /* Sliding Control Panel */
 .sliding-control-panel {
   position: fixed;
-  top: 91px;
+  top: 0;
   right: 0;
-  height: calc(100vh - 90px);
+  height: 100vh;
   width: 300px;
   background: rgba(0, 0, 0, 0.7);
   backdrop-filter: blur(10px);
@@ -427,7 +881,7 @@
 
 /* Control Panel Header */
 .control-panel-header-wrapper {
-  padding: 20px 20px 15px 20px;
+  padding: 80px 20px 15px 20px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.2);
   background: rgba(0, 0, 0, 0.3);
   /* Sticky header to ensure it stays visible when scrolling */
