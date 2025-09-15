@@ -1020,7 +1020,13 @@
 
 .leaflet-top .leaflet-control {
 	margin-top: 110px;
-	}
+	transition: margin-top 0.3s ease;
+}
+
+/* Push controls down when stats panel is open */
+.simple-storm-tracker.stats-open .leaflet-top .leaflet-control {
+	margin-top: 320px;
+}
 
 /* Path Visibility Controls */
 .path-controls {

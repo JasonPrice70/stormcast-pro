@@ -10,6 +10,10 @@ import WindSpeedLegend from '../components/WindSpeedLegend';
 import { useHWRFData, useHMONData } from '../hooks/useHWRFData';
 import ExpandLessOutlinedIcon from '@mui/icons-material/ExpandLessOutlined';
 import LayersOutlinedIcon from '@mui/icons-material/LayersOutlined';
+import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined';
+import TrackChangesOutlinedIcon from '@mui/icons-material/TrackChangesOutlined';
+import AssessmentOutlinedIcon from '@mui/icons-material/AssessmentOutlined';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import { formatWindSpeed, getIntensityCategoryFromKnots } from '../utils/windSpeed';
 
 // Fix for default markers in React Leaflet
@@ -521,7 +525,7 @@ const SimpleStormTracker: React.FC = () => {
   };
 
   return (
-    <div className={`simple-storm-tracker ${!isControlPanelClosed ? 'panel-open' : ''}`}>
+    <div className={`simple-storm-tracker ${!isControlPanelClosed ? 'panel-open' : ''} ${(isStatsPanelOpen || isStatsPanelPinned) ? 'stats-open' : ''}`}>
       {/* Hamburger Menu Button - Top Left */}
       <button 
         className={`hamburger-menu-btn ${isMenuOpen ? 'active' : ''}`}
@@ -548,22 +552,26 @@ const SimpleStormTracker: React.FC = () => {
         <ul className="slide-menu-items">
           <li>
             <a href="/" onClick={closeMenu}>
-              🏠 Home
+              <HomeOutlinedIcon style={{ marginRight: '8px', fontSize: '18px' }} />
+              Home
             </a>
           </li>
           <li>
             <a href="/tracker" className="active" onClick={closeMenu}>
-              🌀 Tracker
+              <TrackChangesOutlinedIcon style={{ marginRight: '8px', fontSize: '18px' }} />
+              Tracker
             </a>
           </li>
           <li>
             <a href="/forecast" onClick={closeMenu}>
-              📊 Forecast
+              <AssessmentOutlinedIcon style={{ marginRight: '8px', fontSize: '18px' }} />
+              Forecast
             </a>
           </li>
           <li>
             <a href="/about" onClick={closeMenu}>
-              ℹ️ About
+              <InfoOutlinedIcon style={{ marginRight: '8px', fontSize: '18px' }} />
+              About
             </a>
           </li>
         </ul>
@@ -628,7 +636,7 @@ const SimpleStormTracker: React.FC = () => {
           <div className="stats-header-content">
             <ExpandLessOutlinedIcon 
               className="stats-caret-icon"
-              style={{ transform: isStatsPanelOpen ? 'rotate(180deg)' : 'rotate(0deg)' }} 
+              style={{ transform: isStatsPanelOpen ? 'rotate(0deg)' : 'rotate(180deg)' }} 
             />
             <span className="stats-header-text">Storm Stats</span>
           </div>
