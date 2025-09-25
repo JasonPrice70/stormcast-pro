@@ -2091,7 +2091,14 @@ class NHCApiService {
         hasGraphics: false
       }
       
-      console.log(`🌀 Created invest area from direct pattern:`, investArea)
+      console.log(`🌀 Created invest area from direct pattern:`, {
+        id: investArea.id,
+        name: investArea.name,
+        location: investArea.location,
+        position: investArea.position,
+        description: investArea.description.substring(0, 100) + '...',
+        coordsExtracted: this.extractCoordinatesFromText(description) !== null
+      })
       investAreas.push(investArea)
     }
 
@@ -2150,14 +2157,21 @@ class NHCApiService {
         name: `Invest ${investId}`,
         description: description.trim(),
         location: area.trim(),
-        position: position || [0, 0], // Default if no coordinates found
+        position: position || this.getDefaultInvestPosition(area.trim(), basin),
         formationChance48hr: chance48,
         formationChance7day: chance7,
         lastUpdate,
         hasGraphics: false // We'll check for graphics separately
       }
       
-      console.log(`🌀 Created invest area:`, investArea)
+      console.log(`🌀 Created invest area:`, {
+        id: investArea.id,
+        name: investArea.name,
+        location: investArea.location,
+        position: investArea.position,
+        description: investArea.description.substring(0, 100) + '...',
+        coordsExtracted: this.extractCoordinatesFromText(description) !== null
+      })
       investAreas.push(investArea)
     }
 
@@ -2173,26 +2187,121 @@ class NHCApiService {
 
   /**
    * Extract latitude/longitude coordinates from outlook text
+   * Enhanced with geographic reference parsing
    */
   private extractCoordinatesFromText(text: string): [number, number] | null {
-    // Look for various coordinate formats
+    console.log(`🔍 Extracting coordinates from text: "${text.substring(0, 200)}..."`)
+    
+    // First try to extract explicit numeric coordinates
+    const numericCoords = this.extractNumericCoordinates(text)
+    if (numericCoords) {
+      return numericCoords
+    }
+    
+    // If no numeric coordinates, try geographic reference extraction
+    const geoCoords = this.extractGeographicReferences(text)
+    if (geoCoords) {
+      console.log(`📍 Using geographic reference coordinates: ${geoCoords[0]}°N, ${Math.abs(geoCoords[1])}°W`)
+      return geoCoords
+    }
+    
+    console.log('❌ No coordinates or geographic references found')
+    return null
+  }
+
+  /**
+   * Extract explicit numeric coordinates from text
+   */
+  private extractNumericCoordinates(text: string): [number, number] | null {
+    // Look for various coordinate formats that appear in NHC text
     const patterns = [
+      // Standard formats with "and"
       /(\d+\.?\d*)\s*[degrees°]?\s*N\s*and\s*(\d+\.?\d*)\s*[degrees°]?\s*W/i,
       /(\d+\.?\d*)\s*[degrees°]?\s*North\s*[,\s]+(\d+\.?\d*)\s*[degrees°]?\s*West/i,
-      /near\s*(\d+\.?\d*)\s*[degrees°]?\s*N[,\s]*(\d+\.?\d*)\s*[degrees°]?\s*W/i
+      
+      // Near/around formats
+      /near\s*(\d+\.?\d*)\s*[degrees°]?\s*N[,\s]*(\d+\.?\d*)\s*[degrees°]?\s*W/i,
+      /around\s*(\d+\.?\d*)\s*[degrees°]?\s*N[,\s]*(\d+\.?\d*)\s*[degrees°]?\s*W/i,
+      
+      // Over/across formats (common for Caribbean)
+      /over\s*(\d+\.?\d*)\s*[degrees°]?\s*N[,\s]*(\d+\.?\d*)\s*[degrees°]?\s*W/i,
+      /across\s*(\d+\.?\d*)\s*[degrees°]?\s*N[,\s]*(\d+\.?\d*)\s*[degrees°]?\s*W/i,
+      
+      // Formats without "and" but with various separators
+      /(\d+\.?\d*)\s*[degrees°]?\s*N[,\s]*(\d+\.?\d*)\s*[degrees°]?\s*W/i,
+      /(\d+\.?\d*)\s*[degrees°]?\s*N[\s]*[-–]\s*(\d+\.?\d*)\s*[degrees°]?\s*W/i,
+      
+      // Centered/located formats
+      /centered\s*near\s*(\d+\.?\d*)\s*[degrees°]?\s*N[,\s]*(\d+\.?\d*)\s*[degrees°]?\s*W/i,
+      /located\s*near\s*(\d+\.?\d*)\s*[degrees°]?\s*N[,\s]*(\d+\.?\d*)\s*[degrees°]?\s*W/i,
+      /positioned\s*near\s*(\d+\.?\d*)\s*[degrees°]?\s*N[,\s]*(\d+\.?\d*)\s*[degrees°]?\s*W/i,
+      
+      // Formats with additional text between coordinates
+      /(\d+\.?\d*)\s*[degrees°]?\s*N[\s\w,]*(\d+\.?\d*)\s*[degrees°]?\s*W/i,
     ]
 
-    for (const pattern of patterns) {
+    for (let i = 0; i < patterns.length; i++) {
+      const pattern = patterns[i]
       const match = text.match(pattern)
       if (match) {
         const lat = parseFloat(match[1])
         const lon = -parseFloat(match[2]) // West is negative
-        if (!isNaN(lat) && !isNaN(lon)) {
+        if (!isNaN(lat) && !isNaN(lon) && lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180) {
+          console.log(`✅ Found coordinates using pattern ${i + 1}: ${lat}°N, ${Math.abs(lon)}°W`)
+          console.log(`📍 Matched text: "${match[0]}"`)
           return [lat, lon]
         }
       }
     }
 
+    console.log(`❌ No coordinates found in text`)
+    return null
+  }
+
+  /**
+   * Extract coordinates from geographic references in text
+   */
+  private extractGeographicReferences(text: string): [number, number] | null {
+    const textLower = text.toLowerCase()
+    console.log(`🗺️ Looking for geographic references in text...`)
+    
+    // Known geographic locations with coordinates
+    const geoReferences = [
+      // Caribbean Islands
+      { names: ['hispaniola', 'dominican republic', 'haiti'], coords: [19.0, -71.0] },
+      { names: ['puerto rico'], coords: [18.2, -66.5] },
+      { names: ['jamaica'], coords: [18.1, -77.3] },
+      { names: ['cuba'], coords: [21.5, -80.0] },
+      { names: ['turks and caicos', 'turks', 'caicos'], coords: [21.8, -71.8] },
+      { names: ['bahamas'], coords: [24.0, -76.0] },
+      
+      // Regional references
+      { names: ['lesser antilles'], coords: [15.0, -61.0] },
+      { names: ['greater antilles'], coords: [19.0, -72.0] },
+      { names: ['windward islands'], coords: [13.0, -61.0] },
+      { names: ['leeward islands'], coords: [17.0, -62.5] },
+      
+      // Specific seas/regions
+      { names: ['caribbean sea'], coords: [15.0, -75.0] },
+      { names: ['gulf of mexico'], coords: [25.0, -88.0] },
+      { names: ['yucatan peninsula', 'yucatan'], coords: [20.0, -89.0] },
+      { names: ['florida straits'], coords: [24.5, -81.0] },
+      
+      // Atlantic regions
+      { names: ['cape verde', 'cabo verde'], coords: [16.0, -24.0] },
+      { names: ['azores'], coords: [38.5, -28.0] }
+    ]
+    
+    // Look for geographic references
+    for (const geoRef of geoReferences) {
+      for (const name of geoRef.names) {
+        if (textLower.includes(name)) {
+          console.log(`🌍 Found geographic reference: "${name}" → ${geoRef.coords[0]}°N, ${Math.abs(geoRef.coords[1])}°W`)
+          return geoRef.coords as [number, number]
+        }
+      }
+    }
+    
     return null
   }
 
@@ -2201,22 +2310,82 @@ class NHCApiService {
    */
   private getDefaultInvestPosition(area: string, basin: 'atlantic' | 'epacific' | 'cpacific'): [number, number] {
     const areaLower = area.toLowerCase()
+    console.log(`🗺️  Getting default position for area: "${area}" in basin: ${basin}`)
     
-    // Atlantic basin positions
+    // Atlantic basin positions with enhanced geographic intelligence
     if (basin === 'atlantic') {
-      if (areaLower.includes('eastern') || areaLower.includes('tropical atlantic')) {
-        return [15.0, -45.0] // Eastern Atlantic (typical AL90/91 area)
+      // Specific priority matches (most specific first)
+      if (areaLower.includes('central caribbean') && areaLower.includes('southwestern atlantic')) {
+        console.log(`📍 Using Central Caribbean/SW Atlantic position (AL94 area) for: ${area}`)
+        return [19.0, -71.0] // Over Hispaniola - where AL94 is currently located
       }
-      if (areaLower.includes('central')) {
-        return [15.0, -60.0] // Central Atlantic
+      
+      // Island-specific positioning
+      if (areaLower.includes('hispaniola') || areaLower.includes('dominican') || areaLower.includes('haiti')) {
+        console.log(`📍 Using Hispaniola position for: ${area}`)
+        return [19.0, -71.0] // Over Hispaniola
       }
-      if (areaLower.includes('western') || areaLower.includes('gulf')) {
-        return [25.0, -85.0] // Gulf of Mexico/Western Atlantic
+      if (areaLower.includes('puerto rico')) {
+        console.log(`📍 Using Puerto Rico position for: ${area}`)
+        return [18.2, -66.5] // Over Puerto Rico
       }
-      if (areaLower.includes('caribbean')) {
-        return [15.0, -75.0] // Caribbean
+      if (areaLower.includes('jamaica')) {
+        console.log(`📍 Using Jamaica position for: ${area}`)
+        return [18.1, -77.3] // Over Jamaica
       }
-      return [20.0, -50.0] // Default Atlantic position
+      if (areaLower.includes('cuba')) {
+        console.log(`📍 Using Cuba position for: ${area}`)
+        return [21.5, -80.0] // Over Cuba
+      }
+      if (areaLower.includes('turks') && areaLower.includes('caicos')) {
+        console.log(`📍 Using Turks and Caicos position for: ${area}`)
+        return [21.8, -71.8] // Over Turks and Caicos
+      }
+      if (areaLower.includes('bahamas')) {
+        console.log(`📍 Using Bahamas position for: ${area}`)
+        return [24.0, -76.0] // Over Bahamas
+      }
+      
+      // Regional positioning (broader areas)
+      if (areaLower.includes('eastern') || areaLower.includes('tropical atlantic') || areaLower.includes('cabo verde') || areaLower.includes('cape verde')) {
+        console.log(`📍 Using Eastern Atlantic position for: ${area}`)
+        return [15.0, -40.0] // Eastern Atlantic (Cape Verde region)
+      }
+      if (areaLower.includes('central atlantic') || areaLower.includes('central tropical atlantic')) {
+        console.log(`📍 Using Central Atlantic position for: ${area}`)
+        return [20.0, -55.0] // Central Atlantic
+      }
+      if (areaLower.includes('western atlantic') && !areaLower.includes('southwestern')) {
+        console.log(`📍 Using Western Atlantic position for: ${area}`)
+        return [28.0, -70.0] // Western Atlantic
+      }
+      if (areaLower.includes('southwestern atlantic') && !areaLower.includes('caribbean')) {
+        console.log(`📍 Using Southwestern Atlantic position for: ${area}`)
+        return [25.0, -65.0] // Southwestern Atlantic
+      }
+      if (areaLower.includes('gulf') || areaLower.includes('bay of campeche')) {
+        console.log(`📍 Using Gulf of Mexico position for: ${area}`)
+        return [25.0, -88.0] // Gulf of Mexico
+      }
+      if (areaLower.includes('caribbean') || areaLower.includes('lesser antilles') || areaLower.includes('windward')) {
+        console.log(`📍 Using Caribbean position for: ${area}`)
+        return [15.0, -75.0] // Caribbean Sea
+      }
+      if (areaLower.includes('yucatan') || areaLower.includes('campeche')) {
+        console.log(`📍 Using Yucatan/Campeche position for: ${area}`)
+        return [22.0, -90.0] // Yucatan Peninsula
+      }
+      if (areaLower.includes('florida') || areaLower.includes('southeast') && areaLower.includes('coast')) {
+        console.log(`📍 Using Southeast US Coast position for: ${area}`)
+        return [27.0, -80.0] // Off Florida coast
+      }
+      if (areaLower.includes('greater antilles') || areaLower.includes('puerto rico') || areaLower.includes('jamaica')) {
+        console.log(`📍 Using Greater Antilles position for: ${area}`)
+        return [18.5, -72.0] // Greater Antilles region
+      }
+      
+      console.log(`📍 Using default Atlantic position for: ${area}`)
+      return [18.0, -45.0] // Default Atlantic position (moved east to better represent typical invest areas)
     }
     
     // Eastern Pacific positions
