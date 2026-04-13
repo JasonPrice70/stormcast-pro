@@ -1,101 +1,105 @@
 import React, { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined'
-import CycloneOutlined from '@mui/icons-material/CycloneOutlined'
 import ShowChartOutlinedIcon from '@mui/icons-material/ShowChartOutlined'
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
 import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined'
+import LayersOutlinedIcon from '@mui/icons-material/LayersOutlined'
+import CycloTrakIcon from './CycloTrakIcon'
 import './Header.css'
 
-const SimpleHeader = () => {
+const navLinks = [
+  { to: '/',         label: 'Home',     icon: <HomeOutlinedIcon fontSize="small" /> },
+  { to: '/forecast', label: 'Forecast', icon: <ShowChartOutlinedIcon fontSize="small" /> },
+  { to: '/about',    label: 'About',    icon: <InfoOutlinedIcon fontSize="small" /> },
+]
+
+interface SimpleHeaderProps {
+  layersPanelOpen?: boolean
+  onLayersToggle?: () => void
+}
+
+const SimpleHeader = ({ layersPanelOpen = false, onLayersToggle }: SimpleHeaderProps) => {
   const location = useLocation()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
 
-  const toggleMenu = () => {
-    setIsMenuOpen(!isMenuOpen)
-  }
-
-  const closeMenu = () => {
-    setIsMenuOpen(false)
-  }
+  const toggleMenu = () => setIsMenuOpen(prev => !prev)
+  const closeMenu  = () => setIsMenuOpen(false)
 
   return (
     <>
       <header className="header">
-        <div className="container">
-          <div className="header-content">
-            {/* Hamburger Menu Button - Moved to Left */}
-            <button 
-              className={`hamburger ${isMenuOpen ? 'active' : ''}`}
+        <div className="header-inner">
+
+          {/* ── Left: hamburger + brand ── */}
+          <div className="header-brand">
+            <button
+              className={`hamburger${isMenuOpen ? ' active' : ''}`}
               onClick={toggleMenu}
               aria-label="Toggle navigation menu"
+              aria-expanded={isMenuOpen}
             >
               <span></span>
               <span></span>
               <span></span>
             </button>
-            
-            <div className="header-text">
-              <h1>Cyclotrak</h1>
-              <p>Hurricane & Tropical Cyclone Tracking</p>
+
+            <CycloTrakIcon size={34} />
+
+            <div className="brand-text">
+              <span className="brand-name">CycloTrak</span>
+              <span className="brand-sub">Hurricane &amp; Cyclone Tracking</span>
             </div>
           </div>
+
+          {/* ── Right: layers button ── */}
+          {onLayersToggle && (
+            <button
+              className={`header-layers-btn${layersPanelOpen ? ' active' : ''}`}
+              onClick={onLayersToggle}
+              aria-label={layersPanelOpen ? 'Close Layers Panel' : 'Open Layers Panel'}
+              aria-expanded={layersPanelOpen}
+            >
+              <LayersOutlinedIcon fontSize="small" />
+              <span>Layers</span>
+            </button>
+          )}
+
         </div>
       </header>
 
-      {/* Slide-out Menu Overlay */}
-      <div className={`menu-overlay ${isMenuOpen ? 'active' : ''}`} onClick={closeMenu}></div>
-      
-      {/* Slide-out Navigation Menu - Coming from Left */}
-      <nav className={`slide-menu ${isMenuOpen ? 'active' : ''}`}>
+      {/* Overlay */}
+      <div
+        className={`menu-overlay${isMenuOpen ? ' active' : ''}`}
+        onClick={closeMenu}
+        aria-hidden="true"
+      />
+
+      {/* Slide-out Navigation */}
+      <nav className={`slide-menu${isMenuOpen ? ' active' : ''}`} aria-label="Slide-out navigation">
         <div className="slide-menu-header">
-          <h3>Navigation</h3>
-                  <button className="hamburger-close" onClick={closeMenu}>
-          <CloseOutlinedIcon />
-        </button>
+          <div className="slide-menu-brand">
+            <CycloTrakIcon size={28} />
+            <h3>CycloTrak</h3>
+          </div>
+          <button className="hamburger-close" onClick={closeMenu} aria-label="Close menu">
+            <CloseOutlinedIcon />
+          </button>
         </div>
-        
+
         <ul className="slide-menu-items">
-          <li>
-            <Link 
-              to="/" 
-              className={location.pathname === '/' ? 'active' : ''}
-              onClick={closeMenu}
-            >
-              <HomeOutlinedIcon className="menu-icon" />
-              Home
-            </Link>
-          </li>
-          <li>
-            <Link 
-              to="/tracker" 
-              className={location.pathname === '/tracker' ? 'active' : ''}
-              onClick={closeMenu}
-            >
-                            <CycloneOutlined className="menu-icon" />
-                            Tracker
-            </Link>
-          </li>
-          <li>
-            <Link 
-              to="/forecast" 
-              className={location.pathname === '/forecast' ? 'active' : ''}
-              onClick={closeMenu}
-            >
-              <ShowChartOutlinedIcon className="menu-icon" />
-              Forecast
-            </Link>
-          </li>
-          <li>
-            <Link 
-              to="/about" 
-              className={location.pathname === '/about' ? 'active' : ''}
-              onClick={closeMenu}
-            >
-              <InfoOutlinedIcon className="menu-icon" />
-              About
-            </Link>
-          </li>
+          {navLinks.map(({ to, label, icon }) => (
+            <li key={to}>
+              <Link
+                to={to}
+                className={location.pathname === to ? 'active' : ''}
+                onClick={closeMenu}
+              >
+                <span className="menu-icon">{icon}</span>
+                {label}
+              </Link>
+            </li>
+          ))}
         </ul>
       </nav>
     </>

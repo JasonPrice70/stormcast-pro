@@ -10,7 +10,9 @@ import WindSpeedLegend from '../components/WindSpeedLegend';
 import { useHWRFData, useHMONData } from '../hooks/useHWRFData';
 import SimpleHeader from '../components/SimpleHeader';
 import ExpandLessOutlinedIcon from '@mui/icons-material/ExpandLessOutlined';
+import ExpandMoreOutlinedIcon from '@mui/icons-material/ExpandMoreOutlined';
 import LayersOutlinedIcon from '@mui/icons-material/LayersOutlined';
+import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined';
 import { formatWindSpeed, getIntensityCategoryFromKnots } from '../utils/windSpeed';
 
 // Fix for default markers in React Leaflet
@@ -114,10 +116,6 @@ const createStormIcon = (category: any, classification: string) => {
                         classification === 'EC' ||
                         classification === 'PTC';
   
-  // Debug logging to see what's happening with the classification
-  console.log('=== STORM ICON DEBUG ===');
-  console.log('createStormIcon called with:', { category, classification, isHurricane, isTropicalStorm, isTropicalDepression, isPostTropical });
-  console.log('=======================');
   
   if (isHurricane) {
     // Custom Hurricane SVG icon with category number
@@ -359,6 +357,9 @@ const SimpleStormTracker: React.FC = () => {
   const [showHMONWindfield, setShowHMONWindfield] = useState(false);
   
   const [isControlPanelClosed, setIsControlPanelClosed] = useState(true);
+  const [isNhcSectionOpen, setIsNhcSectionOpen] = useState(true);
+  const [isWindFieldsOpen, setIsWindFieldsOpen] = useState(false);
+  const [isModelTracksOpen, setIsModelTracksOpen] = useState(false);
   
   // Refs for layer button
   const layerButtonRef = useRef<HTMLButtonElement>(null);
@@ -473,14 +474,6 @@ const SimpleStormTracker: React.FC = () => {
     window.open('https://cors-anywhere.herokuapp.com/corsdemo', '_blank');
   };
 
-  // Debug logging
-  console.log('Storm Tracker Debug:', { 
-    dataSource: 'live', // Always live now
-    displayStorms: displayStorms.length,
-    hasStorms,
-    storms: storms?.length || 0,
-    error: error?.substring(0, 50)
-  });
 
   // Function to get full intensity name for storms
   const getFullIntensityName = (storm: any) => {
@@ -503,7 +496,10 @@ const SimpleStormTracker: React.FC = () => {
   return (
     <div className={`simple-storm-tracker ${!isControlPanelClosed ? 'panel-open' : ''}`}>
       {/* Header positioned on top of map */}
-      <SimpleHeader />
+      <SimpleHeader
+        layersPanelOpen={!isControlPanelClosed}
+        onLayersToggle={() => setIsControlPanelClosed(!isControlPanelClosed)}
+      />
       
       {/* Map Container */}
       <div className="map-wrapper">
@@ -2268,25 +2264,20 @@ const SimpleStormTracker: React.FC = () => {
       )}
       </div>
 
-      {/* Layer Toggle Button */}
-      <button 
-        ref={layerButtonRef}
-        className="layer-toggle-btn"
-        onClick={() => setIsControlPanelClosed(!isControlPanelClosed)}
-        title={isControlPanelClosed ? "Open Layers Panel" : "Close Layers Panel"}
-      >
-        <LayersOutlinedIcon fontSize="medium" />
-      </button>
-
       {/* Sliding Control Panel */}
       <div 
         ref={controlPanelRef}
         className={`sliding-control-panel ${isControlPanelClosed ? 'closed' : 'open'}`}
       >
         <div className="control-panel-header-wrapper">
-          <h3 className="control-panel-header">
-             Map Layers
-          </h3>
+          <h3 className="control-panel-header">Map Layers</h3>
+          <button
+            className="panel-close-btn"
+            onClick={() => setIsControlPanelClosed(true)}
+            aria-label="Close layers panel"
+          >
+            <CloseOutlinedIcon fontSize="small" />
+          </button>
         </div>
         <div className="control-panel-content">
           {loading ? (
@@ -2381,12 +2372,6 @@ const SimpleStormTracker: React.FC = () => {
             </>
           ) : (
             <>
-              {lastUpdated && (
-                <span className="control-panel-updated">
-                  Updated: {lastUpdated.toLocaleTimeString()}
-                </span>
-              )}
-              
               {/* Visual Storm Selector */}
               {displayStorms.length > 0 && (
                 <div style={{ marginTop: '10px', padding: '8px 0', borderTop: '1px solid rgba(255, 255, 255, 0.2)' }}>
@@ -2763,168 +2748,130 @@ const SimpleStormTracker: React.FC = () => {
                 )}
               </div>
               
-              {/* Path Visibility Controls */}
-              <div style={{ marginTop: '10px', padding: '8px 0', borderTop: '1px solid rgba(255, 255, 255, 0.2)' }}>
-                <div style={{ fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '5px', color: '#ffffff' }}>
-                  NHC Layers
-                  <div style={{ fontSize: '0.7rem', fontWeight: 'normal', color: '#cccccc', marginTop: '2px' }}>
-                    Real-time NHC forecast & historical data
-                  </div>
+              {/* NHC Layers */}
+              <div className="panel-section">
+                <div className="panel-section-header" onClick={() => setIsNhcSectionOpen(o => !o)}>
+                  <span className="section-title">NHC Layers</span>
+                  <span className={`section-chevron${isNhcSectionOpen ? ' open' : ''}`}>
+                    <ExpandMoreOutlinedIcon style={{ fontSize: '1rem' }} />
+                  </span>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.8rem', cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={showHistoricalTracks}
-                      onChange={(e) => setShowHistoricalTracks(e.target.checked)}
-                      style={{ marginRight: '6px' }}
-                    />
-                    Historical Track
-                  </label>
-                  <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.8rem', cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={showForecastTracks}
-                      onChange={(e) => setShowForecastTracks(e.target.checked)}
-                      style={{ marginRight: '6px' }}
-                    />
-                    Forecast Track
-                  </label>
-                  <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.8rem', cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={showForecastCones}
-                      onChange={(e) => setShowForecastCones(e.target.checked)}
-                      style={{ marginRight: '6px' }}
-                    />
-                    <span style={{ color: '#2196F3' }}></span> Forecast Cone
-                  </label>
-                  {/* Hidden: Regular Storm Surge toggle
-                  <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.8rem', cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={showStormSurge}
-                      onChange={(e) => setShowStormSurge(e.target.checked)}
-                      style={{ marginRight: '6px' }}
-                    />
-                    <span style={{ color: '#ff4444' }}></span> Storm Surge
-                    {stormSurge.available === false && (
-                      <span style={{ fontSize: '0.7rem', color: '#aaaaaa', marginLeft: '5px' }}>
-                        (N/A for EP storms)
-                      </span>
-                    )}
-                  </label>
-                  */}
-                  <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.8rem', cursor: !selectedStormId ? 'not-allowed' : 'pointer', opacity: !selectedStormId ? 0.6 : 1 }}>
-                    <input
-                      type="checkbox"
-                      checked={showPeakStormSurge}
-                      onChange={(e) => setShowPeakStormSurge(e.target.checked)}
-                      disabled={!selectedStormId}
-                      style={{ marginRight: '6px' }}
-                    />
-                    <span style={{ color: '#cc00cc' }}></span> Peak Storm Surge
-                    {peakStormSurge.loading && selectedStormId && (
-                      <div className="loading-spinner" style={{ marginLeft: '8px' }}></div>
-                    )}
-                    {!selectedStormId ? (
-                      <span style={{ fontSize: '0.7rem', color: '#aaaaaa', marginLeft: '5px' }}>
-                        (Select a storm to view)
-                      </span>
-                    ) : peakStormSurge.available === false && !peakStormSurge.loading ? (
-                      <span style={{ fontSize: '0.7rem', color: '#aaaaaa', marginLeft: '5px' }}>
-                        (N/A for EP storms)
-                      </span>
-                    ) : null}
-                  </label>
-                  <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.8rem', cursor: !selectedStormId ? 'not-allowed' : 'pointer', opacity: !selectedStormId ? 0.6 : 1 }}>
-                    <input
-                      type="checkbox"
-                      checked={showWindArrival}
-                      onChange={(e) => setShowWindArrival(e.target.checked)}
-                      disabled={!selectedStormId}
-                      style={{ marginRight: '6px' }}
-                    />
-                    <span style={{ color: '#9932CC' }}></span> Wind Arrival Time
-                    {!selectedStormId ? (
-                      <span style={{ fontSize: '0.7rem', color: '#aaaaaa', marginLeft: '5px' }}>
-                        (Select a storm to view)
-                      </span>
-                    ) : windArrival.available === false ? (
-                      <span style={{ fontSize: '0.7rem', color: '#aaaaaa', marginLeft: '5px' }}>
-                        
-                      </span>
-                    ) : null}
-                  </label>
-                  {showWindArrival && selectedStormId && (
-                    <div style={{ marginLeft: '20px', marginTop: '4px' }}>
-                      <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.7rem', marginBottom: '2px' }}>
-                        <input
-                          type="radio"
-                          name="windArrivalType"
-                          value="most-likely"
-                          checked={windArrivalType === 'most-likely'}
-                          onChange={(e) => setWindArrivalType(e.target.value as 'most-likely' | 'earliest')}
-                          style={{ marginRight: '4px' }}
-                        />
-                        Most Likely Arrival
-                      </label>
-                      <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.7rem' }}>
-                        <input
-                          type="radio"
-                          name="windArrivalType"
-                          value="earliest"
-                          checked={windArrivalType === 'earliest'}
-                          onChange={(e) => setWindArrivalType(e.target.value as 'most-likely' | 'earliest')}
-                          style={{ marginRight: '4px' }}
-                        />
-                        Earliest Reasonable Arrival
-                      </label>
-                    </div>
-                  )}
 
-                  <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.8rem', cursor: isAllStormsShown ? 'pointer' : 'not-allowed', opacity: isAllStormsShown ? 1 : 0.6 }}>
-                    <input
-                      type="checkbox"
-                      checked={showWindSpeedProb}
-                      onChange={(e) => setShowWindSpeedProb(e.target.checked)}
-                      disabled={!isAllStormsShown}
-                      style={{ marginRight: '6px' }}
-                    />
-                    <span style={{ color: '#0066cc' }}></span> Wind Speed Probability
-                    {!isAllStormsShown ? (
-                      <span style={{ fontSize: '0.7rem', color: '#aaaaaa', marginLeft: '5px' }}>
-                        (Only available when viewing all storms)
-                      </span>
-                    ) : windSpeedProb.available === false ? (
-                      <span style={{ fontSize: '0.7rem', color: '#aaaaaa', marginLeft: '5px' }}>
-                        (No data available)
-                      </span>
-                    ) : null}
-                  </label>
-                  
-                  {/* Wind Speed Options - only show when wind speed probability is enabled */}
-                  {showWindSpeedProb && isAllStormsShown && (
-                    <div style={{ marginLeft: '20px', marginTop: '5px' }}>
-                      <div style={{ fontSize: '0.75rem', color: '#cccccc', marginBottom: '3px' }}>Wind Speed Options:</div>
-                      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                {isNhcSectionOpen && (
+                  <>
+                    {/* Historical Track */}
+                    <label className="layer-item">
+                      <div className="layer-item-left">
+                        <span className="layer-color-swatch" style={{ background: '#888888' }} />
+                        <span className="layer-name">Historical Track</span>
+                      </div>
+                      <div className="toggle-switch">
+                        <input type="checkbox" checked={showHistoricalTracks} onChange={(e) => setShowHistoricalTracks(e.target.checked)} />
+                        <span className="toggle-track" />
+                      </div>
+                    </label>
+
+                    {/* Forecast Track */}
+                    <label className="layer-item">
+                      <div className="layer-item-left">
+                        <span className="layer-color-swatch" style={{ background: '#ff3333' }} />
+                        <span className="layer-name">Forecast Track</span>
+                      </div>
+                      <div className="toggle-switch">
+                        <input type="checkbox" checked={showForecastTracks} onChange={(e) => setShowForecastTracks(e.target.checked)} />
+                        <span className="toggle-track" />
+                      </div>
+                    </label>
+
+                    {/* Forecast Cone */}
+                    <label className="layer-item">
+                      <div className="layer-item-left">
+                        <span className="layer-color-swatch" style={{ background: '#2196F3' }} />
+                        <span className="layer-name">Forecast Cone</span>
+                      </div>
+                      <div className="toggle-switch">
+                        <input type="checkbox" checked={showForecastCones} onChange={(e) => setShowForecastCones(e.target.checked)} />
+                        <span className="toggle-track" />
+                      </div>
+                    </label>
+
+                    {/* Peak Storm Surge */}
+                    <label className={`layer-item${!selectedStormId ? ' disabled' : ''}`}>
+                      <div className="layer-item-left">
+                        <span className="layer-color-swatch" style={{ background: '#cc00cc' }} />
+                        <div className="layer-item-text">
+                          <span className="layer-name">Peak Storm Surge</span>
+                          {!selectedStormId && <span className="layer-hint">Select a storm first</span>}
+                          {peakStormSurge.available === false && selectedStormId && !peakStormSurge.loading && (
+                            <span className="layer-hint">N/A for EP storms</span>
+                          )}
+                        </div>
+                        {peakStormSurge.loading && selectedStormId && (
+                          <div className="gefs-spinner" />
+                        )}
+                      </div>
+                      <div className="toggle-switch">
+                        <input type="checkbox" checked={showPeakStormSurge} onChange={(e) => setShowPeakStormSurge(e.target.checked)} disabled={!selectedStormId} />
+                        <span className="toggle-track" />
+                      </div>
+                    </label>
+
+                    {/* Wind Arrival Time */}
+                    <label className={`layer-item${!selectedStormId ? ' disabled' : ''}`}>
+                      <div className="layer-item-left">
+                        <span className="layer-color-swatch" style={{ background: '#9932CC' }} />
+                        <div className="layer-item-text">
+                          <span className="layer-name">Wind Arrival Time</span>
+                          {!selectedStormId && <span className="layer-hint">Select a storm first</span>}
+                        </div>
+                      </div>
+                      <div className="toggle-switch">
+                        <input type="checkbox" checked={showWindArrival} onChange={(e) => setShowWindArrival(e.target.checked)} disabled={!selectedStormId} />
+                        <span className="toggle-track" />
+                      </div>
+                    </label>
+
+                    {showWindArrival && selectedStormId && (
+                      <div className="layer-sub-options">
+                        <label className="sub-option-label">
+                          <input type="radio" name="windArrivalType" value="most-likely" checked={windArrivalType === 'most-likely'} onChange={(e) => setWindArrivalType(e.target.value as 'most-likely' | 'earliest')} />
+                          Most Likely Arrival
+                        </label>
+                        <label className="sub-option-label">
+                          <input type="radio" name="windArrivalType" value="earliest" checked={windArrivalType === 'earliest'} onChange={(e) => setWindArrivalType(e.target.value as 'most-likely' | 'earliest')} />
+                          Earliest Reasonable Arrival
+                        </label>
+                      </div>
+                    )}
+
+                    {/* Wind Speed Probability */}
+                    <label className={`layer-item${!isAllStormsShown ? ' disabled' : ''}`}>
+                      <div className="layer-item-left">
+                        <span className="layer-color-swatch" style={{ background: '#0066cc' }} />
+                        <div className="layer-item-text">
+                          <span className="layer-name">Wind Speed Probability</span>
+                          {!isAllStormsShown && <span className="layer-hint">View all storms to enable</span>}
+                          {isAllStormsShown && windSpeedProb.available === false && <span className="layer-hint">No data available</span>}
+                        </div>
+                      </div>
+                      <div className="toggle-switch">
+                        <input type="checkbox" checked={showWindSpeedProb} onChange={(e) => setShowWindSpeedProb(e.target.checked)} disabled={!isAllStormsShown} />
+                        <span className="toggle-track" />
+                      </div>
+                    </label>
+
+                    {showWindSpeedProb && isAllStormsShown && (
+                      <div className="wind-speed-options">
                         {(['34kt', '50kt', '64kt'] as const).map((speed) => (
-                          <label key={speed} style={{ display: 'flex', alignItems: 'center', fontSize: '0.7rem', cursor: 'pointer' }}>
-                            <input
-                              type="radio"
-                              name="windSpeedType"
-                              value={speed}
-                              checked={windSpeedProbType === speed}
-                              onChange={(e) => setWindSpeedProbType(e.target.value as '34kt' | '50kt' | '64kt')}
-                              style={{ marginRight: '4px', transform: 'scale(0.8)' }}
-                            />
+                          <label key={speed} className="wind-speed-option">
+                            <input type="radio" name="windSpeedType" value={speed} checked={windSpeedProbType === speed} onChange={(e) => setWindSpeedProbType(e.target.value as '34kt' | '50kt' | '64kt')} />
                             {speed}
                           </label>
                         ))}
                       </div>
-                    </div>
-                  )}
-                </div>
+                    )}
+                  </>
+                )}
               </div>
               
               {/* Live Track Data Control - Hidden */}
@@ -3025,343 +2972,235 @@ const SimpleStormTracker: React.FC = () => {
                   )}
               </div>
               
-              {/* Hurricane Wind Fields Section */}
-              <div style={{ marginTop: '10px', padding: '8px 0', borderTop: '1px solid rgba(255, 255, 255, 0.2)' }}>
-                <div style={{ fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '5px', color: '#ffffff' }}>
-                  Hurricane Wind Fields
-                  <div style={{ fontSize: '0.7rem', fontWeight: 'normal', color: '#999', marginTop: '2px' }}>
-                    High-resolution hurricane-specific models
-                  </div>
+              {/* Hurricane Wind Fields */}
+              <div className="panel-section">
+                <div className="panel-section-header" onClick={() => setIsWindFieldsOpen(o => !o)}>
+                  <span className="section-title">Wind Fields</span>
+                  <span className={`section-chevron${isWindFieldsOpen ? ' open' : ''}`}>
+                    <ExpandMoreOutlinedIcon style={{ fontSize: '1rem' }} />
+                  </span>
                 </div>
-                
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginLeft: '10px' }}>
-                  {/* HWRF Windfield Toggle */}
-                  <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.75rem', cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={showHWRFWindfield}
-                      onChange={(e) => setShowHWRFWindfield(e.target.checked)}
-                      style={{ marginRight: '6px', transform: 'scale(0.9)' }}
-                    />
-                    <span style={{ color: '#ffffff', backgroundColor: '#ff4444', padding: '1px 4px', borderRadius: '2px', marginRight: '4px', fontSize: '0.7rem', fontWeight: 'bold' }}>
-                      HWRF
-                    </span>
-                    Wind Field
-                    {hwrf.isLoading && (
-                      <span style={{ display: 'flex', alignItems: 'center', marginLeft: '6px', fontSize: '0.7rem', color: '#4FC3F7' }}>
-                        <div className="gefs-spinner"></div>
-                      </span>
-                    )}
-                    {hwrf.error && (
-                      <span style={{ fontSize: '0.7rem', color: '#d32f2f', marginLeft: '6px' }}>
-                        Error
-                      </span>
-                    )}
-                  </label>
-                  
-                  {/* HMON Windfield Toggle */}
-                  <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.75rem', cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={showHMONWindfield}
-                      onChange={(e) => setShowHMONWindfield(e.target.checked)}
-                      style={{ marginRight: '6px', transform: 'scale(0.9)' }}
-                    />
-                    <span style={{ color: '#ffffff', backgroundColor: '#4682b4', padding: '1px 4px', borderRadius: '2px', marginRight: '4px', fontSize: '0.7rem', fontWeight: 'bold' }}>
-                      HMON
-                    </span>
-                    Wind Field
-                    {hmon.isLoading && (
-                      <span style={{ display: 'flex', alignItems: 'center', marginLeft: '6px', fontSize: '0.7rem', color: '#4FC3F7' }}>
-                        <div className="gefs-spinner"></div>
-                      </span>
-                    )}
-                    {hmon.error && (
-                      <span style={{ fontSize: '0.7rem', color: '#d32f2f', marginLeft: '6px' }}>
-                        Error
-                      </span>
-                    )}
-                  </label>
-                </div>
+
+                {isWindFieldsOpen && (
+                  <>
+                    <label className="layer-item">
+                      <div className="layer-item-left">
+                        <span className="layer-badge" style={{ background: '#ff4444' }}>HWRF</span>
+                        <div className="layer-item-text">
+                          <span className="layer-name">Wind Field</span>
+                        </div>
+                        {hwrf.isLoading && <div className="gefs-spinner" />}
+                      </div>
+                      <div className="toggle-switch">
+                        <input type="checkbox" checked={showHWRFWindfield} onChange={(e) => setShowHWRFWindfield(e.target.checked)} />
+                        <span className="toggle-track" />
+                      </div>
+                    </label>
+
+                    <label className="layer-item">
+                      <div className="layer-item-left">
+                        <span className="layer-badge" style={{ background: '#4682b4' }}>HMON</span>
+                        <div className="layer-item-text">
+                          <span className="layer-name">Wind Field</span>
+                        </div>
+                        {hmon.isLoading && <div className="gefs-spinner" />}
+                      </div>
+                      <div className="toggle-switch">
+                        <input type="checkbox" checked={showHMONWindfield} onChange={(e) => setShowHMONWindfield(e.target.checked)} />
+                        <span className="toggle-track" />
+                      </div>
+                    </label>
+                  </>
+                )}
               </div>
               
-              <div style={{ marginTop: '10px', padding: '8px 0', borderTop: '1px solid rgba(255, 255, 255, 0.2)' }}>
-              <div style={{ fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '5px', color: '#ffffff' }}>
-                  Model Tracks
-                  <div style={{ fontSize: '0.7rem', fontWeight: 'normal', color: '#999', marginTop: '2px' }}>
-                    Individual model controls
-                  </div>
+              {/* Model Tracks */}
+              <div className="panel-section">
+                <div className="panel-section-header" onClick={() => setIsModelTracksOpen(o => !o)}>
+                  <span className="section-title">
+                    Model Tracks
+                    {selectedStormId && (gefs.tracks?.modelsPresent?.length ?? 0) > 0 && (
+                      <span style={{ marginLeft: '6px', color: 'rgba(79,195,247,0.8)', fontWeight: 400, textTransform: 'none', letterSpacing: 0, fontSize: '0.68rem' }}>
+                        · {gefs.tracks?.modelsPresent?.length ?? 0} available
+                      </span>
+                    )}
+                  </span>
+                  <span className={`section-chevron${isModelTracksOpen ? ' open' : ''}`}>
+                    <ExpandMoreOutlinedIcon style={{ fontSize: '1rem' }} />
+                  </span>
                 </div>
-                
-                {/* Master toggle for all models */}
-                <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.8rem', cursor: selectedStormId ? 'pointer' : 'not-allowed', opacity: selectedStormId ? 1 : 0.6, marginBottom: '8px' }}>
-                  <input
-                    type="checkbox"
-                    checked={showGEFSSpaghetti}
-                    onChange={(e) => setShowGEFSSpaghetti(e.target.checked)}
-                    disabled={!selectedStormId}
-                    style={{ marginRight: '6px' }}
-                  />
-                  <strong>Enable Model Display</strong>
-                  {gefs.loading && (
-                    <span style={{ display: 'flex', alignItems: 'center', marginLeft: '6px', fontSize: '0.7rem', color: '#4FC3F7' }}>
-                      <div className="gefs-spinner"></div>
-                      loading...
-                    </span>
-                  )}
-                  {selectedStormId && gefs.tracks && gefs.tracks.modelsPresent && gefs.tracks.modelsPresent.length > 0 && (
-                    <span style={{ fontSize: '0.7rem', color: '#4FC3F7', marginLeft: '6px' }}>
-                      ({gefs.tracks.modelsPresent.length} models available)
-                    </span>
-                  )}
-                  {gefs.error && (
-                    <span style={{ fontSize: '0.7rem', color: '#d32f2f', marginLeft: '6px' }}>
-                      {gefs.error}
-                    </span>
-                  )}
-                  {!selectedStormId ? (
-                    <span style={{ fontSize: '0.7rem', color: '#aaaaaa', marginLeft: '5px' }}>
-                      (Select a storm)
-                    </span>
-                  ) : gefs.available === false ? (
-                    <span style={{ fontSize: '0.7rem', color: '#aaaaaa', marginLeft: '5px' }}>
-                      (No data found)
-                    </span>
-                  ) : null}
-                </label>
 
-                {/* Individual Model Toggles */}
-                {showGEFSSpaghetti && selectedStormId && gefs.tracks && gefs.tracks.modelsPresent && (
-                  <div style={{ marginLeft: '20px' }}>
-                    
-                    {/* Quick Actions */}
-                    <div style={{ marginBottom: '8px', display: 'flex', gap: '8px' }}>
-                      <button
-                        onClick={() => {
-                          setShowOfficialTrack(true);
-                          setShowHAFS(true);
-                          setShowGFS(true);
-                          setShowECMWF(true);
-                          setShowGEFSEnsemble(true);
-                          setShowOtherModels(true);
-                          setShowHWRF(true);
-                          setShowHMON(true);
-                        }}
-                        style={{
-                          fontSize: '0.65rem',
-                          padding: '2px 6px',
-                          backgroundColor: 'rgba(76, 175, 80, 0.2)',
-                          border: '1px solid rgba(76, 175, 80, 0.5)',
-                          borderRadius: '3px',
-                          color: '#4caf50',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        Select All
-                      </button>
-                      <button
-                        onClick={() => {
-                          setShowOfficialTrack(false);
-                          setShowHAFS(false);
-                          setShowGFS(false);
-                          setShowECMWF(false);
-                          setShowGEFSEnsemble(false);
-                          setShowOtherModels(false);
-                          setShowHWRF(false);
-                          setShowHMON(false);
-                        }}
-                        style={{
-                          fontSize: '0.65rem',
-                          padding: '2px 6px',
-                          backgroundColor: 'rgba(244, 67, 54, 0.2)',
-                          border: '1px solid rgba(244, 67, 54, 0.5)',
-                          borderRadius: '3px',
-                          color: '#f44336',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        Clear All
-                      </button>
-                    </div>
-                    
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    
-                    {/* Official Forecast */}
-                    {gefs.tracks.modelsPresent.some((m: string) => m === 'OFCL' || m === 'OFCI') && (
-                      <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.75rem', cursor: 'pointer' }}>
-                        <input
-                          type="checkbox"
-                          checked={showOfficialTrack}
-                          onChange={(e) => setShowOfficialTrack(e.target.checked)}
-                          style={{ marginRight: '6px', transform: 'scale(0.9)' }}
-                        />
-                        <span style={{ color: '#000000', backgroundColor: '#ffffff', padding: '1px 4px', borderRadius: '2px', marginRight: '4px', fontSize: '0.7rem', fontWeight: 'bold' }}>
-                          OFCL
-                        </span>
-                        Official NHC Forecast
-                      </label>
-                    )}
-                    
-                    {/* HAFS */}
-                    {gefs.tracks.modelsPresent.some((m: string) => m === 'HAFS' || m === 'HAFA' || m === 'HAFB') && (
-                      <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.75rem', cursor: 'pointer' }}>
-                        <input
-                          type="checkbox"
-                          checked={showHAFS}
-                          onChange={(e) => setShowHAFS(e.target.checked)}
-                          style={{ marginRight: '6px', transform: 'scale(0.9)' }}
-                        />
-                        <span style={{ color: '#ffffff', backgroundColor: '#4444ff', padding: '1px 4px', borderRadius: '2px', marginRight: '4px', fontSize: '0.7rem', fontWeight: 'bold' }}>
-                          HAFS
-                        </span>
-                        Hurricane Analysis & Forecast System
-                      </label>
-                    )}
-                    
-                    {/* GFS */}
-                    {gefs.tracks.modelsPresent.some((m: string) => m === 'GFS' || m === 'GFSO') && (
-                      <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.75rem', cursor: 'pointer' }}>
-                        <input
-                          type="checkbox"
-                          checked={showGFS}
-                          onChange={(e) => setShowGFS(e.target.checked)}
-                          style={{ marginRight: '6px', transform: 'scale(0.9)' }}
-                        />
-                        <span style={{ color: '#ffffff', backgroundColor: '#9c27b0', padding: '1px 4px', borderRadius: '2px', marginRight: '4px', fontSize: '0.7rem', fontWeight: 'bold' }}>
-                          GFS
-                        </span>
-                        Global Forecast System
-                      </label>
-                    )}
-                    
-                    {/* ECMWF */}
-                    {gefs.tracks.modelsPresent.some((m: string) => m === 'ECMW' || m === 'ECM2') && (
-                      <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.75rem', cursor: 'pointer' }}>
-                        <input
-                          type="checkbox"
-                          checked={showECMWF}
-                          onChange={(e) => setShowECMWF(e.target.checked)}
-                          style={{ marginRight: '6px', transform: 'scale(0.9)' }}
-                        />
-                        <span style={{ color: '#ffffff', backgroundColor: '#ff9800', padding: '1px 4px', borderRadius: '2px', marginRight: '4px', fontSize: '0.7rem', fontWeight: 'bold' }}>
-                          ECMWF
-                        </span>
-                        European Centre Model
-                      </label>
-                    )}
-                    
-                    {/* GEFS Ensemble */}
-                    {gefs.tracks.modelsPresent.some((m: string) => m === 'AEMI' || m === 'AEMN' || m === 'AC00' || m.startsWith('AP')) && (
-                      <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.75rem', cursor: 'pointer' }}>
-                        <input
-                          type="checkbox"
-                          checked={showGEFSEnsemble}
-                          onChange={(e) => setShowGEFSEnsemble(e.target.checked)}
-                          style={{ marginRight: '6px', transform: 'scale(0.9)' }}
-                        />
-                        <span style={{ color: '#ffffff', backgroundColor: '#0d47a1', padding: '1px 4px', borderRadius: '2px', marginRight: '4px', fontSize: '0.7rem', fontWeight: 'bold' }}>
-                          GEFS
-                        </span>
-                        GEFS Ensemble ({gefs.tracks.modelsPresent.filter((m: string) => m === 'AEMI' || m === 'AEMN' || m === 'AC00' || m.startsWith('AP')).length} members)
-                      </label>
-                    )}
-                    
-                    {/* HWRF Track */}
-                    {gefs.tracks.modelsPresent.some((m: string) => m === 'HWRF') && (
-                      <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.75rem', cursor: 'pointer' }}>
-                        <input
-                          type="checkbox"
-                          checked={showHWRF}
-                          onChange={(e) => setShowHWRF(e.target.checked)}
-                          style={{ marginRight: '6px', transform: 'scale(0.9)' }}
-                        />
-                        <span style={{ color: '#ffffff', backgroundColor: '#ff4444', padding: '1px 4px', borderRadius: '2px', marginRight: '4px', fontSize: '0.7rem', fontWeight: 'bold' }}>
-                          HWRF
-                        </span>
-                        Hurricane Weather Research & Forecasting
-                      </label>
-                    )}
-                    
-                    {/* HMON Track */}
-                    {gefs.tracks.modelsPresent.some((m: string) => m === 'HMON') && (
-                      <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.75rem', cursor: 'pointer' }}>
-                        <input
-                          type="checkbox"
-                          checked={showHMON}
-                          onChange={(e) => setShowHMON(e.target.checked)}
-                          style={{ marginRight: '6px', transform: 'scale(0.9)' }}
-                        />
-                        <span style={{ color: '#ffffff', backgroundColor: '#4682b4', padding: '1px 4px', borderRadius: '2px', marginRight: '4px', fontSize: '0.7rem', fontWeight: 'bold' }}>
-                          HMON
-                        </span>
-                        Hurricane Multi-scale Ocean-coupled
-                      </label>
-                    )}
-                    
-                    {/* Other Models */}
-                    {(() => {
-                      const knownModels = ['OFCL', 'OFCI', 'HWRF', 'HMON', 'HAFS', 'HAFA', 'HAFB', 'GFS', 'GFSO', 'ECMW', 'ECM2', 'AEMI', 'AEMN', 'AEM2', 'AC00'];
-                      const otherModels = gefs.tracks.modelsPresent.filter((m: string) => !knownModels.includes(m) && !m.startsWith('AP'));
-                      return otherModels.length > 0 ? (
-                        <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.75rem', cursor: 'pointer' }}>
-                          <input
-                            type="checkbox"
-                            checked={showOtherModels}
-                            onChange={(e) => setShowOtherModels(e.target.checked)}
-                            style={{ marginRight: '6px', transform: 'scale(0.9)' }}
-                          />
-                          <span style={{ color: '#ffffff', backgroundColor: '#666666', padding: '1px 4px', borderRadius: '2px', marginRight: '4px', fontSize: '0.7rem', fontWeight: 'bold' }}>
-                            OTHER
-                          </span>
-                          Other Models ({otherModels.join(', ')})
-                        </label>
-                      ) : null;
-                    })()}
-                    </div>
-                  </div>
-                )}
-                  
-                  {/* Model Data Details */}
-                  {selectedStormId && gefs.tracks && (
-                    <div style={{ marginTop: '8px', fontSize: '0.7rem', color: '#999', borderTop: '1px solid rgba(255, 255, 255, 0.1)', paddingTop: '6px' }}>
-                      {/* Cycle Time */}
-                      {gefs.tracks.cycleTime && (
-                        <div>
-                          Cycle: {(() => {
-                            const cycle = gefs.tracks.cycleTime;
-                            const year = cycle.substring(0, 4);
-                            const month = cycle.substring(4, 6);
-                            const day = cycle.substring(6, 8);
-                            const hour = cycle.substring(8, 10);
-                            return `${year}-${month}-${day} ${hour}:00 UTC`;
-                          })()}
+                {isModelTracksOpen && (
+                  <>
+                    {/* Master enable toggle */}
+                    <label className={`layer-item${!selectedStormId ? ' disabled' : ''}`}>
+                      <div className="layer-item-left">
+                        <div className="layer-item-text">
+                          <span className="layer-name" style={{ fontWeight: 600 }}>Enable Model Display</span>
+                          {!selectedStormId && <span className="layer-hint">Select a storm first</span>}
+                          {gefs.available === false && selectedStormId && <span className="layer-hint">No data found</span>}
                         </div>
-                      )}
-                      {/* Fetch Time */}
-                      {gefs.tracks.fetchTime && (
-                        <div>
-                          Updated: {gefs.tracks.fetchTime.toLocaleTimeString()}
-                          <button
-                            onClick={() => gefs.refresh && gefs.refresh()}
-                            style={{
-                              marginLeft: '8px',
-                              padding: '1px 4px',
-                              fontSize: '0.6rem',
-                              backgroundColor: 'rgba(79, 195, 247, 0.2)',
-                              border: '1px solid rgba(79, 195, 247, 0.5)',
-                              borderRadius: '3px',
-                              color: '#4FC3F7',
-                              cursor: 'pointer'
-                            }}
-                            title="Force refresh model data"
-                          >
-                            ↻
+                        {gefs.loading && <div className="gefs-spinner" />}
+                      </div>
+                      <div className="toggle-switch">
+                        <input type="checkbox" checked={showGEFSSpaghetti} onChange={(e) => setShowGEFSSpaghetti(e.target.checked)} disabled={!selectedStormId} />
+                        <span className="toggle-track" />
+                      </div>
+                    </label>
+
+                    {showGEFSSpaghetti && selectedStormId && gefs.tracks?.modelsPresent && (
+                      <>
+                        {/* Quick actions */}
+                        <div className="model-quick-actions">
+                          <button className="model-quick-btn model-quick-btn--all" onClick={() => { setShowOfficialTrack(true); setShowHAFS(true); setShowGFS(true); setShowECMWF(true); setShowGEFSEnsemble(true); setShowOtherModels(true); setShowHWRF(true); setShowHMON(true); }}>
+                            Select All
+                          </button>
+                          <button className="model-quick-btn model-quick-btn--clear" onClick={() => { setShowOfficialTrack(false); setShowHAFS(false); setShowGFS(false); setShowECMWF(false); setShowGEFSEnsemble(false); setShowOtherModels(false); setShowHWRF(false); setShowHMON(false); }}>
+                            Clear All
                           </button>
                         </div>
-                      )}
-                    </div>
-                  )}
-                  </div>
+
+                        {/* Individual model rows */}
+                        {gefs.tracks.modelsPresent.some((m: string) => m === 'OFCL' || m === 'OFCI') && (
+                          <label className="layer-item">
+                            <div className="layer-item-left">
+                              <span className="layer-badge" style={{ background: '#555', color: '#fff' }}>OFCL</span>
+                              <span className="layer-name">Official NHC Forecast</span>
+                            </div>
+                            <div className="toggle-switch">
+                              <input type="checkbox" checked={showOfficialTrack} onChange={(e) => setShowOfficialTrack(e.target.checked)} />
+                              <span className="toggle-track" />
+                            </div>
+                          </label>
+                        )}
+
+                        {gefs.tracks.modelsPresent.some((m: string) => m === 'HAFS' || m === 'HAFA' || m === 'HAFB') && (
+                          <label className="layer-item">
+                            <div className="layer-item-left">
+                              <span className="layer-badge" style={{ background: '#4444ff' }}>HAFS</span>
+                              <span className="layer-name">Analysis & Forecast System</span>
+                            </div>
+                            <div className="toggle-switch">
+                              <input type="checkbox" checked={showHAFS} onChange={(e) => setShowHAFS(e.target.checked)} />
+                              <span className="toggle-track" />
+                            </div>
+                          </label>
+                        )}
+
+                        {gefs.tracks.modelsPresent.some((m: string) => m === 'GFS' || m === 'GFSO') && (
+                          <label className="layer-item">
+                            <div className="layer-item-left">
+                              <span className="layer-badge" style={{ background: '#9c27b0' }}>GFS</span>
+                              <span className="layer-name">Global Forecast System</span>
+                            </div>
+                            <div className="toggle-switch">
+                              <input type="checkbox" checked={showGFS} onChange={(e) => setShowGFS(e.target.checked)} />
+                              <span className="toggle-track" />
+                            </div>
+                          </label>
+                        )}
+
+                        {gefs.tracks.modelsPresent.some((m: string) => m === 'ECMW' || m === 'ECM2') && (
+                          <label className="layer-item">
+                            <div className="layer-item-left">
+                              <span className="layer-badge" style={{ background: '#ff9800' }}>ECMWF</span>
+                              <span className="layer-name">European Centre Model</span>
+                            </div>
+                            <div className="toggle-switch">
+                              <input type="checkbox" checked={showECMWF} onChange={(e) => setShowECMWF(e.target.checked)} />
+                              <span className="toggle-track" />
+                            </div>
+                          </label>
+                        )}
+
+                        {gefs.tracks.modelsPresent.some((m: string) => m === 'AEMI' || m === 'AEMN' || m === 'AC00' || m.startsWith('AP')) && (
+                          <label className="layer-item">
+                            <div className="layer-item-left">
+                              <span className="layer-badge" style={{ background: '#0d47a1' }}>GEFS</span>
+                              <div className="layer-item-text">
+                                <span className="layer-name">GEFS Ensemble</span>
+                                <span className="layer-hint">{gefs.tracks.modelsPresent.filter((m: string) => m === 'AEMI' || m === 'AEMN' || m === 'AC00' || m.startsWith('AP')).length} members</span>
+                              </div>
+                            </div>
+                            <div className="toggle-switch">
+                              <input type="checkbox" checked={showGEFSEnsemble} onChange={(e) => setShowGEFSEnsemble(e.target.checked)} />
+                              <span className="toggle-track" />
+                            </div>
+                          </label>
+                        )}
+
+                        {gefs.tracks.modelsPresent.some((m: string) => m === 'HWRF') && (
+                          <label className="layer-item">
+                            <div className="layer-item-left">
+                              <span className="layer-badge" style={{ background: '#ff4444' }}>HWRF</span>
+                              <span className="layer-name">Weather Research & Forecasting</span>
+                            </div>
+                            <div className="toggle-switch">
+                              <input type="checkbox" checked={showHWRF} onChange={(e) => setShowHWRF(e.target.checked)} />
+                              <span className="toggle-track" />
+                            </div>
+                          </label>
+                        )}
+
+                        {gefs.tracks.modelsPresent.some((m: string) => m === 'HMON') && (
+                          <label className="layer-item">
+                            <div className="layer-item-left">
+                              <span className="layer-badge" style={{ background: '#4682b4' }}>HMON</span>
+                              <span className="layer-name">Multi-scale Ocean-coupled</span>
+                            </div>
+                            <div className="toggle-switch">
+                              <input type="checkbox" checked={showHMON} onChange={(e) => setShowHMON(e.target.checked)} />
+                              <span className="toggle-track" />
+                            </div>
+                          </label>
+                        )}
+
+                        {(() => {
+                          const knownModels = ['OFCL', 'OFCI', 'HWRF', 'HMON', 'HAFS', 'HAFA', 'HAFB', 'GFS', 'GFSO', 'ECMW', 'ECM2', 'AEMI', 'AEMN', 'AEM2', 'AC00'];
+                          const otherModels = gefs.tracks.modelsPresent.filter((m: string) => !knownModels.includes(m) && !m.startsWith('AP'));
+                          return otherModels.length > 0 ? (
+                            <label className="layer-item">
+                              <div className="layer-item-left">
+                                <span className="layer-badge" style={{ background: '#555' }}>+{otherModels.length}</span>
+                                <div className="layer-item-text">
+                                  <span className="layer-name">Other Models</span>
+                                  <span className="layer-hint">{otherModels.join(', ')}</span>
+                                </div>
+                              </div>
+                              <div className="toggle-switch">
+                                <input type="checkbox" checked={showOtherModels} onChange={(e) => setShowOtherModels(e.target.checked)} />
+                                <span className="toggle-track" />
+                              </div>
+                            </label>
+                          ) : null;
+                        })()}
+
+                        {/* Cycle / fetch time */}
+                        {gefs.tracks && (
+                          <div style={{ marginTop: '8px', fontSize: '0.68rem', color: 'rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            {gefs.tracks.cycleTime && (
+                              <span>
+                                Cycle {gefs.tracks.cycleTime.substring(6,8)}/{gefs.tracks.cycleTime.substring(4,6)} {gefs.tracks.cycleTime.substring(8,10)}Z
+                              </span>
+                            )}
+                            {gefs.tracks.fetchTime && (
+                              <>
+                                <span>·</span>
+                                <span>{gefs.tracks.fetchTime.toLocaleTimeString()}</span>
+                                <button
+                                  onClick={() => gefs.refresh && gefs.refresh()}
+                                  style={{ background: 'none', border: 'none', color: '#4FC3F7', cursor: 'pointer', padding: '0 2px', fontSize: '0.75rem', lineHeight: 1 }}
+                                  title="Refresh model data"
+                                >↻</button>
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </>
+                )}
+              </div>
               {/*<div className="control-panel-buttons">
                 <button 
                   onClick={refresh}
@@ -3382,6 +3221,12 @@ const SimpleStormTracker: React.FC = () => {
             </>
           )}
         </div>
+        {/* Pinned footer */}
+        {lastUpdated && (
+          <div className="control-panel-footer">
+            Updated: {lastUpdated.toLocaleTimeString()}
+          </div>
+        )}
       </div>
     </div>
   );

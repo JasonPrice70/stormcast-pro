@@ -1,6 +1,5 @@
 .header {
-  /*background: linear-gradient(135deg, rgba(26, 35, 126, 0.5) 0%, rgba(94, 53, 177, 0.5) 100%);*/
-  background: (0, 0, 0, 0.7);
+  background: rgba(30, 30, 30, 0.85);
   color: white;
   padding: 0;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
@@ -31,6 +30,88 @@
   font-size: 0.9rem;
   opacity: 0.9;
   font-weight: 300;
+}
+
+/* ── Compact header layout (SimpleHeader) ── */
+.header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  height: 46px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.header-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.brand-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+
+.brand-name {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: white;
+  letter-spacing: -0.01em;
+}
+
+.brand-sub {
+  font-size: 0.68rem;
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+/* Layers toggle button inside header */
+.header-layers-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: rgba(210, 180, 255, 0.85);
+  background: rgba(120, 60, 200, 0.15);
+  border: 1px solid rgba(160, 100, 240, 0.35);
+  border-radius: 7px;
+  padding: 5px 12px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+  white-space: nowrap;
+}
+
+.header-layers-btn:hover {
+  color: white;
+  background: rgba(120, 60, 200, 0.3);
+  border-color: rgba(180, 120, 255, 0.6);
+}
+
+.header-layers-btn.active {
+  color: white;
+  background: rgba(120, 60, 200, 0.45);
+  border-color: #a855f7;
+}
+
+/* Slide-out brand row */
+.slide-menu-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.slide-menu-brand h3 {
+  color: white;
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
 }
 
 .nav {
@@ -92,6 +173,11 @@
     font-size: 0.9rem;
     padding: 6px 12px;
   }
+
+  /* Compact header responsive */
+  .brand-sub {
+    display: none;
+  }
 }
 
 @media (max-width: 480px) {
@@ -125,6 +211,7 @@
 .header-text {
   flex: 1;
 }
+
 
 .hamburger {
   display: flex;
@@ -193,11 +280,13 @@
   left: -350px;
   width: 300px;
   height: 100%;
-  background: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(10px);
+  background: rgba(30, 30, 30, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
   z-index: 9999;
   transition: left 0.3s ease;
-  box-shadow: 2px 0 10px rgba(0, 0, 0, 0.3);
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.5);
   overflow-y: auto;
 }
 
@@ -209,16 +298,9 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 20px;
+  padding: 16px 20px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   background: rgba(0, 0, 0, 0.3);
-}
-
-.slide-menu-header h3 {
-  color: white;
-  margin: 0;
-  font-size: 1.2rem;
-  font-weight: 600;
 }
 
 .close-btn {
@@ -239,6 +321,28 @@
 
 .close-btn:hover {
   background: rgba(255, 255, 255, 0.1);
+  transform: rotate(90deg);
+}
+
+.hamburger-close {
+  background: none;
+  border: none;
+  color: white;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  opacity: 0.8;
+}
+
+.hamburger-close:hover {
+  background: rgba(255, 255, 255, 0.15);
+  opacity: 1;
   transform: rotate(90deg);
 }
 
