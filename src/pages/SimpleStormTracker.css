@@ -97,8 +97,11 @@
   left: 0;
   right: 0;
   z-index: 2000;
-  /*background: linear-gradient(135deg, rgba(26, 35, 126, 0.5) 0%, rgba(94, 53, 177, 0.5) 100%);*/
-  background: rgba(0, 0, 0, 0.7);
+  background: rgba(30, 30, 30, 0.85);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.4);
 }
 
 /* Map Container - takes full space */
@@ -345,21 +348,38 @@
 /* Layer Toggle Button */
 .layer-toggle-btn {
   position: fixed;
-  top: 120px;
+  top: 68px;
   right: 20px;
-  width: 36px;
   height: 36px;
+  padding: 0 12px 0 10px;
   background: rgba(255, 255, 255, 0.95);
-  border: 1px solid #e0e0e0;
-  border-radius: 8px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 20px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.18);
   cursor: pointer;
   z-index: 1001;
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 5px;
   color: #1a237e;
-  transition: all 0.3s ease;
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-family: inherit;
+  letter-spacing: 0.02em;
+  transition: all 0.2s ease;
+}
+
+.layer-toggle-btn--active {
+  background: rgba(30, 30, 30, 0.92);
+  color: white;
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
+}
+
+.layer-toggle-label {
+  display: inline-block;
+  line-height: 1;
 }
 
 /* Adjust layer button position when panel is open */
@@ -369,17 +389,22 @@
 
 .layer-toggle-btn:hover {
   background: rgba(255, 255, 255, 1);
-  border-color: #bdbdbd;
-  transform: scale(1.05);
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25);
+  border-color: #9fa8da;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.22);
+  transform: translateY(-1px);
+}
+
+.layer-toggle-btn--active:hover {
+  background: rgba(50, 50, 50, 0.95);
+  border-color: rgba(255, 255, 255, 0.25);
 }
 
 /* Sliding Control Panel */
 .sliding-control-panel {
   position: fixed;
-  top: 91px;
+  top: 71px;
   right: 0;
-  height: calc(100vh - 90px);
+  height: calc(100vh - 71px);
   width: 300px;
   background: rgba(0, 0, 0, 0.7);
   backdrop-filter: blur(10px);
@@ -392,6 +417,8 @@
   transition: transform 0.3s ease-in-out;
   overflow-y: auto;
   overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
   /* Enhanced scrolling for mobile */
   -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
@@ -449,6 +476,7 @@
   flex-direction: column;
   gap: 12px;
   color: #ffffff;
+  flex: 1;
   /* Ensure proper scrolling on mobile */
   position: relative;
 }
@@ -483,6 +511,18 @@
 .control-panel-updated {
   font-size: 0.8rem;
   color: #cccccc;
+}
+
+.control-panel-footer {
+  position: sticky;
+  bottom: 0;
+  padding: 10px 20px;
+  background: rgba(0, 0, 0, 0.5);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.45);
+  text-align: center;
+  letter-spacing: 0.02em;
 }
 
 .control-panel-buttons {
@@ -565,8 +605,287 @@
 }
 
 .leaflet-top .leaflet-control {
-	margin-top: 110px;
+	margin-top: 86px;
 	}
+
+/* =====================================================
+   MODERN LAYER PANEL COMPONENTS
+   ===================================================== */
+
+/* Panel header row with close button */
+.control-panel-header-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.panel-close-btn {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.55);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s, background 0.15s;
+  line-height: 1;
+  font-size: 1.1rem;
+  font-weight: 300;
+}
+
+.panel-close-btn:hover {
+  color: white;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Collapsible panel sections */
+.panel-section {
+  padding: 10px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.panel-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+  padding: 2px 0 8px;
+  gap: 6px;
+}
+
+.panel-section-header:hover .section-title {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.section-title {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.5);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  transition: color 0.15s;
+}
+
+.section-chevron {
+  color: rgba(255, 255, 255, 0.35);
+  display: flex;
+  align-items: center;
+  transition: transform 0.2s ease;
+}
+
+.section-chevron.open {
+  transform: rotate(180deg);
+}
+
+/* Layer toggle item row */
+.layer-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.layer-item.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.layer-item-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.layer-color-swatch {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.layer-item-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.layer-name {
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.85);
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.layer-hint {
+  font-size: 0.68rem;
+  color: rgba(255, 255, 255, 0.35);
+  display: block;
+  margin-top: 1px;
+}
+
+/* Model badge pill (HAFS, GFS, etc.) */
+.layer-badge {
+  font-size: 0.62rem;
+  font-weight: 700;
+  padding: 2px 5px;
+  border-radius: 3px;
+  color: white;
+  flex-shrink: 0;
+  letter-spacing: 0.04em;
+}
+
+/* Toggle switch */
+.toggle-switch {
+  position: relative;
+  width: 34px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+
+.toggle-track {
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 18px;
+  transition: background 0.2s;
+  cursor: pointer;
+}
+
+.toggle-track::before {
+  content: '';
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  background: rgba(255, 255, 255, 0.55);
+  border-radius: 50%;
+  top: 3px;
+  left: 3px;
+  transition: transform 0.2s ease, background 0.2s;
+}
+
+.toggle-switch input:checked + .toggle-track {
+  background: #a855f7;
+}
+
+.toggle-switch input:checked + .toggle-track::before {
+  transform: translateX(16px);
+  background: white;
+}
+
+.toggle-switch input:disabled + .toggle-track {
+  cursor: not-allowed;
+}
+
+/* Sub-options (radio groups shown when a layer is on) */
+.layer-sub-options {
+  margin-left: 17px;
+  padding: 6px 0 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.sub-option-label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+}
+
+.sub-option-label input[type="radio"] {
+  accent-color: #4FC3F7;
+  cursor: pointer;
+}
+
+/* Wind speed option pills */
+.wind-speed-options {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-left: 17px;
+  padding: 6px 0 2px;
+}
+
+.wind-speed-option {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+}
+
+.wind-speed-option input[type="radio"] {
+  accent-color: #4FC3F7;
+}
+
+/* Model quick action buttons */
+.model-quick-actions {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.model-quick-btn {
+  font-size: 0.68rem;
+  padding: 3px 10px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+
+.model-quick-btn--all {
+  background: rgba(76, 175, 80, 0.12);
+  border: 1px solid rgba(76, 175, 80, 0.45);
+  color: #66bb6a;
+}
+
+.model-quick-btn--all:hover {
+  background: rgba(76, 175, 80, 0.25);
+}
+
+.model-quick-btn--clear {
+  background: rgba(244, 67, 54, 0.1);
+  border: 1px solid rgba(244, 67, 54, 0.4);
+  color: #ef5350;
+}
+
+.model-quick-btn--clear:hover {
+  background: rgba(244, 67, 54, 0.2);
+}
+
+/* Loading indicator inline */
+.layer-spinner {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.68rem;
+  color: #4FC3F7;
+  margin-left: 4px;
+}
+
+/* ===================================================== */
 
 /* Path Visibility Controls */
 .path-controls {
@@ -633,8 +952,8 @@
   /* Make control panel take full width on mobile */
   .sliding-control-panel {
     width: 100vw;
-    top: 100px; /* Increased to account for taller mobile header */
-    height: calc(100vh - 100px);
+    top: 56px;
+    height: calc(100vh - 56px);
     border-radius: 0;
     border: none;
     transform: translateX(100%);
@@ -663,10 +982,10 @@
   /* Position layer toggle button better for mobile */
   .layer-toggle-btn {
     right: 15px;
-    top: 110px; /* Increased to ensure it's below the header */
-    width: 44px;
-    height: 44px;
-    border-radius: 22px;
+    top: 110px;
+    height: 40px;
+    padding: 0 14px 0 12px;
+    border-radius: 20px;
   }
   
   /* Make legend items more touch-friendly */
@@ -725,15 +1044,15 @@
 @media (max-width: 480px) {
   /* Even smaller screens - adjust header */
   .sliding-control-panel {
-    top: 90px; /* Increased for mobile header height */
-    height: calc(100vh - 90px);
+    top: 56px;
+    height: calc(100vh - 56px);
   }
   
   .layer-toggle-btn {
-    top: 100px; /* Increased to ensure it's below the header */
+    top: 100px;
     right: 10px;
-    width: 40px;
-    height: 40px;
+    height: 38px;
+    padding: 0 12px 0 10px;
   }
   
   /* Reduce padding on very small screens */

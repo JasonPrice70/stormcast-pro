@@ -1,0 +1,39 @@
+<svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="ct-bg" x1="0" y1="0" x2="40" y2="40" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#6b1a1a"/>
+      <stop offset="100%" stop-color="#8b1a1a"/>
+    </linearGradient>
+    <linearGradient id="ct-spiral" x1="0" y1="0" x2="455" y2="640" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#a8d8f0" stop-opacity="0.85"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background circle -->
+  <circle cx="20" cy="20" r="19.5" fill="url(#ct-bg)"/>
+
+  <!-- Subtle outer ring -->
+  <circle cx="20" cy="20" r="18.5" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="0.75"/>
+
+  <!-- Inner accent ring -->
+  <circle cx="20" cy="20" r="6" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="0.5"/>
+
+  <!-- Cyclone spiral -->
+  <g transform="translate(11, 8) scale(0.038)">
+    <path
+      fill="url(#ct-spiral)"
+      d="M404.75,422.16C344.9,540.18,188.17,639.96.11,639.78c-5.6-.02,200.47-113.65,132.59-152.82C40.8,433.89,6.14,314.27,52.78,218.95,108.63,104.8,263.52-5.63,454.97.22c6.5.2-194.96,116.53-130.14,153.95,91.89,53.05,127.92,173.36,79.92,267.99Z"
+    >
+      <animateTransform
+        attributeName="transform"
+        attributeType="XML"
+        type="rotate"
+        from="0 227.5 320"
+        to="-360 227.5 320"
+        dur="6s"
+        repeatCount="indefinite"
+      />
+    </path>
+  </g>
+</svg>
