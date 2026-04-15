@@ -3,6 +3,7 @@ import SimpleStormTracker from './pages/SimpleStormTracker'
 import StormTracker from './pages/StormTracker'
 import Forecast from './pages/Forecast'
 import About from './pages/About'
+import Analytics from './pages/Analytics'
 import './App.css'
 
 function App() {
@@ -14,6 +15,7 @@ function App() {
         <Route path="/advanced" element={<StormTracker />} />
         <Route path="/forecast" element={<Forecast />} />
         <Route path="/about" element={<About />} />
+        <Route path="/analytics" element={<Analytics />} />
         <Route path="*" element={<SimpleStormTracker />} />
       </Routes>
     </div>

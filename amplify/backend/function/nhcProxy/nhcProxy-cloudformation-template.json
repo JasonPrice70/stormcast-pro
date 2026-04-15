@@ -1,6 +1,6 @@
 {
   "AWSTemplateFormatVersion": "2010-09-09",
-  "Description": "Lambda function for NHC API proxy",
+  "Description": "Lambda function for NHC API proxy with storm archive DynamoDB tables",
   "Parameters": {
     "CloudWatchRule": {
       "Type": "String",
@@ -28,8 +28,126 @@
     }
   },
   "Resources": {
+
+    "StormArchiveTable": {
+      "Type": "AWS::DynamoDB::Table",
+      "Properties": {
+        "TableName": {
+          "Fn::Sub": "cyclotrak-storm-archive-${env}"
+        },
+        "BillingMode": "PAY_PER_REQUEST",
+        "PointInTimeRecoverySpecification": {
+          "PointInTimeRecoveryEnabled": true
+        },
+        "AttributeDefinitions": [
+          { "AttributeName": "PK",      "AttributeType": "S" },
+          { "AttributeName": "SK",      "AttributeType": "S" },
+          { "AttributeName": "GSI1PK", "AttributeType": "S" },
+          { "AttributeName": "GSI1SK", "AttributeType": "S" }
+        ],
+        "KeySchema": [
+          { "AttributeName": "PK", "KeyType": "HASH"  },
+          { "AttributeName": "SK", "KeyType": "RANGE" }
+        ],
+        "GlobalSecondaryIndexes": [
+          {
+            "IndexName": "GSI1",
+            "KeySchema": [
+              { "AttributeName": "GSI1PK", "KeyType": "HASH"  },
+              { "AttributeName": "GSI1SK", "KeyType": "RANGE" }
+            ],
+            "Projection": { "ProjectionType": "ALL" }
+          }
+        ],
+        "TimeToLiveSpecification": {
+          "AttributeName": "ttl",
+          "Enabled": true
+        },
+        "Tags": [
+          { "Key": "Application", "Value": "CycloTrak" },
+          { "Key": "Purpose",     "Value": "StormArchive" }
+        ]
+      }
+    },
+
+    "ModelTracksTable": {
+      "Type": "AWS::DynamoDB::Table",
+      "Properties": {
+        "TableName": { "Fn::Sub": "cyclotrak-model-tracks-${env}" },
+        "BillingMode": "PAY_PER_REQUEST",
+        "PointInTimeRecoverySpecification": { "PointInTimeRecoveryEnabled": true },
+        "AttributeDefinitions": [
+          { "AttributeName": "PK",      "AttributeType": "S" },
+          { "AttributeName": "SK",      "AttributeType": "S" },
+          { "AttributeName": "GSI1PK", "AttributeType": "S" },
+          { "AttributeName": "GSI1SK", "AttributeType": "S" }
+        ],
+        "KeySchema": [
+          { "AttributeName": "PK", "KeyType": "HASH"  },
+          { "AttributeName": "SK", "KeyType": "RANGE" }
+        ],
+        "GlobalSecondaryIndexes": [
+          {
+            "IndexName": "GSI1",
+            "KeySchema": [
+              { "AttributeName": "GSI1PK", "KeyType": "HASH"  },
+              { "AttributeName": "GSI1SK", "KeyType": "RANGE" }
+            ],
+            "Projection": { "ProjectionType": "ALL" }
+          }
+        ],
+        "TimeToLiveSpecification": { "AttributeName": "ttl", "Enabled": true },
+        "Tags": [
+          { "Key": "Application", "Value": "CycloTrak" },
+          { "Key": "Purpose",     "Value": "ModelTracks" }
+        ]
+      }
+    },
+
+    "InvestArchiveTable": {
+      "Type": "AWS::DynamoDB::Table",
+      "Properties": {
+        "TableName": {
+          "Fn::Sub": "cyclotrak-invest-archive-${env}"
+        },
+        "BillingMode": "PAY_PER_REQUEST",
+        "PointInTimeRecoverySpecification": {
+          "PointInTimeRecoveryEnabled": true
+        },
+        "AttributeDefinitions": [
+          { "AttributeName": "PK",      "AttributeType": "S" },
+          { "AttributeName": "SK",      "AttributeType": "S" },
+          { "AttributeName": "GSI1PK", "AttributeType": "S" },
+          { "AttributeName": "GSI1SK", "AttributeType": "S" }
+        ],
+        "KeySchema": [
+          { "AttributeName": "PK", "KeyType": "HASH"  },
+          { "AttributeName": "SK", "KeyType": "RANGE" }
+        ],
+        "GlobalSecondaryIndexes": [
+          {
+            "IndexName": "GSI1",
+            "KeySchema": [
+              { "AttributeName": "GSI1PK", "KeyType": "HASH"  },
+              { "AttributeName": "GSI1SK", "KeyType": "RANGE" }
+            ],
+            "Projection": { "ProjectionType": "ALL" }
+          }
+        ],
+        "TimeToLiveSpecification": {
+          "AttributeName": "ttl",
+          "Enabled": true
+        },
+        "Tags": [
+          { "Key": "Application", "Value": "CycloTrak" },
+          { "Key": "Purpose",     "Value": "InvestArchive" }
+        ]
+      }
+    },
+
     "LambdaFunction": {
       "Type": "AWS::Lambda::Function",
+      "DependsOn": ["StormArchiveTable", "InvestArchiveTable", "ModelTracksTable"],
       "Metadata": {
         "aws:asset:path": "./src",
         "aws:asset:property": "Code"
@@ -62,25 +180,22 @@
         },
         "Environment": {
           "Variables": {
-            "ENV": {
-              "Ref": "env"
-            },
-            "REGION": {
-              "Ref": "AWS::Region"
-            }
+            "ENV": { "Ref": "env" },
+            "REGION": { "Ref": "AWS::Region" },
+            "STORM_ARCHIVE_TABLE": { "Ref": "StormArchiveTable" },
+            "INVEST_ARCHIVE_TABLE": { "Ref": "InvestArchiveTable" },
+            "MODEL_TRACKS_TABLE": { "Ref": "ModelTracksTable" }
           }
         },
         "Role": {
-          "Fn::GetAtt": [
-            "LambdaExecutionRole",
-            "Arn"
-          ]
+          "Fn::GetAtt": ["LambdaExecutionRole", "Arn"]
         },
         "Runtime": "nodejs18.x",
         "Layers": [],
         "Timeout": 25
       }
     },
+
     "LambdaExecutionRole": {
       "Type": "AWS::IAM::Role",
       "Properties": {
@@ -91,11 +206,7 @@
             {
               "Fn::Sub": [
                 "stormcastproLambdaRole426c9e5b-${env}",
-                {
-                  "env": {
-                    "Ref": "env"
-                  }
-                }
+                { "env": { "Ref": "env" } }
               ]
             }
           ]
@@ -105,28 +216,19 @@
           "Statement": [
             {
               "Effect": "Allow",
-              "Principal": {
-                "Service": [
-                  "lambda.amazonaws.com"
-                ]
-              },
-              "Action": [
-                "sts:AssumeRole"
-              ]
+              "Principal": { "Service": ["lambda.amazonaws.com"] },
+              "Action": ["sts:AssumeRole"]
             }
           ]
         }
       }
     },
+
     "lambdaexecutionpolicy": {
       "Type": "AWS::IAM::Policy",
       "Properties": {
         "PolicyName": "lambda-execution-policy",
-        "Roles": [
-          {
-            "Ref": "LambdaExecutionRole"
-          }
-        ],
+        "Roles": [{ "Ref": "LambdaExecutionRole" }],
         "PolicyDocument": {
           "Version": "2012-10-17",
           "Statement": [
@@ -141,55 +243,62 @@
                 "Fn::Sub": [
                   "arn:aws:logs:${region}:${account}:log-group:/aws/lambda/${lambda}:log-stream:*",
                   {
-                    "region": {
-                      "Ref": "AWS::Region"
-                    },
-                    "account": {
-                      "Ref": "AWS::AccountId"
-                    },
-                    "lambda": {
-                      "Ref": "LambdaFunction"
-                    }
+                    "region":  { "Ref": "AWS::Region" },
+                    "account": { "Ref": "AWS::AccountId" },
+                    "lambda":  { "Ref": "LambdaFunction" }
                   }
                 ]
               }
+            },
+            {
+              "Effect": "Allow",
+              "Action": [
+                "dynamodb:GetItem",
+                "dynamodb:PutItem",
+                "dynamodb:UpdateItem",
+                "dynamodb:DeleteItem",
+                "dynamodb:Query",
+                "dynamodb:Scan",
+                "dynamodb:BatchWriteItem",
+                "dynamodb:BatchGetItem",
+                "dynamodb:DescribeTable"
+              ],
+              "Resource": [
+                { "Fn::GetAtt": ["StormArchiveTable",  "Arn"] },
+                { "Fn::GetAtt": ["InvestArchiveTable", "Arn"] },
+                { "Fn::GetAtt": ["ModelTracksTable",   "Arn"] },
+                { "Fn::Sub": "${StormArchiveTable.Arn}/index/*"  },
+                { "Fn::Sub": "${InvestArchiveTable.Arn}/index/*" },
+                { "Fn::Sub": "${ModelTracksTable.Arn}/index/*"   }
+              ]
             }
           ]
         }
       }
     }
   },
+
   "Outputs": {
     "Name": {
-      "Value": {
-        "Ref": "LambdaFunction"
-      }
+      "Value": { "Ref": "LambdaFunction" }
     },
     "Arn": {
-      "Value": {
-        "Fn::GetAtt": [
-          "LambdaFunction",
-          "Arn"
-        ]
-      }
+      "Value": { "Fn::GetAtt": ["LambdaFunction", "Arn"] }
     },
     "Region": {
-      "Value": {
-        "Ref": "AWS::Region"
-      }
+      "Value": { "Ref": "AWS::Region" }
     },
     "LambdaExecutionRole": {
-      "Value": {
-        "Ref": "LambdaExecutionRole"
-      }
+      "Value": { "Ref": "LambdaExecutionRole" }
     },
     "LambdaExecutionRoleArn": {
-      "Value": {
-        "Fn::GetAtt": [
-          "LambdaExecutionRole",
-          "Arn"
-        ]
-      }
+      "Value": { "Fn::GetAtt": ["LambdaExecutionRole", "Arn"] }
+    },
+    "StormArchiveTableName": {
+      "Value": { "Ref": "StormArchiveTable" }
+    },
+    "InvestArchiveTableName": {
+      "Value": { "Ref": "InvestArchiveTable" }
     }
   }
 }

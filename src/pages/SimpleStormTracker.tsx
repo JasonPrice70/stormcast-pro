@@ -14,6 +14,15 @@ import ExpandMoreOutlinedIcon from '@mui/icons-material/ExpandMoreOutlined';
 import LayersOutlinedIcon from '@mui/icons-material/LayersOutlined';
 import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined';
 import { formatWindSpeed, getIntensityCategoryFromKnots } from '../utils/windSpeed';
+import {
+  trackPageView,
+  trackStormSelected,
+  trackInvestSelected,
+  trackLayerToggled,
+  trackManualRefresh,
+  trackSessionEnd,
+  type LayerName,
+} from '../services/analytics';
 
 // Fix for default markers in React Leaflet
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -387,7 +396,8 @@ const SimpleStormTracker: React.FC = () => {
 
   // Choose which data source to use
   const currentData = liveData; // Only use live data now
-  const { storms, loading, error, lastUpdated, refresh } = currentData;
+  const { storms, loading, error, lastUpdated, refresh: _refresh } = currentData;
+  const refresh = () => { refreshCountRef.current += 1; trackManualRefresh(); _refresh(); };
 
   // Determine what data to display with proper fallback
   const shouldUseDemoData = false; // Never use demo data
@@ -427,6 +437,74 @@ const SimpleStormTracker: React.FC = () => {
       return filtered;
     });
   }, [invests]);
+
+  // ── Analytics ───────────────────────────────────────────────────────────────
+
+  // Session-level accumulators (not rendered state, so useRef is correct here)
+  const sessionStartRef = useRef<number>(Date.now());
+  const stormsViewedRef = useRef<Set<string>>(new Set());
+  const refreshCountRef = useRef<number>(0);
+  const activeLayersRef = useRef<Set<LayerName>>(new Set());
+
+  // Page view on mount, session summary on unmount
+  useEffect(() => {
+    trackPageView('tracker');
+    return () => {
+      const durationSeconds = Math.round((Date.now() - sessionStartRef.current) / 1000);
+      trackSessionEnd({
+        layersEnabled: Array.from(activeLayersRef.current),
+        stormsViewed: Array.from(stormsViewedRef.current),
+        modelsViewed: [],
+        refreshCount: refreshCountRef.current,
+        durationSeconds,
+      });
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Track selected storm changes
+  useEffect(() => {
+    if (!selectedStormId) return;
+    const storm = displayStorms.find(s => s.id === selectedStormId);
+    if (!storm) return;
+    stormsViewedRef.current.add(selectedStormId);
+    trackStormSelected({
+      stormId: storm.id,
+      stormName: storm.name,
+      basin: 'AL',
+      category: String(storm.category ?? 'TS'),
+      maxWindsKnots: storm.maxWinds ?? 0,
+      pressureMb: storm.pressure ?? null,
+    });
+  }, [selectedStormId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Helper: track a layer toggle and keep activeLayersRef in sync
+  const trackLayer = (layer: LayerName, enabled: boolean) => {
+    if (enabled) {
+      activeLayersRef.current.add(layer);
+    } else {
+      activeLayersRef.current.delete(layer);
+    }
+    trackLayerToggled(layer, enabled, selectedStormId ?? undefined);
+  };
+
+  // Layer toggle tracking (each fires only when its value actually changes)
+  useEffect(() => { trackLayer('forecast_cone', showForecastCones); },        [showForecastCones]);  // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { trackLayer('storm_surge', showStormSurge); },              [showStormSurge]);     // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { trackLayer('storm_surge', showPeakStormSurge); },          [showPeakStormSurge]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { trackLayer('wind_arrival_likely', showWindArrival); },     [showWindArrival]);    // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { trackLayer('gefs_spaghetti', showGEFSSpaghetti); },        [showGEFSSpaghetti]);  // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { trackLayer('hwrf_windfield', showHWRFWindfield); },        [showHWRFWindfield]);  // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { trackLayer('hmon_windfield', showHMONWindfield); },        [showHMONWindfield]);  // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const layer: LayerName = windSpeedProbType === '34kt'
+      ? 'wind_probability_34kt'
+      : windSpeedProbType === '50kt'
+      ? 'wind_probability_50kt'
+      : 'wind_probability_64kt';
+    trackLayer(layer, showWindSpeedProb);
+  }, [showWindSpeedProb, windSpeedProbType]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── End Analytics ───────────────────────────────────────────────────────────
 
   // Get selected storm data (primary for overlays) and which storms to show on map (multi-select)
   const selectedStorm = selectedStormId ? displayStorms.find(s => s.id === selectedStormId) : null;
@@ -2659,6 +2737,7 @@ const SimpleStormTracker: React.FC = () => {
                               setSelectedStormIds([]);
                               // Set this as an invest selection
                               setLastSelectionType('invest');
+                              trackInvestSelected(invest.id, invest.formationChance48hr ?? 0, invest.formationChance7day ?? 0);
                             }
                           }}
                           style={{

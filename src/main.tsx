@@ -4,6 +4,9 @@ import { BrowserRouter } from 'react-router-dom'
 import App from './App.tsx'
 import 'leaflet/dist/leaflet.css'
 import './index.css'
+import { initAnalytics } from './services/analytics'
+
+initAnalytics()
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

@@ -3,15 +3,17 @@ import { Link, useLocation } from 'react-router-dom'
 import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined'
 import ShowChartOutlinedIcon from '@mui/icons-material/ShowChartOutlined'
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
+import BarChartOutlinedIcon from '@mui/icons-material/BarChartOutlined'
 import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined'
 import LayersOutlinedIcon from '@mui/icons-material/LayersOutlined'
 import CycloTrakIcon from './CycloTrakIcon'
 import './Header.css'
 
 const navLinks = [
-  { to: '/',         label: 'Home',     icon: <HomeOutlinedIcon fontSize="small" /> },
-  { to: '/forecast', label: 'Forecast', icon: <ShowChartOutlinedIcon fontSize="small" /> },
-  { to: '/about',    label: 'About',    icon: <InfoOutlinedIcon fontSize="small" /> },
+  { to: '/',          label: 'Home',      icon: <HomeOutlinedIcon fontSize="small" /> },
+  { to: '/forecast',  label: 'Forecast',  icon: <ShowChartOutlinedIcon fontSize="small" /> },
+  { to: '/analytics', label: 'Analytics', icon: <BarChartOutlinedIcon fontSize="small" /> },
+  { to: '/about',     label: 'About',     icon: <InfoOutlinedIcon fontSize="small" /> },
 ]
 
 interface SimpleHeaderProps {
