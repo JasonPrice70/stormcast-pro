@@ -103,6 +103,61 @@
   margin: 0 0 32px;
 }
 
+/* ─── Developer bio card ──────────────────────────── */
+.ab-dev-card {
+  display: flex;
+  gap: 36px;
+  align-items: flex-start;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(0, 212, 255, 0.12);
+  border-radius: 16px;
+  padding: 36px 32px;
+}
+
+.ab-dev-avatar {
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: center 12%;
+  flex-shrink: 0;
+  border: 3px solid rgba(0, 212, 255, 0.35);
+  box-shadow: 0 0 24px rgba(0, 212, 255, 0.18);
+}
+
+.ab-dev-bio h2 {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #e8f4ff;
+  margin: 0 0 16px;
+  letter-spacing: -0.01em;
+}
+
+.ab-dev-bio p {
+  font-size: 0.97rem;
+  color: rgba(232, 244, 255, 0.65);
+  line-height: 1.75;
+  margin: 0 0 14px;
+}
+
+.ab-dev-bio p:last-child {
+  margin-bottom: 0;
+}
+
+.ab-dev-bio strong {
+  color: rgba(232, 244, 255, 0.9);
+  font-weight: 600;
+}
+
+@media (max-width: 600px) {
+  .ab-dev-card {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 28px 20px;
+  }
+}
+
 /* ─── Mission card ─────────────────────────────────── */
 .ab-mission-card {
   display: flex;
