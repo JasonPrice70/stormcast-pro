@@ -78,10 +78,10 @@ const About = () => {
         </div>
       </section>
 
-      {/* ── About the Developer ── */}
+      {/* ── The Dev Behind the Data ── */}
       <section className="ab-section ab-section-alt">
         <div className="ab-inner">
-          <p className="ab-label">ABOUT THE DEVELOPER</p>
+          <p className="ab-label">THE DEV BEHIND THE DATA</p>
           <div className="ab-dev-card">
             <img
               src="/jason-price.jpg"
@@ -108,11 +108,25 @@ const About = () => {
                 decision, and every data pipeline was built by Jason — with the goal of
                 giving people better situational awareness when a storm is bearing down.
               </p>
+              <div className="ab-dev-contact">
+                <span className="ab-contact-icon"><EmailOutlinedIcon /></span>
+                <div>
+                  <p className="ab-contact-label">Get in touch</p>
+                  <a href="mailto:jason.cyclotrak@gmail.com" className="ab-contact-link">
+                    jason.cyclotrak@gmail.com
+                  </a>
+                </div>
+              </div>
+              <p className="ab-contact-note" style={{ marginTop: 10 }}>
+                Feedback, bug reports, and feature suggestions are always welcome.
+              </p>
             </div>
           </div>
         </div>
       </section>
-      <section className="ab-section ab-section-alt">
+
+      {/* ── Data Sources ── */}
+      <section className="ab-section">
         <div className="ab-inner">
           <p className="ab-label">DATA SOURCES</p>
           <h2 className="ab-section-title">Official data. Live feeds.</h2>
@@ -146,27 +160,7 @@ const About = () => {
         </div>
       </section>
 
-      {/* ── Contact ── */}
-      <section className="ab-section ab-section-alt">
-        <div className="ab-inner">
-          <p className="ab-label">CONTACT</p>
-          <h2 className="ab-section-title">Get in touch.</h2>
-          <div className="ab-contact-card">
-            <div className="ab-contact-row">
-              <span className="ab-contact-icon"><EmailOutlinedIcon /></span>
-              <div>
-                <p className="ab-contact-label">Email</p>
-                <a href="mailto:jason.cyclotrak@gmail.com" className="ab-contact-link">
-                  jason.cyclotrak@gmail.com
-                </a>
-              </div>
-            </div>
-            <p className="ab-contact-note">
-              Feedback, bug reports, and feature suggestions are always welcome.
-            </p>
-          </div>
-        </div>
-      </section>
+
 
       {/* ── Disclaimer ── */}
       <section className="ab-section">
