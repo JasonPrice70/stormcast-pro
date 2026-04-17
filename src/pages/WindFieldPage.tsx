@@ -289,21 +289,6 @@ const WindFieldPage = () => {
             </div>
           </div>
 
-          <div className="wf-tab-group">
-            <span className="wf-tab-label">BASEMAP</span>
-            <div className="wf-tabs">
-              {BASEMAPS.map(b => (
-                <button
-                  key={b.id}
-                  className={`wf-tab${basemapId === b.id ? ' active' : ''}`}
-                  onClick={() => setBasemapId(b.id)}
-                >
-                  <span className="wf-tab-line1">{b.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
           <div className="wf-opacity-group">
             <span className="wf-tab-label">OPACITY</span>
             <input
@@ -338,6 +323,20 @@ const WindFieldPage = () => {
           <StormTrackLayer points={ADVISORY} activeIdx={activeIdx} />
           <TileLayer key={basemap.labels} url={basemap.labels} zIndex={600} />
         </MapContainer>
+
+        {/* Basemap picker */}
+        <div className="wf-basemap-control">
+          {BASEMAPS.map(b => (
+            <button
+              key={b.id}
+              className={`wf-basemap-btn${basemapId === b.id ? ' active' : ''}`}
+              onClick={() => setBasemapId(b.id)}
+              title={b.label}
+            >
+              {b.label}
+            </button>
+          ))}
+        </div>
 
         {/* Wind speed legend */}
         <div className="wf-legend">
