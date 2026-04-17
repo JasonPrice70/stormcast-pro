@@ -3,6 +3,8 @@ import { Link, useLocation } from 'react-router-dom'
 import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined'
 import TrackChangesOutlinedIcon from '@mui/icons-material/TrackChangesOutlined'
 import ShowChartOutlinedIcon from '@mui/icons-material/ShowChartOutlined'
+import CloudQueueOutlinedIcon from '@mui/icons-material/CloudQueueOutlined'
+import TornadoOutlinedIcon from '@mui/icons-material/TornadoOutlined'
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
 import BarChartOutlinedIcon from '@mui/icons-material/BarChartOutlined'
 import SatelliteAltOutlinedIcon from '@mui/icons-material/SatelliteAltOutlined'
@@ -15,6 +17,8 @@ const navLinks = [
   { to: '/tracker',    label: 'Tracker',   icon: <TrackChangesOutlinedIcon fontSize="small" /> },
   { to: '/satellite',  label: 'Satellite', icon: <SatelliteAltOutlinedIcon fontSize="small" /> },
   { to: '/forecast',   label: 'Forecast',  icon: <ShowChartOutlinedIcon fontSize="small" /> },
+  { to: '/models',     label: 'Models',    icon: <CloudQueueOutlinedIcon fontSize="small" /> },
+  { to: '/wind',       label: 'Wind Field', icon: <TornadoOutlinedIcon fontSize="small" /> },
   { to: '/analytics',  label: 'Analytics', icon: <BarChartOutlinedIcon fontSize="small" /> },
   { to: '/about',      label: 'About',     icon: <InfoOutlinedIcon fontSize="small" /> },
 ]
