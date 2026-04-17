@@ -3,6 +3,321 @@ const yauzl = require('yauzl');
 const xml2js = require('xml2js');
 const zlib = require('zlib');
 
+// ─── DynamoDB Archive (AWS SDK v3 is built into Lambda Node 18+) ─────────────
+const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
+const { DynamoDBDocumentClient, PutCommand, QueryCommand, GetCommand } = require('@aws-sdk/lib-dynamodb');
+
+const ddbClient = new DynamoDBClient({ region: process.env.REGION || 'us-east-1' });
+const ddb = DynamoDBDocumentClient.from(ddbClient, {
+  marshallOptions:   { removeUndefinedValues: true },
+  unmarshallOptions: { wrapNumbers: false }
+});
+
+const STORM_TABLE  = process.env.STORM_ARCHIVE_TABLE  || 'cyclotrak-storm-archive-dev';
+const INVEST_TABLE = process.env.INVEST_ARCHIVE_TABLE || 'cyclotrak-invest-archive-dev';
+const MODEL_TABLE  = process.env.MODEL_TRACKS_TABLE   || 'cyclotrak-model-tracks-dev';
+
+// TTL = 2 years from now (DynamoDB TTL is seconds since epoch)
+const archiveTtl = () => Math.floor(Date.now() / 1000) + 2 * 365 * 24 * 3600;
+
+/**
+ * Snapshot one storm advisory to DynamoDB.
+ * Called automatically whenever the active-storms endpoint is hit.
+ * Writes are fire-and-forget — we never let a DynamoDB failure block the
+ * normal NHC response.
+ */
+async function archiveStormAdvisory(storm) {
+  const now = new Date().toISOString();
+  const season = new Date().getUTCFullYear();
+  const pk = `STORM#${storm.id}`;
+  const sk = `ADVISORY#${now}`;
+
+  const item = {
+    PK:  pk,
+    SK:  sk,
+    // GSI for querying all storms in a season
+    GSI1PK: `SEASON#${season}`,
+    GSI1SK: `${storm.id}#${now}`,
+
+    stormId:       storm.id,
+    stormName:     storm.name,
+    season,
+    basin:         storm.id.slice(0, 2).toUpperCase(),          // AL, EP, CP
+    classification: storm.classification || 'TD',
+    category:      typeof storm.category === 'number' ? storm.category : 0,
+    maxWindsKnots: storm.maxWinds        || 0,
+    pressureMb:    storm.pressure        || null,
+    positionLat:   storm.position?.[0]   || null,
+    positionLon:   storm.position?.[1]   || null,
+    movementDir:   storm.movement?.direction  || null,
+    movementSpeed: storm.movement?.speed      || null,
+    advisoryTimestamp: now,
+    // Forecast track snapshot (NHC official positions)
+    forecastPoints: (storm.forecast || []).map(p => ({
+      hour:         p.forecastHour,
+      lat:          p.latitude,
+      lon:          p.longitude,
+      maxWindsKnots: p.maxWinds,
+      pressureMb:   p.pressure
+    })),
+    ttl: archiveTtl()
+  };
+
+  try {
+    await ddb.send(new PutCommand({ TableName: STORM_TABLE, Item: item }));
+    console.log(`[archive] Saved storm advisory: ${pk} / ${sk}`);
+  } catch (err) {
+    console.error('[archive] Failed to save storm advisory:', err.message);
+  }
+}
+
+/**
+ * Snapshot an invest area to DynamoDB.
+ */
+async function archiveInvest(invest) {
+  const now = new Date().toISOString();
+  const season = new Date().getUTCFullYear();
+  const pk = `INVEST#${invest.id}`;
+  const sk = `SNAPSHOT#${now}`;
+
+  const item = {
+    PK:  pk,
+    SK:  sk,
+    GSI1PK: `SEASON#${season}`,
+    GSI1SK: `${invest.id}#${now}`,
+
+    investId:            invest.id,
+    season,
+    basin:               invest.basin || 'atlantic',
+    name:                invest.name  || invest.id,
+    location:            invest.location || null,
+    positionLat:         invest.position?.[0] || null,
+    positionLon:         invest.position?.[1] || null,
+    formationChance48hr: invest.formationChance48hr || 0,
+    formationChance7day: invest.formationChance7day || 0,
+    snapshotTimestamp:   now,
+    developed:           false,           // updated later if it names
+    developedIntoStormId: null,
+    ttl: archiveTtl()
+  };
+
+  try {
+    await ddb.send(new PutCommand({ TableName: INVEST_TABLE, Item: item }));
+    console.log(`[archive] Saved invest snapshot: ${pk} / ${sk}`);
+  } catch (err) {
+    console.error('[archive] Failed to save invest snapshot:', err.message);
+  }
+}
+
+/**
+ * Archive all storms from an active-storms response.
+ * Runs concurrently, never throws.
+ */
+async function archiveActiveStorms(storms) {
+  if (!Array.isArray(storms) || storms.length === 0) return;
+  await Promise.allSettled(storms.map(s => archiveStormAdvisory(s)));
+}
+
+/**
+ * Archive all invest areas from a TWO parse result.
+ * Runs concurrently, never throws.
+ */
+async function archiveInvests(invests) {
+  if (!Array.isArray(invests) || invests.length === 0) return;
+  await Promise.allSettled(invests.map(i => archiveInvest(i)));
+}
+
+// ─── Archive Reader helpers ───────────────────────────────────────────────────
+
+/**
+ * Return all advisory snapshots for a single storm, newest-first.
+ * Limit defaults to 100 (one per advisory = ~16 per day at peak).
+ */
+async function getStormHistory(stormId, limit = 100) {
+  const result = await ddb.send(new QueryCommand({
+    TableName: STORM_TABLE,
+    KeyConditionExpression: 'PK = :pk AND begins_with(SK, :prefix)',
+    ExpressionAttributeValues: {
+      ':pk':     `STORM#${stormId}`,
+      ':prefix': 'ADVISORY#'
+    },
+    ScanIndexForward: false,   // newest first
+    Limit: limit
+  }));
+  return result.Items || [];
+}
+
+/**
+ * Return the latest snapshot for a storm.
+ */
+async function getLatestStormSnapshot(stormId) {
+  const items = await getStormHistory(stormId, 1);
+  return items[0] || null;
+}
+
+/**
+ * Return all storms that appeared in a given season.
+ * Uses GSI1 to query SEASON#<year>.
+ */
+async function getSeasonStorms(season) {
+  const result = await ddb.send(new QueryCommand({
+    TableName: STORM_TABLE,
+    IndexName: 'GSI1',
+    KeyConditionExpression: 'GSI1PK = :season',
+    ExpressionAttributeValues: {
+      ':season': `SEASON#${season}`
+    }
+  }));
+
+  // Deduplicate by stormId — keep the latest snapshot per storm
+  const byStorm = {};
+  for (const item of (result.Items || [])) {
+    if (!byStorm[item.stormId] || item.advisoryTimestamp > byStorm[item.stormId].advisoryTimestamp) {
+      byStorm[item.stormId] = item;
+    }
+  }
+  return Object.values(byStorm);
+}
+
+/**
+ * Return all invest snapshots for a season.
+ */
+async function getSeasonInvests(season) {
+  const result = await ddb.send(new QueryCommand({
+    TableName: INVEST_TABLE,
+    IndexName: 'GSI1',
+    KeyConditionExpression: 'GSI1PK = :season',
+    ExpressionAttributeValues: {
+      ':season': `SEASON#${season}`
+    }
+  }));
+
+  const byInvest = {};
+  for (const item of (result.Items || [])) {
+    if (!byInvest[item.investId] || item.snapshotTimestamp > byInvest[item.investId].snapshotTimestamp) {
+      byInvest[item.investId] = item;
+    }
+  }
+  return Object.values(byInvest);
+}
+
+/**
+ * Archive every model track from one A-deck parse result.
+ *
+ * Schema per item:
+ *   PK  = STORM#AL052025
+ *   SK  = RUN#2025081518#MODEL#HWRF
+ *   GSI1PK = MODEL#HWRF#STORM#AL052025      (query all HWRF runs for a storm)
+ *   GSI1SK = RUN#2025081518
+ *
+ * runCycle is the raw ATCF cycle string: yyyymmddhh  (e.g. 2025081518)
+ * tracks is the array from parseAdeckGEFSTracks(): [{ modelId, points:[{tau,lat,lon,vmax}] }]
+ */
+async function archiveModelTracks(stormId, runCycle, tracks) {
+  if (!stormId || !runCycle || !Array.isArray(tracks) || tracks.length === 0) return;
+
+  const season = parseInt(runCycle.slice(0, 4), 10);
+
+  // Convert ATCF cycle "2025081518" → ISO8601 "2025-08-15T18:00:00Z"
+  const cy = runCycle;
+  const runTimestamp = `${cy.slice(0,4)}-${cy.slice(4,6)}-${cy.slice(6,8)}T${cy.slice(8,10)}:00:00Z`;
+
+  // We write one DynamoDB item per (storm, run, model) — idempotent overwrites are fine
+  // because the A-deck data for a given run never changes after issuance.
+  const writes = tracks.map(({ modelId, points }) => {
+    const pk     = `STORM#${stormId}`;
+    const sk     = `RUN#${runCycle}#MODEL#${modelId}`;
+    const gsi1pk = `MODEL#${modelId}#STORM#${stormId}`;
+    const gsi1sk = `RUN#${runCycle}`;
+
+    return ddb.send(new PutCommand({
+      TableName: MODEL_TABLE,
+      Item: {
+        PK:  pk,
+        SK:  sk,
+        GSI1PK: gsi1pk,
+        GSI1SK: gsi1sk,
+
+        stormId,
+        modelId,
+        runCycle,
+        runTimestamp,
+        season,
+        basin: stormId.slice(0, 2).toUpperCase(),
+        fetchedAt: new Date().toISOString(),
+
+        // Forecast track points: [{tau, lat, lon, vmax}]
+        // tau = forecast hour (0, 6, 12, 24, 48, 72, 96, 120)
+        trackPoints: points.map(p => ({
+          forecastHour: p.tau,
+          lat:          p.lat,
+          lon:          p.lon,
+          maxWindsKnots: p.vmax != null ? p.vmax : null,
+        })),
+
+        ttl: archiveTtl(),
+      },
+      // Skip the write if this exact run+model was already archived (saves write units)
+      ConditionExpression: 'attribute_not_exists(SK)',
+    })).catch(err => {
+      // ConditionalCheckFailedException = already exists, that's fine
+      if (err.name !== 'ConditionalCheckFailedException') {
+        console.error(`[archive] Failed to save model track ${modelId} run ${runCycle}:`, err.message);
+      }
+    });
+  });
+
+  await Promise.allSettled(writes);
+  console.log(`[archive] Model tracks saved: storm=${stormId} run=${runCycle} models=${tracks.map(t => t.modelId).join(',')}`);
+}
+
+/**
+ * Get all archived runs for a storm, optionally filtered by model.
+ * Returns items sorted by runCycle descending (newest run first).
+ */
+async function getModelRuns(stormId, modelId = null, limit = 200) {
+  const params = {
+    TableName: MODEL_TABLE,
+    Limit: limit,
+    ScanIndexForward: false,
+  };
+
+  if (modelId) {
+    // Use GSI1 to get all runs of a specific model for this storm
+    params.IndexName = 'GSI1';
+    params.KeyConditionExpression = 'GSI1PK = :gsi1pk';
+    params.ExpressionAttributeValues = { ':gsi1pk': `MODEL#${modelId}#STORM#${stormId}` };
+  } else {
+    // Query main table for all models across all runs for this storm
+    params.KeyConditionExpression = 'PK = :pk AND begins_with(SK, :prefix)';
+    params.ExpressionAttributeValues = {
+      ':pk':     `STORM#${stormId}`,
+      ':prefix': 'RUN#',
+    };
+  }
+
+  const result = await ddb.send(new QueryCommand(params));
+  return result.Items || [];
+}
+
+/**
+ * Get all models archived for a specific run of a storm.
+ * e.g. stormId=AL052025, runCycle=2025081518 → [HWRF, GFS, ECMW, ...]
+ */
+async function getRunModels(stormId, runCycle) {
+  const result = await ddb.send(new QueryCommand({
+    TableName: MODEL_TABLE,
+    KeyConditionExpression: 'PK = :pk AND begins_with(SK, :prefix)',
+    ExpressionAttributeValues: {
+      ':pk':     `STORM#${stormId}`,
+      ':prefix': `RUN#${runCycle}#`,
+    },
+  }));
+  return result.Items || [];
+}
+
+// ─── End DynamoDB Archive ─────────────────────────────────────────────────────
+
 // NHC API endpoints
 const NHC_BASE_URL = 'https://www.nhc.noaa.gov';
 const NHC_FTP_BASE = 'https://ftp.nhc.ncep.noaa.gov/wsp/2025/';
@@ -2372,6 +2687,15 @@ exports.handler = async (event) => {
           }
 
           const parsed = parseAdeckGEFSTracks(raw);
+
+          // Archive every model track for this run — fire-and-forget
+          const runCycle = parsed.debug?.latestCycle || parsed.debug?.targetCycle;
+          if (runCycle && parsed.tracks && parsed.tracks.length > 0) {
+            archiveModelTracks(stormId, runCycle, parsed.tracks).catch(e =>
+              console.error('[archive] Uncaught error in archiveModelTracks:', e)
+            );
+          }
+
           return {
             statusCode: 200,
             headers: corsHeaders,
@@ -2646,12 +2970,144 @@ exports.handler = async (event) => {
           };
         }
         
+      // ── Model track archive reader endpoints ───────────────────────────────
+
+      case 'archive-model-runs': {
+        // All archived model runs for a storm, optionally filtered to one model.
+        // ?stormId=AL052025
+        // ?stormId=AL052025&modelId=HWRF        ← only HWRF runs
+        // ?stormId=AL052025&runCycle=2025081518  ← all models for one specific run
+        const stormId  = queryStringParameters?.stormId;
+        const modelId  = queryStringParameters?.modelId  || null;
+        const runCycle = queryStringParameters?.runCycle || null;
+        if (!stormId) {
+          return {
+            statusCode: 400,
+            headers: corsHeaders,
+            body: JSON.stringify({ error: 'stormId query parameter is required' })
+          };
+        }
+        try {
+          const items = runCycle
+            ? await getRunModels(stormId, runCycle)
+            : await getModelRuns(stormId, modelId);
+          return {
+            statusCode: 200,
+            headers: corsHeaders,
+            body: JSON.stringify({ success: true, stormId, modelId, runCycle, items, timestamp: new Date().toISOString() })
+          };
+        } catch (err) {
+          return {
+            statusCode: 500,
+            headers: corsHeaders,
+            body: JSON.stringify({ success: false, error: err.message })
+          };
+        }
+      }
+
+      // ── Storm/invest archive reader endpoints ──────────────────────────────
+
+      case 'archive-storm-history': {
+        // Returns all advisory snapshots for a storm, newest-first.
+        // ?stormId=AL052025&limit=50
+        const stormId = queryStringParameters?.stormId;
+        if (!stormId) {
+          return {
+            statusCode: 400,
+            headers: corsHeaders,
+            body: JSON.stringify({ error: 'stormId query parameter is required' })
+          };
+        }
+        const limit = Math.min(parseInt(queryStringParameters?.limit || '100', 10), 500);
+        try {
+          const items = await getStormHistory(stormId, limit);
+          return {
+            statusCode: 200,
+            headers: corsHeaders,
+            body: JSON.stringify({ success: true, stormId, items, timestamp: new Date().toISOString() })
+          };
+        } catch (err) {
+          return {
+            statusCode: 500,
+            headers: corsHeaders,
+            body: JSON.stringify({ success: false, error: err.message })
+          };
+        }
+      }
+
+      case 'archive-season-storms': {
+        // Returns the latest snapshot for each storm seen in a season.
+        // ?season=2025
+        const season = parseInt(queryStringParameters?.season || String(new Date().getUTCFullYear()), 10);
+        try {
+          const storms = await getSeasonStorms(season);
+          return {
+            statusCode: 200,
+            headers: corsHeaders,
+            body: JSON.stringify({ success: true, season, storms, timestamp: new Date().toISOString() })
+          };
+        } catch (err) {
+          return {
+            statusCode: 500,
+            headers: corsHeaders,
+            body: JSON.stringify({ success: false, error: err.message })
+          };
+        }
+      }
+
+      case 'archive-season-invests': {
+        // Returns the latest snapshot for each invest seen in a season.
+        // ?season=2025
+        const season = parseInt(queryStringParameters?.season || String(new Date().getUTCFullYear()), 10);
+        try {
+          const invests = await getSeasonInvests(season);
+          return {
+            statusCode: 200,
+            headers: corsHeaders,
+            body: JSON.stringify({ success: true, season, invests, timestamp: new Date().toISOString() })
+          };
+        } catch (err) {
+          return {
+            statusCode: 500,
+            headers: corsHeaders,
+            body: JSON.stringify({ success: false, error: err.message })
+          };
+        }
+      }
+
+      case 'archive-storm-snapshot': {
+        // Returns the single most-recent snapshot for a storm.
+        // ?stormId=AL052025
+        const stormId = queryStringParameters?.stormId;
+        if (!stormId) {
+          return {
+            statusCode: 400,
+            headers: corsHeaders,
+            body: JSON.stringify({ error: 'stormId query parameter is required' })
+          };
+        }
+        try {
+          const snapshot = await getLatestStormSnapshot(stormId);
+          return {
+            statusCode: 200,
+            headers: corsHeaders,
+            body: JSON.stringify({ success: true, stormId, snapshot, timestamp: new Date().toISOString() })
+          };
+        } catch (err) {
+          return {
+            statusCode: 500,
+            headers: corsHeaders,
+            body: JSON.stringify({ success: false, error: err.message })
+          };
+        }
+      }
+
       default:
         return {
           statusCode: 400,
           headers: corsHeaders,
-          body: JSON.stringify({ 
-            error: 'Invalid endpoint. Supported endpoints: active-storms, track-kmz, forecast-track, historical-track, forecast-cone, forecast-track-kmz, storm-surge, peak-storm-surge, wind-speed-probability, wind-speed-probability-50kt, wind-speed-probability-64kt, wind-arrival-most-likely, wind-arrival-earliest, hwrf-windfield, hmon-windfield' 
+          body: JSON.stringify({
+            error: 'Invalid endpoint. Supported endpoints: active-storms, track-kmz, forecast-track, historical-track, forecast-cone, forecast-track-kmz, storm-surge, peak-storm-surge, wind-speed-probability, wind-speed-probability-50kt, wind-speed-probability-64kt, wind-arrival-most-likely, wind-arrival-earliest, hwrf-windfield, hmon-windfield, archive-storm-history, archive-season-storms, archive-season-invests, archive-storm-snapshot'
           })
         };
     }
@@ -2767,6 +3223,15 @@ exports.handler = async (event) => {
       } else {
         responseData = response.data;
       }
+    }
+
+    // ── Archive fire-and-forget ───────────────────────────────────────────────
+    // After each active-storms fetch, snapshot any processed storms to DynamoDB.
+    // We intentionally do NOT await this so it never slows down the response.
+    if (endpoint === 'active-storms' && responseData && Array.isArray(responseData.activeStorms)) {
+      archiveActiveStorms(responseData.activeStorms).catch(e =>
+        console.error('[archive] Uncaught error in archiveActiveStorms:', e)
+      );
     }
 
     // Return successful response

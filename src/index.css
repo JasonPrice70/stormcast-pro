@@ -18,12 +18,10 @@
   box-sizing: border-box;
 }
 
-html, body {
-  margin: 0 !important;
-  padding: 0 !important;
+html {
+  margin: 0;
+  padding: 0;
   height: 100%;
-  overflow-x: hidden;
-  overflow-y: auto;
 }
 
 body {
@@ -31,6 +29,7 @@ body {
   padding: 0 !important;
   min-width: 320px;
   min-height: 100vh;
+  overflow-x: hidden;
   background-color: #ffffff;
   color: #2c3e50;
 }

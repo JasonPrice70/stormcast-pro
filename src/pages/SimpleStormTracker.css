@@ -31,7 +31,7 @@
 .storm-selector-box:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(79, 195, 247, 0.3);
-  border-color: #4FC3F7 !important;
+  border-color: #00d4ff !important;
   background-color: rgba(79, 195, 247, 0.15) !important;
 }
 
@@ -66,7 +66,7 @@
   width: 12px;
   height: 12px;
   border: 2px solid #f3f3f3;
-  border-top: 2px solid #1976d2;
+  border-top: 2px solid #00d4ff;
   border-radius: 50%;
   animation: spin 1s linear infinite;
   margin-right: 6px;
@@ -77,7 +77,7 @@
   width: 12px;
   height: 12px;
   border: 2px solid #f3f3f3;
-  border-top: 2px solid #1976d2;
+  border-top: 2px solid #00d4ff;
   border-radius: 50%;
   animation: spin 1s linear infinite;
   margin-left: 6px;
@@ -87,29 +87,17 @@
 .simple-storm-tracker {
   height: 100vh;
   width: 100vw;
-  position: relative;
+  display: flex;
+  flex-direction: column;
 }
 
-/* Header positioned on top of map */
-.simple-storm-tracker .header {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 2000;
-  background: rgba(30, 30, 30, 0.85);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.4);
-}
-
-/* Map Container - takes full space */
+/* Map Container - fills remaining space below header */
 .map-wrapper {
-  height: 100vh;
+  flex: 1;
   width: 100%;
   position: relative;
   transition: width 0.3s ease-in-out;
+  min-height: 0;
 }
 
 /* Responsive adjustments for mobile */
@@ -402,16 +390,18 @@
 /* Sliding Control Panel */
 .sliding-control-panel {
   position: fixed;
-  top: 71px;
+  top: 64px;
   right: 0;
-  height: calc(100vh - 71px);
+  height: calc(100vh - 64px);
+  z-index: 1500;
   width: 300px;
-  background: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(10px);
-  border: 1px solid #e0e0e0;
+  background: rgba(5, 13, 26, 0.97);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(0, 212, 255, 0.15);
   border-right: none;
   border-radius: 0;
-  box-shadow: -2px 0 20px rgba(0, 0, 0, 0.15);
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.5);
   z-index: 1000;
   transform: translateX(100%);
   transition: transform 0.3s ease-in-out;
@@ -551,7 +541,7 @@
 }
 
 .control-panel-button--primary {
-  background: #1976d2;
+  background: #00d4ff;
   color: white;
   font-weight: 600;
 }
@@ -605,8 +595,8 @@
 }
 
 .leaflet-top .leaflet-control {
-	margin-top: 86px;
-	}
+  margin-top: 10px;
+}
 
 /* =====================================================
    MODERN LAYER PANEL COMPONENTS
@@ -780,7 +770,7 @@
 }
 
 .toggle-switch input:checked + .toggle-track {
-  background: #a855f7;
+  background: #00d4ff;
 }
 
 .toggle-switch input:checked + .toggle-track::before {
@@ -811,7 +801,7 @@
 }
 
 .sub-option-label input[type="radio"] {
-  accent-color: #4FC3F7;
+  accent-color: #00d4ff;
   cursor: pointer;
 }
 
@@ -834,7 +824,7 @@
 }
 
 .wind-speed-option input[type="radio"] {
-  accent-color: #4FC3F7;
+  accent-color: #00d4ff;
 }
 
 /* Model quick action buttons */
@@ -881,7 +871,7 @@
   align-items: center;
   gap: 4px;
   font-size: 0.68rem;
-  color: #4FC3F7;
+  color: #00d4ff;
   margin-left: 4px;
 }
 

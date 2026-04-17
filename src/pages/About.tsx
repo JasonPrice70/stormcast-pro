@@ -1,99 +1,167 @@
+import { Link } from 'react-router-dom'
 import SimpleHeader from '../components/SimpleHeader'
-import '../App.css'
+import './About.css'
+
+const dataSources = [
+  {
+    icon: '🌀',
+    title: 'National Hurricane Center',
+    desc: 'Official storm advisories, forecast cones, wind radii, and storm surge data directly from NOAA/NHC.',
+  },
+  {
+    icon: '🛰️',
+    title: 'NASA GIBS / GOES-East',
+    desc: 'Live GeoColor and infrared satellite composites from GOES-East via NASA\'s Global Imagery Browse Services.',
+  },
+  {
+    icon: '📡',
+    title: 'GEFS Ensemble Models',
+    desc: 'Global Ensemble Forecast System spaghetti tracks for probabilistic path guidance.',
+  },
+  {
+    icon: '🔬',
+    title: 'HWRF & HMON Models',
+    desc: 'Hurricane Weather Research & Forecasting and Hurricanes in a Multi-scale Ocean-coupled Non-hydrostatic model intensity guidance.',
+  },
+]
+
+const techStack = [
+  'React 18', 'TypeScript', 'Vite', 'Leaflet / React-Leaflet',
+  'AWS Amplify', 'NASA GIBS', 'NOAA NHC API', 'PostHog Analytics',
+]
 
 const About = () => {
   return (
-    <div className="page">
+    <div className="about-page">
       <SimpleHeader />
-      <div className="container" style={{ padding: '40px 20px' }}>
-        <div className="hero">
-          <h1>About Cyclotrak</h1>
-          <p>Professional Hurricane & Tropical Cyclone Tracking Platform</p>
+
+      {/* ── Hero ── */}
+      <section className="ab-hero">
+        <div className="ab-hero-glow" />
+        <div className="ab-hero-content">
+          <p className="ab-eyebrow">ABOUT CYCLOTRAK</p>
+          <h1 className="ab-headline">
+            Built for the storms<br />
+            <span className="ab-accent">that matter most.</span>
+          </h1>
+          <p className="ab-subheadline">
+            CycloTrak is a professional hurricane tracking platform delivering real-time
+            satellite imagery, NHC official data, and multi-model ensemble guidance
+            — all in one place.
+          </p>
         </div>
+      </section>
 
-        <div className="content">
-          <section className="storm-info">
-            <h2>Mission Statement</h2>
-            <p>
-              Cyclotrak is dedicated to providing accurate, real-time hurricane and tropical cyclone 
-              tracking information to help communities, emergency responders, and researchers stay 
-              informed about developing weather threats.
-            </p>
-          </section>
-
-          <section className="storm-info">
-            <h2>Data Sources</h2>
-            <ul>
-              <li><strong>National Hurricane Center (NHC)</strong> - Official storm advisories and forecasts</li>
-              <li><strong>Weather Models</strong> - GFS, ECMWF, HWRF, and other meteorological models</li>
-              <li><strong>Satellite Data</strong> - Real-time satellite imagery and analysis</li>
-              <li><strong>Observational Data</strong> - Hurricane hunter aircraft and weather stations</li>
-            </ul>
-          </section>
-
-          <section className="storm-info">
-            <h2>Features</h2>
-            <div className="forecast-grid">
-              <div className="forecast-card">
-                <h3>🗺️ Interactive Maps</h3>
-                <p>Real-time storm tracking with forecast cones, wind probability zones, and storm surge data.</p>
-              </div>
-              <div className="forecast-card">
-                <h3>📊 Data Visualization</h3>
-                <p>Charts and graphs showing storm intensity, pressure trends, and forecast models.</p>
-              </div>
-              <div className="forecast-card">
-                <h3>🌪️ Multi-Storm Tracking</h3>
-                <p>Monitor multiple active storms simultaneously across all ocean basins.</p>
-              </div>
-              <div className="forecast-card">
-                <h3>⚡ Real-time Updates</h3>
-                <p>Automatic data refresh to ensure you have the latest storm information.</p>
-              </div>
-            </div>
-          </section>
-
-          <section className="storm-info">
-            <h2>Technology</h2>
-            <p>
-              Built with modern web technologies including React, TypeScript, Leaflet mapping, 
-              and AWS cloud infrastructure for reliable, scalable storm tracking.
-            </p>
-          </section>
-
-          <section className="storm-info">
-            <h2>Contact Information</h2>
-            <p>
-              For questions, feedback, or technical support regarding Cyclotrak, please reach out:
-            </p>
-            <div className="contact-info">
+      {/* ── Mission ── */}
+      <section className="ab-section">
+        <div className="ab-inner">
+          <p className="ab-label">MISSION</p>
+          <div className="ab-mission-card">
+            <div className="ab-mission-icon">🎯</div>
+            <div>
+              <h2>Keeping people informed when it counts.</h2>
               <p>
-                <strong>📧 Email:</strong> 
-                <a href="mailto:jason.cyclotrak@gmail.com" style={{
-                  color: '#1a237e',
-                  textDecoration: 'none',
-                  marginLeft: '8px'
-                }}>
+                CycloTrak exists to give communities, emergency planners, and weather
+                enthusiasts access to the best available storm data — presented clearly,
+                updated continuously, and available on any device. When a storm is
+                approaching, there's no time for complicated tools.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Data Sources ── */}
+      <section className="ab-section ab-section-alt">
+        <div className="ab-inner">
+          <p className="ab-label">DATA SOURCES</p>
+          <h2 className="ab-section-title">Official data. Live feeds.</h2>
+          <div className="ab-grid">
+            {dataSources.map(({ icon, title, desc }) => (
+              <div className="ab-card" key={title}>
+                <span className="ab-card-icon">{icon}</span>
+                <h3>{title}</h3>
+                <p>{desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Tech Stack ── */}
+      <section className="ab-section">
+        <div className="ab-inner">
+          <p className="ab-label">TECHNOLOGY</p>
+          <h2 className="ab-section-title">Modern stack, reliable delivery.</h2>
+          <p className="ab-body-text">
+            Built with React and TypeScript on Vite, deployed globally on AWS Amplify,
+            and powered by open geospatial standards. Every layer of the stack is chosen
+            for performance and reliability during peak storm-season traffic.
+          </p>
+          <div className="ab-pills">
+            {techStack.map(t => (
+              <span className="ab-pill" key={t}>{t}</span>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Contact ── */}
+      <section className="ab-section ab-section-alt">
+        <div className="ab-inner">
+          <p className="ab-label">CONTACT</p>
+          <h2 className="ab-section-title">Get in touch.</h2>
+          <div className="ab-contact-card">
+            <div className="ab-contact-row">
+              <span className="ab-contact-icon">📧</span>
+              <div>
+                <p className="ab-contact-label">Email</p>
+                <a href="mailto:jason.cyclotrak@gmail.com" className="ab-contact-link">
                   jason.cyclotrak@gmail.com
                 </a>
-              </p>
-              <p style={{ marginTop: '10px', fontSize: '0.9rem', color: '#666' }}>
-                We welcome your feedback and suggestions to help improve Cyclotrak's storm tracking capabilities.
+              </div>
+            </div>
+            <p className="ab-contact-note">
+              Feedback, bug reports, and feature suggestions are always welcome.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Disclaimer ── */}
+      <section className="ab-section">
+        <div className="ab-inner">
+          <div className="ab-disclaimer">
+            <span className="ab-disclaimer-icon">⚠️</span>
+            <div>
+              <h3>Important Disclaimer</h3>
+              <p>
+                CycloTrak is for <strong>informational purposes only</strong>. Always follow
+                guidance from the{' '}
+                <a
+                  href="https://www.nhc.noaa.gov"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="ab-inline-link"
+                >
+                  National Hurricane Center
+                </a>{' '}
+                and local emergency management officials for evacuation orders and
+                life-safety decisions. Do not rely solely on this tool.
               </p>
             </div>
-          </section>
-
-          <section className="storm-info">
-            <h2>Disclaimer</h2>
-            <p>
-              <strong>⚠️ Important:</strong> This application is for informational purposes only. 
-              Always consult official sources like the National Hurricane Center for authoritative 
-              storm information and evacuation guidance. Do not rely solely on this tool for 
-              life-safety decisions.
-            </p>
-          </section>
+          </div>
         </div>
-      </div>
+      </section>
+
+      {/* ── CTA Banner ── */}
+      <section className="ab-banner">
+        <div className="ab-banner-inner">
+          <h2>Ready to track the storm?</h2>
+          <p>Open the live tracker and see what's active right now.</p>
+          <Link to="/tracker" className="ab-cta">Launch Storm Tracker →</Link>
+        </div>
+      </section>
     </div>
   )
 }
