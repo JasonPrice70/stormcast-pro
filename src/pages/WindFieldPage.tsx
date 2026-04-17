@@ -89,8 +89,32 @@ const ADVISORY: ForecastPoint[] = [
   },
 ]
 
-const DARK_TILES = 'https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png'
-const LABEL_TILES = 'https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png'
+const BASEMAPS = [
+  {
+    id: 'satellite',
+    label: 'Satellite',
+    tiles: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    labels: 'https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png',
+  },
+  {
+    id: 'light',
+    label: 'Light',
+    tiles: 'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png',
+    labels: 'https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png',
+  },
+  {
+    id: 'terrain',
+    label: 'Terrain',
+    tiles: 'https://tiles.stadiamaps.com/tiles/stamen_terrain_background/{z}/{x}/{y}{r}.png',
+    labels: 'https://tiles.stadiamaps.com/tiles/stamen_terrain_labels/{z}/{x}/{y}{r}.png',
+  },
+  {
+    id: 'dark',
+    label: 'Dark',
+    tiles: 'https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png',
+    labels: 'https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png',
+  },
+]
 
 // Land mask domain covers Gulf + Atlantic
 const MASK_DOMAIN = { south: 5, north: 52, west: -115, east: -50, step: 0.1 }
@@ -219,6 +243,9 @@ const WindFieldPage = () => {
   const [mask, setMask] = useState<LandMask | null>(null)
   const [maskLoading, setMaskLoading] = useState(true)
   const [opacity, setOpacity] = useState(0.85)
+  const [basemapId, setBasemapId] = useState('satellite')
+
+  const basemap = BASEMAPS.find(b => b.id === basemapId) ?? BASEMAPS[0]
 
   const fc = ADVISORY[activeIdx]
   const initialCenter: [number, number] = [22, -83]
@@ -262,6 +289,21 @@ const WindFieldPage = () => {
             </div>
           </div>
 
+          <div className="wf-tab-group">
+            <span className="wf-tab-label">BASEMAP</span>
+            <div className="wf-tabs">
+              {BASEMAPS.map(b => (
+                <button
+                  key={b.id}
+                  className={`wf-tab${basemapId === b.id ? ' active' : ''}`}
+                  onClick={() => setBasemapId(b.id)}
+                >
+                  <span className="wf-tab-line1">{b.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="wf-opacity-group">
             <span className="wf-tab-label">OPACITY</span>
             <input
@@ -291,10 +333,10 @@ const WindFieldPage = () => {
           attributionControl={false}
           style={{ width: '100%', height: '100%' }}
         >
-          <TileLayer url={DARK_TILES} />
+          <TileLayer key={basemap.tiles} url={basemap.tiles} />
           <WindFieldLayer fc={fc} mask={mask} opacity={opacity} />
           <StormTrackLayer points={ADVISORY} activeIdx={activeIdx} />
-          <TileLayer url={LABEL_TILES} zIndex={600} />
+          <TileLayer key={basemap.labels} url={basemap.labels} zIndex={600} />
         </MapContainer>
 
         {/* Wind speed legend */}
