@@ -111,6 +111,34 @@
   opacity: 0.75;
 }
 
+.wf-nav-btn {
+  background: transparent;
+  border: 1px solid rgba(0, 212, 255, 0.2);
+  color: rgba(232, 244, 255, 0.6);
+  border-radius: 7px;
+  width: 30px;
+  height: 30px;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.wf-nav-btn:hover:not(:disabled) {
+  background: rgba(0, 212, 255, 0.1);
+  border-color: rgba(0, 212, 255, 0.5);
+  color: #00d4ff;
+}
+
+.wf-nav-btn:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+
 .wf-opacity-group {
   display: flex;
   align-items: center;
@@ -315,6 +343,24 @@
   border-radius: 4px;
   padding: 2px 7px;
   align-self: flex-start;
+}
+
+/* ─── Wind speed hover tooltip ─────────────────────────── */
+.wf-wind-tooltip.leaflet-tooltip {
+  background: rgba(5, 13, 26, 0.92) !important;
+  border: 1px solid rgba(0, 212, 255, 0.3) !important;
+  border-radius: 7px !important;
+  color: #e8f4ff !important;
+  font-size: 0.8rem !important;
+  font-family: inherit !important;
+  padding: 4px 9px !important;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.5) !important;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.wf-wind-tooltip.leaflet-tooltip::before {
+  border-top-color: rgba(0, 212, 255, 0.3) !important;
 }
 
 /* ─── Responsive ───────────────────────────────────── */

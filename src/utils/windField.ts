@@ -1,6 +1,56 @@
 // Wind field computation using modified Rankine vortex with quadrant interpolation
+// Post-landfall decay: Kaplan & DeMaria (1995) exponential decay model
 
 const DEG = Math.PI / 180
+
+// ─── Kaplan & DeMaria (1995) Post-Landfall Decay ──────────────────────────────
+// Reference: Kaplan, J. and M. DeMaria (1995), "A simple empirical model for
+// predicting the decay of tropical cyclone winds after landfall."
+// J. Appl. Meteor., 34, 2499–2512.
+//
+// V(t) = Vb + (V0 − Vb) × exp(−α × t)
+//   V0  = maximum wind at landfall (kt)
+//   Vb  = 26.7 kt  — residual background wind after full decay
+//   α   = 0.095 h⁻¹ for Atlantic,  0.169 h⁻¹ for Gulf of Mexico
+//   t   = hours since landfall
+
+export const KD_VB_KT           = 26.7   // kt  — residual background wind
+export const KD_ALPHA_ATLANTIC   = 0.095  // h⁻¹ — Atlantic decay rate
+export const KD_ALPHA_GULF       = 0.169  // h⁻¹ — Gulf of Mexico decay rate
+
+export type KDBasin = 'atlantic' | 'gulf'
+
+/**
+ * Kaplan-DeMaria decayed maximum wind.
+ * @param v0Kt       Maximum wind at landfall (kt)
+ * @param hoursInland Hours elapsed since landfall
+ * @param basin      'atlantic' (default) or 'gulf'
+ * @returns Decayed Vmax (kt)
+ */
+export function kaplanDeMariaVmax(
+  v0Kt: number,
+  hoursInland: number,
+  basin: KDBasin = 'atlantic',
+): number {
+  const alpha = basin === 'gulf' ? KD_ALPHA_GULF : KD_ALPHA_ATLANTIC
+  return KD_VB_KT + (v0Kt - KD_VB_KT) * Math.exp(-alpha * hoursInland)
+}
+
+/**
+ * Multiplicative K-D decay factor relative to v0 (range 0–1).
+ * Multiply raw Rankine winds by this to account for inland surface effects.
+ * @param v0Kt       Wind at landfall (kt) — used to anchor the Vb ratio
+ * @param hoursInland Hours over land
+ * @param basin      'atlantic' (default) or 'gulf'
+ */
+export function kaplanDeMariaFactor(
+  v0Kt: number,
+  hoursInland: number,
+  basin: KDBasin = 'atlantic',
+): number {
+  if (v0Kt <= KD_VB_KT) return 1.0
+  return kaplanDeMariaVmax(v0Kt, hoursInland, basin) / v0Kt
+}
 
 // ─── Geography ────────────────────────────────────────────────────────────────
 
@@ -62,7 +112,7 @@ export function windSpeedKt(
   vmaxKt: number,
   rmaxNm: number,
   r34: [number, number, number, number],
-  r50: [number, number, number, number] | null,
+  _r50: [number, number, number, number] | null,
   _r64: [number, number, number, number] | null,
 ): number {
   const dist = haversineNm(gridLat, gridLon, cLat, cLon)
@@ -71,13 +121,12 @@ export function windSpeedKt(
   const bearing = bearingDeg(cLat, cLon, gridLat, gridLon)
 
   const q34 = quadrantInterp(bearing, r34)
-  const q50 = r50 ? quadrantInterp(bearing, r50) : 0
 
-  // Fit Rankine decay exponent from available outer radii
+  // Fit n from r34 so wind = 34 kt exactly at the NHC-reported radius in each direction.
+  // Using r50 to fit n produces similar n values when r50/r34 ratios are equal across
+  // quadrants, which makes the field appear circular even when r34 values differ greatly.
   let n: number
-  if (q50 > 0 && q34 > q50 && q50 > rmaxNm) {
-    n = Math.log(50 / 34) / Math.log(q34 / q50)
-  } else if (q34 > 0 && q34 > rmaxNm) {
+  if (q34 > 0 && q34 > rmaxNm) {
     n = Math.log(vmaxKt / 34) / Math.log(q34 / rmaxNm)
   } else {
     n = 0.6

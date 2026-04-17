@@ -3,7 +3,7 @@ import { MapContainer, TileLayer, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import SimpleHeader from '../components/SimpleHeader'
-import { windSpeedKt, rmaxFromVmax, windToRGBA, categoryLabel, categoryColor } from '../utils/windField'
+import { windSpeedKt, rmaxFromVmax, windToRGBA, categoryLabel, categoryColor, type KDBasin } from '../utils/windField'
 import { buildLandMask, isLand, type LandMask } from '../utils/landMask'
 import './WindFieldPage.css'
 
@@ -19,6 +19,10 @@ export interface ForecastPoint {
   r34: [number, number, number, number]
   r50: [number, number, number, number] | null
   r64: [number, number, number, number] | null
+  /** Storm translation speed (kt) — used by K-D decay to convert inland distance to time */
+  stormSpeedKt?: number
+  /** Basin for Kaplan-DeMaria α coefficient (default: 'atlantic') */
+  basin?: KDBasin
   inland?: boolean
 }
 
@@ -85,6 +89,8 @@ const ADVISORY: ForecastPoint[] = [
     r34: [120, 90,  60,  90],
     r50: null,
     r64: null,
+    stormSpeedKt: 12,
+    basin: 'gulf',
     inland: true,
   },
 ]
@@ -127,9 +133,21 @@ interface WindLayerProps {
   opacity: number
 }
 
+const WIND_PANE = 'windPane'
+const WIND_PANE_Z = 450 // above tilePane (200) and overlayPane (400), below markerPane (600)
+
 function WindFieldLayer({ fc, mask, opacity }: WindLayerProps) {
   const map = useMap()
   const overlayRef = useRef<L.ImageOverlay | null>(null)
+
+  // Create a dedicated pane above all tile layers on first mount
+  useEffect(() => {
+    if (!map.getPane(WIND_PANE)) {
+      const pane = map.createPane(WIND_PANE)
+      pane.style.zIndex = String(WIND_PANE_Z)
+      pane.style.pointerEvents = 'none'
+    }
+  }, [map])
 
   const draw = useCallback(() => {
     const bounds = map.getBounds()
@@ -154,10 +172,11 @@ function WindFieldLayer({ fc, mask, opacity }: WindLayerProps) {
     for (let lat = south; lat <= north; lat += STEP) {
       for (let lon = west; lon <= east; lon += STEP) {
         let kt = windSpeedKt(lat, lon, fc.lat, fc.lon, fc.vmax, rmaxNm, fc.r34, fc.r50, fc.r64)
-        if (kt < 16) continue
 
-        // Land friction: ~25% reduction over land (surface roughness effect)
+        // Apply land friction before threshold so reduced values still render
         if (mask && isLand(lat, lon, mask)) kt *= 0.75
+
+        if (kt < 16) continue
 
         const [r, g, b, a] = windToRGBA(kt)
         if (a < 10) continue
@@ -182,7 +201,7 @@ function WindFieldLayer({ fc, mask, opacity }: WindLayerProps) {
       overlayRef.current.remove()
       overlayRef.current = null
     }
-    overlayRef.current = L.imageOverlay(dataUrl, bounds, { zIndex: 400 }).addTo(map)
+    overlayRef.current = L.imageOverlay(dataUrl, bounds, { pane: WIND_PANE }).addTo(map)
   }, [map, fc, mask, opacity])
 
   useEffect(() => {
@@ -193,6 +212,53 @@ function WindFieldLayer({ fc, mask, opacity }: WindLayerProps) {
       overlayRef.current?.remove()
     }
   }, [map, draw])
+
+  return null
+}
+
+// ─── Wind speed hover tooltip ─────────────────────────────────────────────────
+
+function WindHoverLayer({ fc, mask }: { fc: ForecastPoint; mask: LandMask | null }) {
+  const map = useMap()
+
+  useEffect(() => {
+    const tooltip = L.tooltip({
+      permanent: false,
+      direction: 'top',
+      offset: [0, -10],
+      opacity: 1,
+      className: 'wf-wind-tooltip',
+    })
+
+    const onMove = (e: L.LeafletMouseEvent) => {
+      const { lat, lng } = e.latlng
+      const rmaxNm = rmaxFromVmax(fc.vmax, fc.lat)
+      let kt = windSpeedKt(lat, lng, fc.lat, fc.lon, fc.vmax, rmaxNm, fc.r34, fc.r50, fc.r64)
+      if (mask && isLand(lat, lng, mask)) kt *= 0.75
+      if (kt < 16) {
+        if (map.hasLayer(tooltip)) map.removeLayer(tooltip)
+        return
+      }
+      const rounded = Math.round(kt)
+      tooltip.setLatLng(e.latlng)
+      tooltip.setContent(
+        `<span style="color:${categoryColor(rounded)};font-weight:700">${rounded} kt</span> · ${categoryLabel(rounded)}`
+      )
+      if (!map.hasLayer(tooltip)) tooltip.addTo(map)
+    }
+
+    const onOut = () => {
+      if (map.hasLayer(tooltip)) map.removeLayer(tooltip)
+    }
+
+    map.on('mousemove', onMove)
+    map.on('mouseout', onOut)
+    return () => {
+      map.off('mousemove', onMove)
+      map.off('mouseout', onOut)
+      if (map.hasLayer(tooltip)) map.removeLayer(tooltip)
+    }
+  }, [map, fc, mask])
 
   return null
 }
@@ -241,6 +307,19 @@ function StormTrackLayer({ points, activeIdx }: { points: ForecastPoint[]; activ
 const WindFieldPage = () => {
   const [activeIdx, setActiveIdx] = useState(4) // default: +48h (near peak)
   const [mask, setMask] = useState<LandMask | null>(null)
+
+  const goBack    = () => setActiveIdx(i => Math.max(0, i - 1))
+  const goForward = () => setActiveIdx(i => Math.min(ADVISORY.length - 1, i + 1))
+
+  // Keyboard arrow navigation
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft')  goBack()
+      if (e.key === 'ArrowRight') goForward()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
   const [maskLoading, setMaskLoading] = useState(true)
   const [opacity, setOpacity] = useState(0.85)
   const [basemapId, setBasemapId] = useState('satellite')
@@ -274,6 +353,12 @@ const WindFieldPage = () => {
 
           <div className="wf-tab-group">
             <span className="wf-tab-label">FORECAST TIME</span>
+            <button
+              className="wf-nav-btn"
+              onClick={goBack}
+              disabled={activeIdx === 0}
+              aria-label="Previous forecast time"
+            >&#8592;</button>
             <div className="wf-tabs">
               {ADVISORY.map((p, i) => (
                 <button
@@ -287,6 +372,12 @@ const WindFieldPage = () => {
                 </button>
               ))}
             </div>
+            <button
+              className="wf-nav-btn"
+              onClick={goForward}
+              disabled={activeIdx === ADVISORY.length - 1}
+              aria-label="Next forecast time"
+            >&#8594;</button>
           </div>
 
           <div className="wf-opacity-group">
@@ -320,6 +411,7 @@ const WindFieldPage = () => {
         >
           <TileLayer key={basemap.tiles} url={basemap.tiles} />
           <WindFieldLayer fc={fc} mask={mask} opacity={opacity} />
+          <WindHoverLayer fc={fc} mask={mask} />
           <StormTrackLayer points={ADVISORY} activeIdx={activeIdx} />
           <TileLayer key={basemap.labels} url={basemap.labels} zIndex={600} />
         </MapContainer>
@@ -342,7 +434,7 @@ const WindFieldPage = () => {
         <div className="wf-legend">
           <p className="wf-legend-title">WIND SPEED</p>
           {[
-            { color: '#82dcff', label: 'TD  < 34kt' },
+            { color: '#82dcff', label: 'TD  18–33 kt' },
             { color: '#50d264', label: 'TS  34–63kt' },
             { color: '#ffeb00', label: 'Cat 1  64–82kt' },
             { color: '#ff9b00', label: 'Cat 2  83–95kt' },
@@ -355,7 +447,7 @@ const WindFieldPage = () => {
               <span>{label}</span>
             </div>
           ))}
-          <p className="wf-legend-note">Land: −25% friction applied</p>
+          <p className="wf-legend-note">Land: −25% surface friction · hover for speed</p>
         </div>
 
         {/* Active forecast info */}
