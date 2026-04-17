@@ -345,7 +345,7 @@ const Analytics: React.FC = () => {
 
   return (
     <div style={{ minHeight: '100vh', background: '#0f1b2d', color: '#fff', fontFamily: 'system-ui, sans-serif' }}>
-      <SimpleHeader layersPanelOpen={false} onLayersToggle={() => {}} />
+      <SimpleHeader />
 
       <div style={{ maxWidth: 1200, margin: '0 auto', padding: '24px 16px' }}>
 

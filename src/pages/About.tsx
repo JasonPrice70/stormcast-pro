@@ -1,25 +1,32 @@
 import { Link } from 'react-router-dom'
+import TrackChangesOutlinedIcon from '@mui/icons-material/TrackChangesOutlined'
+import SatelliteAltOutlinedIcon from '@mui/icons-material/SatelliteAltOutlined'
+import HubOutlinedIcon from '@mui/icons-material/HubOutlined'
+import TuneOutlinedIcon from '@mui/icons-material/TuneOutlined'
+import GpsFixedOutlinedIcon from '@mui/icons-material/GpsFixedOutlined'
+import EmailOutlinedIcon from '@mui/icons-material/EmailOutlined'
+import WarningAmberOutlinedIcon from '@mui/icons-material/WarningAmberOutlined'
 import SimpleHeader from '../components/SimpleHeader'
 import './About.css'
 
 const dataSources = [
   {
-    icon: '🌀',
+    icon: <TrackChangesOutlinedIcon />,
     title: 'National Hurricane Center',
     desc: 'Official storm advisories, forecast cones, wind radii, and storm surge data directly from NOAA/NHC.',
   },
   {
-    icon: '🛰️',
+    icon: <SatelliteAltOutlinedIcon />,
     title: 'NASA GIBS / GOES-East',
     desc: 'Live GeoColor and infrared satellite composites from GOES-East via NASA\'s Global Imagery Browse Services.',
   },
   {
-    icon: '📡',
+    icon: <HubOutlinedIcon />,
     title: 'GEFS Ensemble Models',
     desc: 'Global Ensemble Forecast System spaghetti tracks for probabilistic path guidance.',
   },
   {
-    icon: '🔬',
+    icon: <TuneOutlinedIcon />,
     title: 'HWRF & HMON Models',
     desc: 'Hurricane Weather Research & Forecasting and Hurricanes in a Multi-scale Ocean-coupled Non-hydrostatic model intensity guidance.',
   },
@@ -57,7 +64,7 @@ const About = () => {
         <div className="ab-inner">
           <p className="ab-label">MISSION</p>
           <div className="ab-mission-card">
-            <div className="ab-mission-icon">🎯</div>
+            <div className="ab-mission-icon"><GpsFixedOutlinedIcon /></div>
             <div>
               <h2>Keeping people informed when it counts.</h2>
               <p>
@@ -113,7 +120,7 @@ const About = () => {
           <h2 className="ab-section-title">Get in touch.</h2>
           <div className="ab-contact-card">
             <div className="ab-contact-row">
-              <span className="ab-contact-icon">📧</span>
+              <span className="ab-contact-icon"><EmailOutlinedIcon /></span>
               <div>
                 <p className="ab-contact-label">Email</p>
                 <a href="mailto:jason.cyclotrak@gmail.com" className="ab-contact-link">
@@ -132,7 +139,7 @@ const About = () => {
       <section className="ab-section">
         <div className="ab-inner">
           <div className="ab-disclaimer">
-            <span className="ab-disclaimer-icon">⚠️</span>
+            <span className="ab-disclaimer-icon"><WarningAmberOutlinedIcon /></span>
             <div>
               <h3>Important Disclaimer</h3>
               <p>
