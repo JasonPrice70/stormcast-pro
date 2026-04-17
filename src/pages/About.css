@@ -115,9 +115,21 @@
 }
 
 .ab-mission-icon {
-  font-size: 2.4rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
   flex-shrink: 0;
+  border-radius: 14px;
+  background: rgba(0, 212, 255, 0.1);
+  border: 1px solid rgba(0, 212, 255, 0.22);
+  color: #00d4ff;
   margin-top: 4px;
+}
+
+.ab-mission-icon svg {
+  font-size: 1.6rem;
 }
 
 .ab-mission-card h2 {
@@ -157,9 +169,20 @@
 }
 
 .ab-card-icon {
-  font-size: 1.8rem;
-  display: block;
-  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: rgba(0, 212, 255, 0.1);
+  border: 1px solid rgba(0, 212, 255, 0.2);
+  color: #00d4ff;
+  margin-bottom: 16px;
+}
+
+.ab-card-icon svg {
+  font-size: 1.4rem;
 }
 
 .ab-card h3 {
@@ -216,8 +239,20 @@
 }
 
 .ab-contact-icon {
-  font-size: 1.6rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
   flex-shrink: 0;
+  border-radius: 12px;
+  background: rgba(0, 212, 255, 0.1);
+  border: 1px solid rgba(0, 212, 255, 0.2);
+  color: #00d4ff;
+}
+
+.ab-contact-icon svg {
+  font-size: 1.4rem;
 }
 
 .ab-contact-label {
@@ -263,9 +298,21 @@
 }
 
 .ab-disclaimer-icon {
-  font-size: 1.6rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
   flex-shrink: 0;
+  border-radius: 12px;
+  background: rgba(255, 180, 0, 0.1);
+  border: 1px solid rgba(255, 180, 0, 0.25);
+  color: rgba(255, 210, 80, 0.9);
   margin-top: 2px;
+}
+
+.ab-disclaimer-icon svg {
+  font-size: 1.4rem;
 }
 
 .ab-disclaimer h3 {

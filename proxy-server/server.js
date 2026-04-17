@@ -43,7 +43,7 @@ app.get('/api/active-storms', async (req, res) => {
       timeout: 15000,
       maxRedirects: 5,
       headers: {
-        'User-Agent': 'StormCast-Pro/1.0 (Hurricane Tracking Application)',
+        'User-Agent': 'CycloTrak/1.0 (Hurricane Tracking Application)',
         'Accept': 'application/json',
         'Accept-Encoding': 'gzip, deflate'
       }
@@ -81,7 +81,7 @@ app.get('/api/forecast-track/:stormId', async (req, res) => {
     const response = await axios.get(url, {
       timeout: 10000,
       headers: {
-        'User-Agent': 'StormCast-Pro/1.0 (Hurricane Tracking Application)',
+        'User-Agent': 'CycloTrak/1.0 (Hurricane Tracking Application)',
         'Accept': 'application/json'
       }
     });
@@ -131,7 +131,7 @@ app.get('/api/historical-track/:stormId', async (req, res) => {
     const response = await axios.get(url, {
       timeout: 10000,
       headers: {
-        'User-Agent': 'StormCast-Pro/1.0 (Hurricane Tracking Application)',
+        'User-Agent': 'CycloTrak/1.0 (Hurricane Tracking Application)',
         'Accept': 'application/json'
       }
     });
@@ -181,7 +181,7 @@ app.get('/api/forecast-cone/:stormId', async (req, res) => {
     const response = await axios.get(url, {
       timeout: 10000,
       headers: {
-        'User-Agent': 'StormCast-Pro/1.0 (Hurricane Tracking Application)',
+        'User-Agent': 'CycloTrak/1.0 (Hurricane Tracking Application)',
         'Accept': 'application/json'
       }
     });
@@ -245,7 +245,7 @@ app.get('/api/proxy', async (req, res) => {
     const response = await axios.get(url, {
       timeout: 15000,
       headers: {
-        'User-Agent': 'StormCast-Pro/1.0 (Hurricane Tracking Application)',
+        'User-Agent': 'CycloTrak/1.0 (Hurricane Tracking Application)',
         'Accept': 'application/json'
       }
     });

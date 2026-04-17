@@ -2637,7 +2637,7 @@ exports.handler = async (event) => {
                 timeout: REQUEST_TIMEOUT,
                 responseType: adeckUrl.endsWith('.gz') ? 'arraybuffer' : 'text',
                 headers: {
-                  'User-Agent': 'StormCast Pro (cyclotrak.com, jasonprice70@gmail.com)',
+                  'User-Agent': 'CycloTrak (cyclotrak.com, jasonprice70@gmail.com)',
                   'Accept': adeckUrl.endsWith('.gz') ? 'application/gzip, */*' : 'text/plain, */*'
                 },
                 transformResponse: [data => data]
