@@ -78,7 +78,40 @@ const About = () => {
         </div>
       </section>
 
-      {/* ── Data Sources ── */}
+      {/* ── About the Developer ── */}
+      <section className="ab-section ab-section-alt">
+        <div className="ab-inner">
+          <p className="ab-label">ABOUT THE DEVELOPER</p>
+          <div className="ab-dev-card">
+            <img
+              src="/jason-price.jpg"
+              alt="Jason Price"
+              className="ab-dev-avatar"
+            />
+            <div className="ab-dev-bio">
+              <h2>Jason Price</h2>
+              <p>
+                Jason has been writing code since <strong>1984</strong> — starting with
+                Applesoft Basic on an Apple II and never really stopping. He spent his
+                entire career in software, cutting his teeth on the Microsoft stack from
+                Visual Basic through the full .NET ecosystem.
+              </p>
+              <p>
+                Today he works in the <strong>Energy &amp; Utilities</strong> space, where
+                a passion for emerging technologies drives him to continuously find better
+                ways to build and deliver. CycloTrak is entirely his own work — a personal
+                project born from a conviction that hurricane data can be presented more
+                clearly, accessibly, and usefully than it currently is.
+              </p>
+              <p>
+                This site has no corporate backing. Every line of code, every design
+                decision, and every data pipeline was built by Jason — with the goal of
+                giving people better situational awareness when a storm is bearing down.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
       <section className="ab-section ab-section-alt">
         <div className="ab-inner">
           <p className="ab-label">DATA SOURCES</p>
