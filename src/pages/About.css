@@ -1,0 +1,369 @@
+/* ─── Base ─────────────────────────────────────────── */
+.about-page {
+  background: #050d1a;
+  color: #e8f4ff;
+  min-height: 100vh;
+}
+
+/* ─── Hero ─────────────────────────────────────────── */
+.ab-hero {
+  position: relative;
+  padding: 100px 24px 90px;
+  text-align: center;
+  overflow: hidden;
+}
+
+/* Radial glow behind hero text */
+.ab-hero-glow {
+  position: absolute;
+  top: -60px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 700px;
+  height: 500px;
+  background: radial-gradient(ellipse at center, rgba(0, 212, 255, 0.12) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.ab-hero-content {
+  position: relative;
+  z-index: 1;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.ab-eyebrow {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: #00d4ff;
+  margin: 0 0 20px;
+  text-transform: uppercase;
+}
+
+.ab-headline {
+  font-size: clamp(2.4rem, 5.5vw, 3.8rem);
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.025em;
+  color: #e8f4ff;
+  margin: 0 0 20px;
+}
+
+.ab-accent {
+  color: #00d4ff;
+  filter: drop-shadow(0 0 20px rgba(0, 212, 255, 0.45));
+}
+
+.ab-subheadline {
+  font-size: clamp(1rem, 2vw, 1.15rem);
+  color: rgba(232, 244, 255, 0.65);
+  line-height: 1.7;
+  max-width: 580px;
+  margin: 0 auto;
+}
+
+/* ─── Sections ─────────────────────────────────────── */
+.ab-section {
+  padding: 80px 24px;
+}
+
+.ab-section-alt {
+  background: #070e1c;
+}
+
+.ab-inner {
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.ab-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: #00d4ff;
+  margin: 0 0 14px;
+  text-transform: uppercase;
+}
+
+.ab-section-title {
+  font-size: clamp(1.6rem, 3vw, 2.2rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #e8f4ff;
+  margin: 0 0 40px;
+  line-height: 1.2;
+}
+
+.ab-body-text {
+  font-size: 1rem;
+  color: rgba(232, 244, 255, 0.65);
+  line-height: 1.75;
+  max-width: 680px;
+  margin: 0 0 32px;
+}
+
+/* ─── Mission card ─────────────────────────────────── */
+.ab-mission-card {
+  display: flex;
+  gap: 28px;
+  align-items: flex-start;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(0, 212, 255, 0.12);
+  border-radius: 16px;
+  padding: 36px 32px;
+}
+
+.ab-mission-icon {
+  font-size: 2.4rem;
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+
+.ab-mission-card h2 {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #e8f4ff;
+  margin: 0 0 14px;
+  letter-spacing: -0.01em;
+}
+
+.ab-mission-card p {
+  font-size: 1rem;
+  color: rgba(232, 244, 255, 0.65);
+  line-height: 1.75;
+  margin: 0;
+}
+
+/* ─── Data source grid ─────────────────────────────── */
+.ab-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 18px;
+}
+
+.ab-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(0, 212, 255, 0.1);
+  border-radius: 14px;
+  padding: 28px 24px;
+  transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+}
+
+.ab-card:hover {
+  border-color: rgba(0, 212, 255, 0.35);
+  background: rgba(0, 212, 255, 0.05);
+  transform: translateY(-3px);
+}
+
+.ab-card-icon {
+  font-size: 1.8rem;
+  display: block;
+  margin-bottom: 14px;
+}
+
+.ab-card h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #e8f4ff;
+  margin: 0 0 8px;
+}
+
+.ab-card p {
+  font-size: 0.9rem;
+  color: rgba(232, 244, 255, 0.55);
+  line-height: 1.65;
+  margin: 0;
+}
+
+/* ─── Tech pills ───────────────────────────────────── */
+.ab-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.ab-pill {
+  background: rgba(0, 212, 255, 0.08);
+  border: 1px solid rgba(0, 212, 255, 0.22);
+  color: #00d4ff;
+  border-radius: 999px;
+  padding: 6px 16px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  transition: background 0.18s ease;
+}
+
+.ab-pill:hover {
+  background: rgba(0, 212, 255, 0.16);
+}
+
+/* ─── Contact ──────────────────────────────────────── */
+.ab-contact-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(0, 212, 255, 0.12);
+  border-radius: 14px;
+  padding: 32px 28px;
+  max-width: 520px;
+}
+
+.ab-contact-row {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.ab-contact-icon {
+  font-size: 1.6rem;
+  flex-shrink: 0;
+}
+
+.ab-contact-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(232, 244, 255, 0.45);
+  margin: 0 0 4px;
+  font-weight: 600;
+}
+
+.ab-contact-link {
+  color: #00d4ff;
+  text-decoration: none;
+  font-size: 1rem;
+  font-weight: 600;
+  transition: color 0.18s ease;
+}
+
+.ab-contact-link:hover {
+  color: #33deff;
+  text-decoration: underline;
+}
+
+.ab-contact-note {
+  font-size: 0.88rem;
+  color: rgba(232, 244, 255, 0.45);
+  line-height: 1.6;
+  margin: 0;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* ─── Disclaimer ───────────────────────────────────── */
+.ab-disclaimer {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+  background: rgba(255, 180, 0, 0.05);
+  border: 1px solid rgba(255, 180, 0, 0.2);
+  border-radius: 14px;
+  padding: 28px 24px;
+}
+
+.ab-disclaimer-icon {
+  font-size: 1.6rem;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.ab-disclaimer h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  color: rgba(255, 210, 80, 0.9);
+  margin: 0 0 8px;
+}
+
+.ab-disclaimer p {
+  font-size: 0.92rem;
+  color: rgba(232, 244, 255, 0.6);
+  line-height: 1.7;
+  margin: 0;
+}
+
+.ab-disclaimer strong {
+  color: rgba(232, 244, 255, 0.85);
+}
+
+.ab-inline-link {
+  color: #00d4ff;
+  text-decoration: none;
+}
+
+.ab-inline-link:hover {
+  text-decoration: underline;
+}
+
+/* ─── CTA Banner ───────────────────────────────────── */
+.ab-banner {
+  background: linear-gradient(135deg, rgba(0, 136, 204, 0.18) 0%, rgba(0, 212, 255, 0.08) 100%);
+  border-top: 1px solid rgba(0, 212, 255, 0.15);
+  padding: 80px 24px;
+  text-align: center;
+}
+
+.ab-banner-inner {
+  max-width: 520px;
+  margin: 0 auto;
+}
+
+.ab-banner h2 {
+  font-size: clamp(1.8rem, 3vw, 2.4rem);
+  font-weight: 800;
+  color: #e8f4ff;
+  margin: 0 0 12px;
+  letter-spacing: -0.02em;
+}
+
+.ab-banner p {
+  font-size: 1.05rem;
+  color: rgba(232, 244, 255, 0.6);
+  margin: 0 0 32px;
+  line-height: 1.6;
+}
+
+.ab-cta {
+  display: inline-block;
+  background: #00d4ff;
+  color: #050d1a;
+  font-weight: 700;
+  font-size: 0.95rem;
+  padding: 13px 28px;
+  border-radius: 10px;
+  text-decoration: none;
+  letter-spacing: 0.02em;
+  transition: background 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+  box-shadow: 0 0 24px rgba(0, 212, 255, 0.35);
+}
+
+.ab-cta:hover {
+  background: #33deff;
+  box-shadow: 0 0 36px rgba(0, 212, 255, 0.55);
+  transform: translateY(-2px);
+}
+
+/* ─── Responsive ───────────────────────────────────── */
+@media (max-width: 640px) {
+  .ab-hero {
+    padding: 72px 20px 64px;
+  }
+
+  .ab-section {
+    padding: 56px 20px;
+  }
+
+  .ab-mission-card {
+    flex-direction: column;
+    gap: 16px;
+    padding: 24px 20px;
+  }
+
+  .ab-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ab-contact-card {
+    padding: 24px 20px;
+  }
+}

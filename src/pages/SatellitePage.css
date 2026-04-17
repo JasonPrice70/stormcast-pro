@@ -1,0 +1,311 @@
+/* ─── Base ─────────────────────────────────────────── */
+.satellite-page {
+  background: #050d1a;
+  color: #e8f4ff;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ─── Page header ──────────────────────────────────── */
+.sat-header {
+  border-bottom: 1px solid rgba(0, 212, 255, 0.12);
+  background: rgba(5, 13, 26, 0.98);
+}
+
+.sat-header-inner {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 20px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.sat-eyebrow {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  color: #00d4ff;
+  margin: 0 0 4px;
+  text-transform: uppercase;
+}
+
+.sat-title {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #e8f4ff;
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+.sat-meta {
+  display: flex;
+  gap: 32px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.sat-timestamp,
+.sat-refresh {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sat-refresh {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+
+.sat-meta-label {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: rgba(232, 244, 255, 0.4);
+  text-transform: uppercase;
+}
+
+.sat-meta-value {
+  font-size: 0.85rem;
+  color: rgba(232, 244, 255, 0.8);
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+
+.sat-countdown {
+  color: #00d4ff;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.sat-refresh-btn {
+  background: rgba(0, 212, 255, 0.1);
+  border: 1px solid rgba(0, 212, 255, 0.25);
+  color: #00d4ff;
+  border-radius: 6px;
+  width: 30px;
+  height: 30px;
+  font-size: 1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.18s, transform 0.18s;
+}
+
+.sat-refresh-btn:hover {
+  background: rgba(0, 212, 255, 0.2);
+  transform: rotate(45deg);
+}
+
+/* ─── Controls ─────────────────────────────────────── */
+.sat-controls {
+  background: rgba(7, 14, 28, 0.95);
+  border-bottom: 1px solid rgba(0, 212, 255, 0.08);
+  padding: 14px 0;
+}
+
+.sat-controls-inner {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 24px;
+  display: flex;
+  gap: 32px;
+  align-items: center;
+  flex-wrap: wrap;
+  row-gap: 12px;
+}
+
+.sat-tab-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sat-tab-label {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: rgba(232, 244, 255, 0.35);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.sat-tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.sat-tab {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: rgba(232, 244, 255, 0.55);
+  border-radius: 7px;
+  padding: 6px 14px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  white-space: nowrap;
+}
+
+.sat-tab:hover {
+  border-color: rgba(0, 212, 255, 0.3);
+  color: rgba(232, 244, 255, 0.85);
+  background: rgba(0, 212, 255, 0.06);
+}
+
+.sat-tab.active {
+  background: rgba(0, 212, 255, 0.15);
+  border-color: rgba(0, 212, 255, 0.5);
+  color: #00d4ff;
+  font-weight: 600;
+}
+
+/* ─── Image ────────────────────────────────────────── */
+.sat-image-wrap {
+  flex: 1;
+  position: relative;
+  background: #020810;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 500px;
+  overflow: hidden;
+}
+
+.sat-image {
+  width: 100%;
+  height: auto;
+  display: block;
+  transition: opacity 0.4s ease;
+}
+
+.sat-image.loading {
+  opacity: 0;
+}
+
+.sat-loading,
+.sat-error {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  color: rgba(232, 244, 255, 0.5);
+  font-size: 0.9rem;
+}
+
+.sat-error span {
+  font-size: 2rem;
+}
+
+.sat-error p {
+  margin: 0;
+  color: rgba(232, 244, 255, 0.5);
+}
+
+.sat-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid rgba(0, 212, 255, 0.15);
+  border-top-color: #00d4ff;
+  border-radius: 50%;
+  animation: sat-spin 0.9s linear infinite;
+}
+
+@keyframes sat-spin {
+  to { transform: rotate(360deg); }
+}
+
+.sat-retry-btn {
+  background: rgba(0, 212, 255, 0.12);
+  border: 1px solid rgba(0, 212, 255, 0.3);
+  color: #00d4ff;
+  border-radius: 8px;
+  padding: 8px 20px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.18s;
+}
+
+.sat-retry-btn:hover {
+  background: rgba(0, 212, 255, 0.22);
+}
+
+/* ─── Description bar ──────────────────────────────── */
+.sat-desc-bar {
+  background: rgba(7, 14, 28, 0.98);
+  border-top: 1px solid rgba(0, 212, 255, 0.08);
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.sat-desc-bar p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: rgba(232, 244, 255, 0.55);
+  line-height: 1.5;
+}
+
+.sat-desc-bar strong {
+  color: #00d4ff;
+  font-weight: 600;
+}
+
+.sat-attribution {
+  font-size: 0.75rem !important;
+  color: rgba(232, 244, 255, 0.3) !important;
+  white-space: nowrap;
+}
+
+.sat-attribution a {
+  color: rgba(0, 212, 255, 0.6);
+  text-decoration: none;
+}
+
+.sat-attribution a:hover {
+  color: #00d4ff;
+  text-decoration: underline;
+}
+
+/* ─── Responsive ───────────────────────────────────── */
+@media (max-width: 768px) {
+  .sat-header-inner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .sat-controls-inner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .sat-tabs {
+    flex-wrap: wrap;
+  }
+
+  .sat-desc-bar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .sat-attribution {
+    white-space: normal !important;
+  }
+}

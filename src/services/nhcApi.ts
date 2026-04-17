@@ -1973,18 +1973,18 @@ class NHCApiService {
    */
   async getTropicalWeatherOutlookForBasin(basin: 'atlantic' | 'epacific' | 'cpacific'): Promise<TropicalWeatherOutlook | null> {
     try {
-      // Try Lambda endpoint first
+      // Try Lambda first — returns raw NHC HTML text
       const data = await this.fetchWithLambdaFallback('outlook', { basin })
-      if (data && data.investAreas) {
-        return data
+      if (data && typeof data === 'string' && data.includes('Tropical Weather Outlook')) {
+        return this.parseTropicalWeatherOutlook(data, basin)
       }
 
-      // Fallback: fetch text outlook and parse invest areas
+      // Fallback: fetch text directly via CORS proxy
       const textOutlook = await this.fetchTropicalWeatherOutlookText(basin)
       if (textOutlook) {
         return this.parseTropicalWeatherOutlook(textOutlook, basin)
       }
-      
+
       return null
     } catch (error) {
       console.error(`Error fetching tropical weather outlook for ${basin}:`, error)
@@ -1998,7 +1998,7 @@ class NHCApiService {
   private async fetchTropicalWeatherOutlookText(basin: 'atlantic' | 'epacific' | 'cpacific'): Promise<string | null> {
     const outlookUrls = {
       atlantic: `${NHC_BASE_URL}/text/MIATWOAT.shtml`,
-      epacific: `${NHC_BASE_URL}/text/MIATWOED.shtml`, 
+      epacific: `${NHC_BASE_URL}/text/MIATWOEP.shtml`,
       cpacific: `${NHC_BASE_URL}/text/HFOTWOCP.shtml`
     }
 

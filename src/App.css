@@ -3,8 +3,6 @@
   width: 100vw;
   margin: 0;
   padding: 0;
-  overflow-x: hidden;
-  overflow-y: auto;
 }
 
 main {
@@ -52,11 +50,8 @@ main {
 
 /* Hurricane/Storm specific styles */
 .header {
-  /*background: linear-gradient(135deg, #1a237e 0%, #5e35b1 100%);*/
-  background: rgba(0, 0, 0, 0.7);
+  background: rgba(5, 13, 26, 0.95);
   color: white;
-  padding: 1rem 0;
-  /*margin-bottom: 2rem;*/
 }
 
 .nav {

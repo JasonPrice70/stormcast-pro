@@ -1,19 +1,22 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined'
+import TrackChangesOutlinedIcon from '@mui/icons-material/TrackChangesOutlined'
 import ShowChartOutlinedIcon from '@mui/icons-material/ShowChartOutlined'
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
 import BarChartOutlinedIcon from '@mui/icons-material/BarChartOutlined'
+import SatelliteAltOutlinedIcon from '@mui/icons-material/SatelliteAltOutlined'
 import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined'
 import LayersOutlinedIcon from '@mui/icons-material/LayersOutlined'
-import CycloTrakIcon from './CycloTrakIcon'
 import './Header.css'
 
 const navLinks = [
-  { to: '/',          label: 'Home',      icon: <HomeOutlinedIcon fontSize="small" /> },
-  { to: '/forecast',  label: 'Forecast',  icon: <ShowChartOutlinedIcon fontSize="small" /> },
-  { to: '/analytics', label: 'Analytics', icon: <BarChartOutlinedIcon fontSize="small" /> },
-  { to: '/about',     label: 'About',     icon: <InfoOutlinedIcon fontSize="small" /> },
+  { to: '/',           label: 'Home',      icon: <HomeOutlinedIcon fontSize="small" /> },
+  { to: '/tracker',    label: 'Tracker',   icon: <TrackChangesOutlinedIcon fontSize="small" /> },
+  { to: '/satellite',  label: 'Satellite', icon: <SatelliteAltOutlinedIcon fontSize="small" /> },
+  { to: '/forecast',   label: 'Forecast',  icon: <ShowChartOutlinedIcon fontSize="small" /> },
+  { to: '/analytics',  label: 'Analytics', icon: <BarChartOutlinedIcon fontSize="small" /> },
+  { to: '/about',      label: 'About',     icon: <InfoOutlinedIcon fontSize="small" /> },
 ]
 
 interface SimpleHeaderProps {
@@ -46,12 +49,11 @@ const SimpleHeader = ({ layersPanelOpen = false, onLayersToggle }: SimpleHeaderP
               <span></span>
             </button>
 
-            <CycloTrakIcon size={34} />
-
-            <div className="brand-text">
-              <span className="brand-name">CycloTrak</span>
-              <span className="brand-sub">Hurricane &amp; Cyclone Tracking</span>
-            </div>
+            <img
+              src="/cyclotrak-logo.svg"
+              alt="CycloTrak"
+              style={{ height: '58px', width: '239px', display: 'block' }}
+            />
           </div>
 
           {/* ── Right: layers button ── */}
@@ -81,8 +83,11 @@ const SimpleHeader = ({ layersPanelOpen = false, onLayersToggle }: SimpleHeaderP
       <nav className={`slide-menu${isMenuOpen ? ' active' : ''}`} aria-label="Slide-out navigation">
         <div className="slide-menu-header">
           <div className="slide-menu-brand">
-            <CycloTrakIcon size={28} />
-            <h3>CycloTrak</h3>
+            <img
+              src="/cyclotrak-logo.svg"
+              alt="CycloTrak"
+              style={{ height: '30px', width: '124px', display: 'block' }}
+            />
           </div>
           <button className="hamburger-close" onClick={closeMenu} aria-label="Close menu">
             <CloseOutlinedIcon />
