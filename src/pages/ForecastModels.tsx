@@ -66,20 +66,13 @@ const ForecastModels = () => {
     <div className="models-page">
       <SimpleHeader />
 
-      {/* ── Page header ── */}
-      <div className="fm-header">
-        <div className="fm-header-inner">
-          <div className="fm-title-group">
-            <p className="fm-eyebrow">WINDY · LIVE MODEL DATA</p>
-            <h1 className="fm-title">Forecast Models</h1>
-          </div>
-          <p className="fm-model-desc">{model.desc}</p>
-        </div>
-      </div>
-
-      {/* ── Controls ── */}
+      {/* ── Controls (single compact bar) ── */}
       <div className="fm-controls">
         <div className="fm-controls-inner">
+          <div className="fm-title-group">
+            <span className="fm-eyebrow">FORECAST MODELS</span>
+            <span className="fm-model-desc">{model.desc}</span>
+          </div>
           <div className="fm-tab-group">
             <span className="fm-tab-label">MODEL</span>
             <div className="fm-tabs">

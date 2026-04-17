@@ -7,64 +7,50 @@
   flex-direction: column;
 }
 
-/* ─── Page header ──────────────────────────────────── */
-.fm-header {
-  border-bottom: 1px solid rgba(0, 212, 255, 0.12);
-  background: rgba(5, 13, 26, 0.98);
-}
-
-.fm-header-inner {
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 20px 24px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 24px;
-  flex-wrap: wrap;
-}
-
-.fm-eyebrow {
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0.16em;
-  color: #00d4ff;
-  margin: 0 0 4px;
-  text-transform: uppercase;
-}
-
-.fm-title {
-  font-size: 1.6rem;
-  font-weight: 800;
-  color: #e8f4ff;
-  margin: 0;
-  letter-spacing: -0.02em;
-}
-
-.fm-model-desc {
-  font-size: 0.85rem;
-  color: rgba(232, 244, 255, 0.45);
-  margin: 0;
-  font-style: italic;
-  text-align: right;
-}
-
-/* ─── Controls ─────────────────────────────────────── */
+/* ─── Controls (compact single bar) ───────────────── */
 .fm-controls {
-  background: rgba(7, 14, 28, 0.95);
-  border-bottom: 1px solid rgba(0, 212, 255, 0.08);
-  padding: 14px 0;
+  background: rgba(7, 14, 28, 0.97);
+  border-bottom: 1px solid rgba(0, 212, 255, 0.1);
+  padding: 10px 0;
 }
 
 .fm-controls-inner {
   max-width: 1400px;
   margin: 0 auto;
-  padding: 0 24px;
+  padding: 0 20px;
   display: flex;
-  gap: 32px;
+  gap: 20px;
   align-items: center;
   flex-wrap: wrap;
-  row-gap: 12px;
+  row-gap: 8px;
+}
+
+.fm-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding-right: 12px;
+  border-right: 1px solid rgba(0, 212, 255, 0.15);
+  margin-right: 4px;
+  flex-shrink: 0;
+}
+
+.fm-eyebrow {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: #00d4ff;
+  text-transform: uppercase;
+}
+
+.fm-model-desc {
+  font-size: 0.72rem;
+  color: rgba(232, 244, 255, 0.38);
+  font-style: italic;
+  white-space: nowrap;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .fm-tab-group {
@@ -160,19 +146,11 @@
 
 /* ─── Responsive ───────────────────────────────────── */
 @media (max-width: 768px) {
-  .fm-header-inner {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 6px;
-  }
-
-  .fm-model-desc {
-    text-align: left;
+  .fm-title-group {
+    display: none;
   }
 
   .fm-controls-inner {
-    flex-direction: column;
-    align-items: flex-start;
     gap: 12px;
   }
 }
