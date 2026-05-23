@@ -78,55 +78,8 @@ const About = () => {
         </div>
       </section>
 
-      {/* ── The Dev Behind the Data ── */}
-      <section className="ab-section ab-section-alt">
-        <div className="ab-inner">
-          <p className="ab-label">THE DEV BEHIND THE DATA</p>
-          <div className="ab-dev-card">
-            <img
-              src="/jason-price.jpg"
-              alt="Jason Price"
-              className="ab-dev-avatar"
-            />
-            <div className="ab-dev-bio">
-              <h2>Jason Price</h2>
-              <p>
-                Jason has been writing code since <strong>1984</strong> — starting with
-                Applesoft Basic on an Apple II and never really stopping. He spent his
-                entire career in software, cutting his teeth on the Microsoft stack from
-                Visual Basic through the full .NET ecosystem.
-              </p>
-              <p>
-                Today he works in the <strong>Energy &amp; Utilities</strong> space, where
-                a passion for emerging technologies drives him to continuously find better
-                ways to build and deliver. CycloTrak is entirely his own work — a personal
-                project born from a conviction that hurricane data can be presented more
-                clearly, accessibly, and usefully than it currently is.
-              </p>
-              <p>
-                This site has no corporate backing. Every line of code, every design
-                decision, and every data pipeline was built by Jason — with the goal of
-                giving people better situational awareness when a storm is bearing down.
-              </p>
-              <div className="ab-dev-contact">
-                <span className="ab-contact-icon"><EmailOutlinedIcon /></span>
-                <div>
-                  <p className="ab-contact-label">Get in touch</p>
-                  <a href="mailto:jason.cyclotrak@gmail.com" className="ab-contact-link">
-                    jason.cyclotrak@gmail.com
-                  </a>
-                </div>
-              </div>
-              <p className="ab-contact-note" style={{ marginTop: 10 }}>
-                Feedback, bug reports, and feature suggestions are always welcome.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* ── Data Sources ── */}
-      <section className="ab-section">
+      <section className="ab-section ab-section-alt">
         <div className="ab-inner">
           <p className="ab-label">DATA SOURCES</p>
           <h2 className="ab-section-title">Official data. Live feeds.</h2>
@@ -160,7 +113,27 @@ const About = () => {
         </div>
       </section>
 
-
+      {/* ── Contact ── */}
+      <section className="ab-section ab-section-alt">
+        <div className="ab-inner">
+          <p className="ab-label">CONTACT</p>
+          <h2 className="ab-section-title">Get in touch.</h2>
+          <div className="ab-contact-card">
+            <div className="ab-contact-row">
+              <span className="ab-contact-icon"><EmailOutlinedIcon /></span>
+              <div>
+                <p className="ab-contact-label">Email</p>
+                <a href="mailto:jason.cyclotrak@gmail.com" className="ab-contact-link">
+                  jason.cyclotrak@gmail.com
+                </a>
+              </div>
+            </div>
+            <p className="ab-contact-note">
+              Feedback, bug reports, and feature suggestions are always welcome.
+            </p>
+          </div>
+        </div>
+      </section>
 
       {/* ── Disclaimer ── */}
       <section className="ab-section">

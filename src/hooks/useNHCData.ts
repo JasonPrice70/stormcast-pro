@@ -408,3 +408,69 @@ export const useGEFSSpaghetti = (enabled: boolean, stormId: string | null) => {
 
   return { tracks, loading, error, available, refresh: fetchTracks }
 }
+
+// Hook for watch/warning polygon data for a specific storm
+export const useWatchWarning = (enabled: boolean, stormId: string | null) => {
+  const [data, setData] = useState<any>(null)
+  const [loading, setLoading] = useState(false)
+  const [available, setAvailable] = useState<boolean | null>(null)
+
+  const fetch = useCallback(async () => {
+    if (!enabled || !stormId) { setData(null); setAvailable(false); return }
+    try {
+      setLoading(true)
+      const api = new NHCApiService()
+      const result = await api.getWatchWarning(stormId)
+      if (result && result.features && result.features.length > 0) { setData(result); setAvailable(true) }
+      else { setData(null); setAvailable(false) }
+    } catch { setData(null); setAvailable(false) }
+    finally { setLoading(false) }
+  }, [enabled, stormId])
+
+  useEffect(() => { fetch() }, [fetch])
+  return { data, loading, available, refresh: fetch }
+}
+
+// Hook for initial wind extent (current 34/50/64kt radius polygons) for a specific storm
+export const useInitialWindExtent = (enabled: boolean, stormId: string | null) => {
+  const [data, setData] = useState<any>(null)
+  const [loading, setLoading] = useState(false)
+  const [available, setAvailable] = useState<boolean | null>(null)
+
+  const fetch = useCallback(async () => {
+    if (!enabled || !stormId) { setData(null); setAvailable(false); return }
+    try {
+      setLoading(true)
+      const api = new NHCApiService()
+      const result = await api.getInitialWindExtent(stormId)
+      if (result && result.features && result.features.length > 0) { setData(result); setAvailable(true) }
+      else { setData(null); setAvailable(false) }
+    } catch { setData(null); setAvailable(false) }
+    finally { setLoading(false) }
+  }, [enabled, stormId])
+
+  useEffect(() => { fetch() }, [fetch])
+  return { data, loading, available, refresh: fetch }
+}
+
+// Hook for forecast wind radii (34/50/64kt at each forecast time) for a specific storm
+export const useForecastWindRadii = (enabled: boolean, stormId: string | null) => {
+  const [data, setData] = useState<any>(null)
+  const [loading, setLoading] = useState(false)
+  const [available, setAvailable] = useState<boolean | null>(null)
+
+  const fetch = useCallback(async () => {
+    if (!enabled || !stormId) { setData(null); setAvailable(false); return }
+    try {
+      setLoading(true)
+      const api = new NHCApiService()
+      const result = await api.getForecastWindRadii(stormId)
+      if (result && result.features && result.features.length > 0) { setData(result); setAvailable(true) }
+      else { setData(null); setAvailable(false) }
+    } catch { setData(null); setAvailable(false) }
+    finally { setLoading(false) }
+  }, [enabled, stormId])
+
+  useEffect(() => { fetch() }, [fetch])
+  return { data, loading, available, refresh: fetch }
+}

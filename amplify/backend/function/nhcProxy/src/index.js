@@ -1556,6 +1556,110 @@ async function extractWindProbFromKML(kmlContent, windSpeed = '34kt') {
 }
 
 /**
+ * Generic KML placemark extractor – preserves all geometry types and raw props.
+ * Used by watch-warning, initial-wind-extent, and forecast-wind-radii endpoints.
+ */
+async function parseKmzToGenericGeoJSON(kmzBuffer) {
+  return new Promise((resolve, reject) => {
+    yauzl.fromBuffer(kmzBuffer, { lazyEntries: true }, (err, zipfile) => {
+      if (err) return reject(err);
+
+      let kmlContent = '';
+      zipfile.readEntry();
+      zipfile.on('entry', (entry) => {
+        if (entry.fileName.toLowerCase().endsWith('.kml')) {
+          zipfile.openReadStream(entry, (streamErr, readStream) => {
+            if (streamErr) return reject(streamErr);
+            const chunks = [];
+            readStream.on('data', (c) => chunks.push(c));
+            readStream.on('end', () => { kmlContent = Buffer.concat(chunks).toString('utf8'); zipfile.readEntry(); });
+            readStream.on('error', reject);
+          });
+        } else {
+          zipfile.readEntry();
+        }
+      });
+
+      zipfile.on('end', () => {
+        if (!kmlContent) return reject(new Error('No KML file found in KMZ'));
+        extractGenericFromKML(kmlContent).then(resolve).catch(reject);
+      });
+      zipfile.on('error', reject);
+    });
+  });
+}
+
+async function extractGenericFromKML(kmlContent) {
+  try {
+    const parser = new xml2js.Parser({ explicitArray: false });
+    const result = await parser.parseStringPromise(kmlContent);
+    const features = [];
+
+    function parseCoordString(coordStr) {
+      return coordStr.trim().split(/\s+/).map(c => {
+        const [lon, lat] = c.split(',').map(Number);
+        return [lon, lat];
+      }).filter(([lon, lat]) => !isNaN(lon) && !isNaN(lat));
+    }
+
+    function visitNode(obj) {
+      if (!obj) return;
+      if (obj.Placemark) {
+        const marks = Array.isArray(obj.Placemark) ? obj.Placemark : [obj.Placemark];
+        marks.forEach(pm => {
+          const props = {
+            name: pm.name || '',
+            description: (typeof pm.description === 'string' ? pm.description : ''),
+            styleId: pm.styleUrl ? String(pm.styleUrl).replace(/^#/, '') : '',
+          };
+          // Pull SimpleData / ExtendedData if present
+          if (pm.ExtendedData && pm.ExtendedData.SchemaData) {
+            const sd = pm.ExtendedData.SchemaData;
+            const rows = Array.isArray(sd.SimpleData) ? sd.SimpleData : (sd.SimpleData ? [sd.SimpleData] : []);
+            rows.forEach(row => {
+              if (row.$ && row.$.name) props[row.$.name] = row._ || row;
+            });
+          }
+
+          if (pm.Polygon) {
+            const outer = pm.Polygon.outerBoundaryIs && pm.Polygon.outerBoundaryIs.LinearRing;
+            if (outer && outer.coordinates) {
+              features.push({ type: 'Feature', properties: props, geometry: { type: 'Polygon', coordinates: [parseCoordString(outer.coordinates)] } });
+            }
+          } else if (pm.MultiGeometry) {
+            const mg = pm.MultiGeometry;
+            const polys = Array.isArray(mg.Polygon) ? mg.Polygon : (mg.Polygon ? [mg.Polygon] : []);
+            if (polys.length > 0) {
+              const coords = polys.map(p => {
+                const lr = p.outerBoundaryIs && p.outerBoundaryIs.LinearRing;
+                return lr && lr.coordinates ? parseCoordString(lr.coordinates) : [];
+              });
+              features.push({ type: 'Feature', properties: props, geometry: { type: 'MultiPolygon', coordinates: coords.map(c => [c]) } });
+            }
+            const lines = Array.isArray(mg.LineString) ? mg.LineString : (mg.LineString ? [mg.LineString] : []);
+            if (lines.length > 0) {
+              lines.forEach(ls => {
+                if (ls.coordinates) features.push({ type: 'Feature', properties: props, geometry: { type: 'LineString', coordinates: parseCoordString(ls.coordinates) } });
+              });
+            }
+          } else if (pm.LineString && pm.LineString.coordinates) {
+            features.push({ type: 'Feature', properties: props, geometry: { type: 'LineString', coordinates: parseCoordString(pm.LineString.coordinates) } });
+          }
+        });
+      }
+      if (obj.Folder) { const fs = Array.isArray(obj.Folder) ? obj.Folder : [obj.Folder]; fs.forEach(visitNode); }
+      if (obj.Document) visitNode(obj.Document);
+    }
+
+    if (result.kml) visitNode(result.kml);
+    return { type: 'FeatureCollection', features, source: 'kmz' };
+  } catch (e) {
+    console.error('Error parsing KML (generic):', e);
+    throw e;
+  }
+}
+
+/**
  * Parse wind arrival KMZ data and convert to GeoJSON
  */
 async function parseKmzToWindArrivalGeoJSON(kmzBuffer) {
@@ -3078,8 +3182,8 @@ exports.handler = async (event) => {
       case 'archive-storm-snapshot': {
         // Returns the single most-recent snapshot for a storm.
         // ?stormId=AL052025
-        const stormId = queryStringParameters?.stormId;
-        if (!stormId) {
+        const archiveSnapshotStormId = queryStringParameters?.stormId;
+        if (!archiveSnapshotStormId) {
           return {
             statusCode: 400,
             headers: corsHeaders,
@@ -3087,11 +3191,11 @@ exports.handler = async (event) => {
           };
         }
         try {
-          const snapshot = await getLatestStormSnapshot(stormId);
+          const snapshot = await getLatestStormSnapshot(archiveSnapshotStormId);
           return {
             statusCode: 200,
             headers: corsHeaders,
-            body: JSON.stringify({ success: true, stormId, snapshot, timestamp: new Date().toISOString() })
+            body: JSON.stringify({ success: true, stormId: archiveSnapshotStormId, snapshot, timestamp: new Date().toISOString() })
           };
         } catch (err) {
           return {
@@ -3102,12 +3206,42 @@ exports.handler = async (event) => {
         }
       }
 
+      case 'watch-warning': {
+        const wwStormId = queryStringParameters?.stormId;
+        if (!wwStormId) {
+          return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ error: 'stormId parameter is required for watch-warning endpoint' }) };
+        }
+        nhcUrl = `${NHC_BASE_URL}/storm_graphics/api/${wwStormId.toUpperCase()}_WW_latest.kmz`;
+        isKmzEndpoint = true;
+        break;
+      }
+
+      case 'initial-wind-extent': {
+        const wndExtStormId = queryStringParameters?.stormId;
+        if (!wndExtStormId) {
+          return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ error: 'stormId parameter is required for initial-wind-extent endpoint' }) };
+        }
+        nhcUrl = `${NHC_BASE_URL}/storm_graphics/api/${wndExtStormId.toUpperCase()}_WNDEXT_latest.kmz`;
+        isKmzEndpoint = true;
+        break;
+      }
+
+      case 'forecast-wind-radii': {
+        const windRadStormId = queryStringParameters?.stormId;
+        if (!windRadStormId) {
+          return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ error: 'stormId parameter is required for forecast-wind-radii endpoint' }) };
+        }
+        nhcUrl = `${NHC_BASE_URL}/storm_graphics/api/${windRadStormId.toUpperCase()}_WINDRAD_latest.kmz`;
+        isKmzEndpoint = true;
+        break;
+      }
+
       default:
         return {
           statusCode: 400,
           headers: corsHeaders,
           body: JSON.stringify({
-            error: 'Invalid endpoint. Supported endpoints: active-storms, track-kmz, forecast-track, historical-track, forecast-cone, forecast-track-kmz, storm-surge, peak-storm-surge, wind-speed-probability, wind-speed-probability-50kt, wind-speed-probability-64kt, wind-arrival-most-likely, wind-arrival-earliest, hwrf-windfield, hmon-windfield, archive-storm-history, archive-season-storms, archive-season-invests, archive-storm-snapshot'
+            error: 'Invalid endpoint. Supported endpoints: active-storms, track-kmz, forecast-track, historical-track, forecast-cone, forecast-track-kmz, storm-surge, peak-storm-surge, wind-speed-probability, wind-speed-probability-50kt, wind-speed-probability-64kt, wind-arrival-most-likely, wind-arrival-earliest, hwrf-windfield, hmon-windfield, archive-storm-history, archive-season-storms, archive-season-invests, archive-storm-snapshot, watch-warning, initial-wind-extent, forecast-wind-radii'
           })
         };
     }
@@ -3157,6 +3291,9 @@ exports.handler = async (event) => {
         } else if (endpoint === 'wind-arrival-most-likely' || endpoint === 'wind-arrival-earliest') {
           responseData = await parseKmzToWindArrivalGeoJSON(response.data, endpoint);
           console.log(`Successfully parsed KMZ wind arrival data with ${responseData.features.length} features`);
+        } else if (endpoint === 'watch-warning' || endpoint === 'initial-wind-extent' || endpoint === 'forecast-wind-radii') {
+          responseData = await parseKmzToGenericGeoJSON(response.data);
+          console.log(`Successfully parsed KMZ ${endpoint} data with ${responseData.features.length} features`);
         } else {
           throw new Error(`Unknown KMZ endpoint: ${endpoint}`);
         }
