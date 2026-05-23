@@ -1431,12 +1431,46 @@ class NHCApiService {
    */
   async getWindArrival(stormId: string, arrivalType: 'most-likely' | 'earliest' = 'most-likely', useProxy = true): Promise<any | null> {
     try {
-      // Use Lambda proxy to fetch wind arrival KMZ data
       const endpoint = arrivalType === 'most-likely' ? 'wind-arrival-most-likely' : 'wind-arrival-earliest';
       return await this.fetchWithLambdaFallback(endpoint, { stormId });
-
     } catch (error) {
       console.error(`Error fetching wind arrival data for storm ${stormId}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Fetch watch/warning polygon data for a specific storm
+   */
+  async getWatchWarning(stormId: string): Promise<any | null> {
+    try {
+      return await this.fetchWithLambdaFallback('watch-warning', { stormId });
+    } catch (error) {
+      console.error(`Error fetching watch/warning data for storm ${stormId}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Fetch current initial wind extent (34/50/64kt radii) for a specific storm
+   */
+  async getInitialWindExtent(stormId: string): Promise<any | null> {
+    try {
+      return await this.fetchWithLambdaFallback('initial-wind-extent', { stormId });
+    } catch (error) {
+      console.error(`Error fetching initial wind extent for storm ${stormId}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Fetch forecast wind radii polygons (34/50/64kt at each forecast time) for a specific storm
+   */
+  async getForecastWindRadii(stormId: string): Promise<any | null> {
+    try {
+      return await this.fetchWithLambdaFallback('forecast-wind-radii', { stormId });
+    } catch (error) {
+      console.error(`Error fetching forecast wind radii for storm ${stormId}:`, error);
       return null;
     }
   }

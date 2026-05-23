@@ -98,7 +98,10 @@ export type LayerName =
   | 'storm_surge'
   | 'gefs_spaghetti'
   | 'hwrf_windfield'
-  | 'hmon_windfield';
+  | 'hmon_windfield'
+  | 'satellite_visible'
+  | 'satellite_ir'
+  | 'radar';
 
 export function trackLayerToggled(layer: LayerName, enabled: boolean, activeStormId?: string): void {
   if (!initialised) return;

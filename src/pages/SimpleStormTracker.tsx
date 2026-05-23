@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Polyline, CircleMarker, Polygon, Tooltip, useMap, Circle } from 'react-leaflet';
+import { MapContainer, TileLayer, WMSTileLayer, Marker, Popup, Polyline, CircleMarker, Polygon, Tooltip, useMap, Circle } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import './SimpleStormTracker.css';
-import { useNHCData, useStormSurge, usePeakStormSurge, useWindSpeedProbability, useWindArrival } from '../hooks/useNHCData';
+import { useNHCData, useStormSurge, usePeakStormSurge, useWindSpeedProbability, useWindArrival, useWatchWarning, useInitialWindExtent, useForecastWindRadii } from '../hooks/useNHCData';
 import { useInvestData } from '../hooks/useInvestData';
 import { useGEFSSpaghetti } from '../hooks/useGEFSSpaghetti';
 import WindSpeedLegend from '../components/WindSpeedLegend';
@@ -13,6 +13,10 @@ import ExpandLessOutlinedIcon from '@mui/icons-material/ExpandLessOutlined';
 import ExpandMoreOutlinedIcon from '@mui/icons-material/ExpandMoreOutlined';
 import LayersOutlinedIcon from '@mui/icons-material/LayersOutlined';
 import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined';
+import TornadoOutlinedIcon from '@mui/icons-material/TornadoOutlined';
+import TimelineOutlinedIcon from '@mui/icons-material/TimelineOutlined';
+import AirOutlinedIcon from '@mui/icons-material/Air';
+import MapOutlinedIcon from '@mui/icons-material/MapOutlined';
 import { formatWindSpeed, getIntensityCategoryFromKnots } from '../utils/windSpeed';
 import {
   trackPageView,
@@ -31,6 +35,42 @@ L.Icon.Default.mergeOptions({
   iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
+
+// Available basemap tile styles
+const BASEMAPS = [
+  {
+    id: 'light',
+    label: 'Light',
+    tiles: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+  },
+  {
+    id: 'dark',
+    label: 'Dark',
+    tiles: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+  },
+  {
+    id: 'satellite',
+    label: 'Satellite',
+    tiles: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
+  },
+  {
+    id: 'osm',
+    label: 'Street',
+    tiles: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+  },
+  {
+    id: 'terrain',
+    label: 'Terrain',
+    tiles: 'https://tiles.stadiamaps.com/tiles/stamen_terrain/{z}/{x}/{y}{r}.png',
+    attribution: '&copy; <a href="https://stadiamaps.com/">Stadia Maps</a>, &copy; <a href="https://stamen.com">Stamen Design</a>, &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+  },
+] as const;
+
+type BasemapId = typeof BASEMAPS[number]['id'];
 
 // Map controller component for auto-zoom functionality
 interface MapControllerProps {
@@ -349,8 +389,18 @@ const SimpleStormTracker: React.FC = () => {
   const [showWindSpeedProb, setShowWindSpeedProb] = useState(false);
   const [windSpeedProbType, setWindSpeedProbType] = useState<'34kt' | '50kt' | '64kt'>('34kt');
   const [showGEFSSpaghetti, setShowGEFSSpaghetti] = useState(false);
+  const [showWatchWarning, setShowWatchWarning] = useState(true);
+  const [showInitialWindExtent, setShowInitialWindExtent] = useState(false);
+  const [showForecastWindRadii, setShowForecastWindRadii] = useState(false);
   const [showInvests, setShowInvests] = useState(true); // New: Show invest areas
-  
+
+  // Satellite & Radar overlay toggles
+  const [showSatellite, setShowSatellite] = useState(false);
+  const [satelliteType, setSatelliteType] = useState<'geocolor' | 'visible' | 'infrared'>('geocolor');
+  const [showRadar, setShowRadar] = useState(false);
+  const [radarTimestamp, setRadarTimestamp] = useState<string | null>(null);
+  const [radarLoading, setRadarLoading] = useState(false);
+
   // Individual model track toggles
   const [showOfficialTrack, setShowOfficialTrack] = useState(true);
   const [showHWRF, setShowHWRF] = useState(false);
@@ -365,10 +415,8 @@ const SimpleStormTracker: React.FC = () => {
   const [showHWRFWindfield, setShowHWRFWindfield] = useState(false);
   const [showHMONWindfield, setShowHMONWindfield] = useState(false);
   
-  const [isControlPanelClosed, setIsControlPanelClosed] = useState(true);
-  const [isNhcSectionOpen, setIsNhcSectionOpen] = useState(true);
-  const [isWindFieldsOpen, setIsWindFieldsOpen] = useState(false);
-  const [isModelTracksOpen, setIsModelTracksOpen] = useState(false);
+  const [activeDrawer, setActiveDrawer] = useState<string | null>(null);
+  const [basemapId, setBasemapId] = useState<BasemapId>('light');
   
   // Refs for layer button
   const layerButtonRef = useRef<HTMLButtonElement>(null);
@@ -503,6 +551,9 @@ const SimpleStormTracker: React.FC = () => {
       : 'wind_probability_64kt';
     trackLayer(layer, showWindSpeedProb);
   }, [showWindSpeedProb, windSpeedProbType]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { trackLayer('satellite_visible', showSatellite && satelliteType === 'visible'); }, [showSatellite, satelliteType]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { trackLayer('satellite_ir',      showSatellite && satelliteType === 'infrared'); }, [showSatellite, satelliteType]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { trackLayer('radar',             showRadar); },                                    [showRadar]);                     // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── End Analytics ───────────────────────────────────────────────────────────
 
@@ -526,6 +577,11 @@ const SimpleStormTracker: React.FC = () => {
   // Use wind arrival hook for the selected storm
   const windArrival = useWindArrival(showWindArrival && selectedStormId !== null, selectedStormId, windArrivalType);
 
+  // Watch/Warning, Initial Wind Extent, Forecast Wind Radii hooks
+  const watchWarning = useWatchWarning(showWatchWarning && !!selectedStormId, selectedStormId);
+  const initialWindExtent = useInitialWindExtent(showInitialWindExtent && !!selectedStormId, selectedStormId);
+  const forecastWindRadii = useForecastWindRadii(showForecastWindRadii && !!selectedStormId, selectedStormId);
+
   // Use NOAA NOMADS spaghetti models hook when enabled and a storm is selected
   const gefs = useGEFSSpaghetti(showGEFSSpaghetti && !!selectedStormId, selectedStormId);
 
@@ -546,6 +602,23 @@ const SimpleStormTracker: React.FC = () => {
     }
   }, [selectedStormId, showHMON, showHMONWindfield]);
 
+  // Fetch latest RainViewer radar path whenever radar is enabled.
+  // RainViewer now returns a hash-based path per frame, e.g. "/v2/radar/abc123".
+  useEffect(() => {
+    if (!showRadar) return;
+    setRadarLoading(true);
+    fetch('https://api.rainviewer.com/public/weather-maps.json')
+      .then(r => r.json())
+      .then((data: any) => {
+        const past = data.radar?.past as Array<{ time: number; path: string }> | undefined;
+        if (past && past.length > 0) {
+          // Store the full tile path returned by the API (e.g. "/v2/radar/abc123")
+          setRadarTimestamp(past[past.length - 1].path);
+        }
+      })
+      .catch(err => console.warn('RainViewer fetch error:', err))
+      .finally(() => setRadarLoading(false));
+  }, [showRadar]);
 
   // Helper function to open CORS proxy access page
   const openCorsAccess = () => {
@@ -572,12 +645,9 @@ const SimpleStormTracker: React.FC = () => {
   };
 
   return (
-    <div className={`simple-storm-tracker ${!isControlPanelClosed ? 'panel-open' : ''}`}>
+    <div className="simple-storm-tracker">
       {/* Header positioned on top of map */}
-      <SimpleHeader
-        layersPanelOpen={!isControlPanelClosed}
-        onLayersToggle={() => setIsControlPanelClosed(!isControlPanelClosed)}
-      />
+      <SimpleHeader />
       
       {/* Map Container */}
       <div className="map-wrapper">
@@ -588,10 +658,42 @@ const SimpleStormTracker: React.FC = () => {
           scrollWheelZoom={true}
           zoomControl={true}
         >
-        <TileLayer
-          url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-        />
+        {(() => {
+          const bm = BASEMAPS.find(b => b.id === basemapId) ?? BASEMAPS[0];
+          return <TileLayer key={bm.id} url={bm.tiles} attribution={bm.attribution} />;
+        })()}
+
+        {/* ── Satellite overlay (NASA GIBS / GOES-East) ── */}
+        {showSatellite && (
+          <WMSTileLayer
+            key={`satellite-${satelliteType}`}
+            url="https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi"
+            layers={
+              satelliteType === 'geocolor'
+                ? 'GOES-East_ABI_GeoColor'
+                : satelliteType === 'visible'
+                ? 'GOES-East_ABI_Band2_Red_Visible_1km'
+                : 'GOES-East_ABI_Band13_Clean_Infrared'
+            }
+            format="image/png"
+            transparent={true}
+            opacity={0.85}
+            version="1.3.0"
+            zIndex={2}
+            attribution='Satellite: <a href="https://www.earthdata.nasa.gov/engage/open-data-services-software/earthdata-developer-portal/gibs-api">NASA GIBS</a> / NOAA GOES'
+          />
+        )}
+
+        {/* ── Radar overlay (NEXRAD via RainViewer) ── */}
+        {showRadar && radarTimestamp && (
+          <TileLayer
+            key={`radar-${radarTimestamp}`}
+            url={`https://tilecache.rainviewer.com${radarTimestamp}/256/{z}/{x}/{y}/6/1_1.png`}
+            opacity={0.7}
+            zIndex={3}
+            attribution='Radar: <a href="https://www.rainviewer.com/">RainViewer</a>'
+          />
+        )}
 
         {/* Map Controller for auto-zoom functionality */}
         <MapController 
@@ -1959,6 +2061,83 @@ const SimpleStormTracker: React.FC = () => {
           });
         })()}
 
+        {/* Watch/Warning Layer */}
+        {showWatchWarning && selectedStormId && watchWarning.data?.features && watchWarning.data.features.map((feature: any, index: number) => {
+          if (!feature.geometry) return null;
+          const styleId = (feature.properties?.styleId || '').toLowerCase();
+          const name = (feature.properties?.name || '').toLowerCase();
+          let color = '#888888';
+          let label = 'Watch/Warning';
+          if (styleId.includes('hurricanewarning') || name.includes('hurricane warning')) { color = '#CC0000'; label = 'Hurricane Warning'; }
+          else if (styleId.includes('hurricanewatch') || name.includes('hurricane watch')) { color = '#FF00FF'; label = 'Hurricane Watch'; }
+          else if (styleId.includes('tropicalstormwarning') || name.includes('tropical storm warning')) { color = '#0000FF'; label = 'Tropical Storm Warning'; }
+          else if (styleId.includes('tropicalstormwatch') || name.includes('tropical storm watch')) { color = '#FFFF00'; label = 'Tropical Storm Watch'; }
+          else if (styleId.includes('posttropical') || name.includes('post-tropical')) { color = '#888888'; label = 'Post-Tropical Warning'; }
+
+          const geomType = feature.geometry.type;
+          if (geomType === 'Polygon' || geomType === 'MultiPolygon') {
+            const rawCoords = geomType === 'Polygon' ? feature.geometry.coordinates[0] : feature.geometry.coordinates[0][0];
+            const positions = rawCoords.map((c: number[]) => [c[1], c[0]] as [number, number]);
+            return (
+              <Polygon key={`ww-${index}`} positions={positions} pathOptions={{ color, weight: 3, opacity: 0.9, fillColor: color, fillOpacity: 0.15 }}>
+                <Tooltip sticky><span style={{ fontWeight: 600, color }}>{label}</span></Tooltip>
+                <Popup><strong style={{ color }}>{label}</strong></Popup>
+              </Polygon>
+            );
+          }
+          if (geomType === 'LineString') {
+            const positions = feature.geometry.coordinates.map((c: number[]) => [c[1], c[0]] as [number, number]);
+            return (
+              <Polyline key={`ww-${index}`} positions={positions} pathOptions={{ color, weight: 4, opacity: 0.9 }}>
+                <Tooltip sticky><span style={{ fontWeight: 600, color }}>{label}</span></Tooltip>
+                <Popup><strong style={{ color }}>{label}</strong></Popup>
+              </Polyline>
+            );
+          }
+          return null;
+        })}
+
+        {/* Initial Wind Extent Layer (current 34/50/64kt radii) */}
+        {showInitialWindExtent && selectedStormId && initialWindExtent.data?.features && initialWindExtent.data.features.map((feature: any, index: number) => {
+          if (!feature.geometry) return null;
+          const name = (feature.properties?.name || feature.properties?.styleId || '').toLowerCase();
+          let color = '#ffff00'; let label = '34 kt Wind Extent';
+          if (name.includes('64') || name.includes('hurrforce')) { color = '#ff4444'; label = '64 kt Wind Extent'; }
+          else if (name.includes('50') || name.includes('tsforce50')) { color = '#ff8800'; label = '50 kt Wind Extent'; }
+          else { color = '#ffdd00'; label = '34 kt Wind Extent'; }
+
+          const geomType = feature.geometry.type;
+          const rawCoords = geomType === 'MultiPolygon' ? feature.geometry.coordinates[0][0] : geomType === 'Polygon' ? feature.geometry.coordinates[0] : null;
+          if (!rawCoords) return null;
+          const positions = rawCoords.map((c: number[]) => [c[1], c[0]] as [number, number]);
+          return (
+            <Polygon key={`wndext-${index}`} positions={positions} pathOptions={{ color, weight: 1.5, opacity: 0.8, fillColor: color, fillOpacity: 0.1, dashArray: '4 4' }}>
+              <Tooltip sticky><span>{label}</span></Tooltip>
+              <Popup><strong>{label}</strong></Popup>
+            </Polygon>
+          );
+        })}
+
+        {/* Forecast Wind Radii Layer (34/50/64kt at each forecast time) */}
+        {showForecastWindRadii && selectedStormId && forecastWindRadii.data?.features && forecastWindRadii.data.features.map((feature: any, index: number) => {
+          if (!feature.geometry) return null;
+          const name = (feature.properties?.name || feature.properties?.styleId || '').toLowerCase();
+          let color = '#ffdd00'; let label = '34 kt Forecast Radii';
+          if (name.includes('64') || name.includes('hurrforce')) { color = '#ff4444'; label = '64 kt Forecast Radii'; }
+          else if (name.includes('50') || name.includes('tsforce50')) { color = '#ff8800'; label = '50 kt Forecast Radii'; }
+
+          const geomType = feature.geometry.type;
+          const rawCoords = geomType === 'MultiPolygon' ? feature.geometry.coordinates[0][0] : geomType === 'Polygon' ? feature.geometry.coordinates[0] : null;
+          if (!rawCoords) return null;
+          const positions = rawCoords.map((c: number[]) => [c[1], c[0]] as [number, number]);
+          return (
+            <Polygon key={`windrad-${index}`} positions={positions} pathOptions={{ color, weight: 1, opacity: 0.7, fillColor: color, fillOpacity: 0.08 }}>
+              <Tooltip sticky><span>{label}</span></Tooltip>
+              <Popup><strong>{label}</strong></Popup>
+            </Polygon>
+          );
+        })}
+
         {/* HWRF Wind Field Layer - Enhanced Contour Display */}
         {showHWRFWindfield && selectedStormId && hwrf.hwrfData && hwrf.hwrfData.windFields && hwrf.hwrfData.windFields.map((windField, index) => (
           <React.Fragment key={`hwrf-windfield-${index}`}>
@@ -2342,971 +2521,679 @@ const SimpleStormTracker: React.FC = () => {
       )}
       </div>
 
-      {/* Sliding Control Panel */}
-      <div 
-        ref={controlPanelRef}
-        className={`sliding-control-panel ${isControlPanelClosed ? 'closed' : 'open'}`}
-      >
-        <div className="control-panel-header-wrapper">
-          <h3 className="control-panel-header">Map Layers</h3>
+      {/* ── Floating Tab Strip ── */}
+      <div className="tab-strip">
+        {([
+          { id: 'storms',  label: 'Storms',  icon: <TornadoOutlinedIcon fontSize="small" /> },
+          { id: 'layers',  label: 'Layers',  icon: <LayersOutlinedIcon fontSize="small" /> },
+          { id: 'models',  label: 'Models',  icon: <TimelineOutlinedIcon fontSize="small" /> },
+          { id: 'wind',    label: 'Wind',    icon: <AirOutlinedIcon fontSize="small" /> },
+          { id: 'style',   label: 'Map',     icon: <MapOutlinedIcon fontSize="small" /> },
+        ] as const).map(tab => (
           <button
-            className="panel-close-btn"
-            onClick={() => setIsControlPanelClosed(true)}
-            aria-label="Close layers panel"
+            key={tab.id}
+            className={`tab-btn${activeDrawer === tab.id ? ' active' : ''}`}
+            onClick={() => setActiveDrawer(activeDrawer === tab.id ? null : tab.id)}
+            aria-label={tab.label}
           >
+            {tab.icon}
+            <span className="tab-label">{tab.label}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* ── Sliding Tab Drawer ── */}
+      <div ref={controlPanelRef} className={`tab-drawer${activeDrawer ? ' open' : ''}`}>
+        {/* Drawer header */}
+        <div className="tab-drawer-header">
+          <span className="tab-drawer-title">
+            {activeDrawer === 'storms' ? 'Storms' :
+             activeDrawer === 'layers' ? 'NHC Layers' :
+             activeDrawer === 'models' ? 'Model Tracks' :
+             activeDrawer === 'wind'   ? 'Wind Fields' :
+             activeDrawer === 'style'  ? 'Map Style' : ''}
+          </span>
+          <button className="tab-drawer-close" onClick={() => setActiveDrawer(null)} aria-label="Close panel">
             <CloseOutlinedIcon fontSize="small" />
           </button>
         </div>
-        <div className="control-panel-content">
-          {loading ? (
-            <span className="control-panel-loading">
-              <div className="loading-spinner"></div>
-              Loading storms...
-            </span>
-          ) : error && !shouldUseDemoData ? (
+
+        {/* Drawer scrollable content */}
+        <div className="tab-drawer-content">
+
+          {/* ── STORMS TAB ── */}
+          {activeDrawer === 'storms' && (
             <>
-              <div className="control-panel-error">
-                {error.includes('CORS proxy access required') || error.includes('🔒') ? (
-                  <>
-                    <div>🔒 Proxy Access Required</div>
-                    <div style={{fontSize: '0.8rem', marginTop: '5px', lineHeight: '1.3'}}>
-                      <a href="https://cors-anywhere.herokuapp.com/corsdemo" target="_blank" rel="noopener noreferrer" style={{color: '#5e35b1', textDecoration: 'underline'}}>
-                        Click here to request access
-                      </a>
-                      <br />
-                      Then return and try "Live Data" again
-                    </div>
-                  </>
-                ) : error.includes('CORS restrictions') || error.includes('🌐') ? (
-                  <>
-                    <div>🌐 Browser Security Restriction</div>
-                    <div style={{fontSize: '0.8rem', marginTop: '5px', lineHeight: '1.3'}}>
-                      This is normal in development.<br />
-                      <a href="https://cors-anywhere.herokuapp.com/corsdemo" target="_blank" rel="noopener noreferrer" style={{color: '#5e35b1', textDecoration: 'underline'}}>
-                        Request proxy access
-                      </a> to connect to live data
-                    </div>
-                  </>
-                ) : error.includes('port conflict') || error.includes('🔌') || error.includes('localhost:3002') ? (
-                  <>
-                    <div>🔌 Port Configuration Issue</div>
-                    <div style={{fontSize: '0.8rem', marginTop: '5px', lineHeight: '1.3'}}>
-                      CORS proxy expects different port.<br />
-                      <button 
-                        onClick={openCorsAccess}
-                        style={{
-                          marginTop: '4px',
-                          padding: '3px 6px',
-                          fontSize: '0.7rem',
-                          backgroundColor: '#007bff',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '3px',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        🔑 Get Access
-                      </button>
-                    </div>
-                  </>
-                ) : error.includes('timeout') || error.includes('⏱️') ? (
-                  <>
-                    <div>⏱️ Connection Timeout</div>
-                    <div style={{fontSize: '0.8rem', marginTop: '5px', lineHeight: '1.3'}}>
-                      Likely needs CORS proxy access.<br />
-                      <button 
-                        onClick={openCorsAccess}
-                        style={{
-                          marginTop: '4px',
-                          padding: '3px 6px',
-                          fontSize: '0.7rem',
-                          backgroundColor: '#007bff',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '3px',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        🔑 Get Access
-                      </button>
-                    </div>
-                  </>
-                ) : error.includes('Network') || error.includes('📡') ? (
-                  <>
-                    <div>📡 Network Issue</div>
-                    <div style={{fontSize: '0.8rem', marginTop: '5px'}}>
-                      Check your internet connection
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div>⚠️ Data Unavailable</div>
-                    <div style={{fontSize: '0.8rem', marginTop: '5px'}}>
-                      {error.substring(0, 50)}...
-                    </div>
-                  </>
-                )}
-              </div>
-            </>
-          ) : (
-            <>
-              {/* Visual Storm Selector */}
-              {displayStorms.length > 0 && (
-                <div style={{ marginTop: '10px', padding: '8px 0', borderTop: '1px solid rgba(255, 255, 255, 0.2)' }}>
-                  <div style={{ fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '8px', color: '#ffffff' }}>
-                    Select Storms
-                  </div>
-                  {/* Selection helpers */}
-                  {selectedStormIds.length > 0 && (
-                    <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-                      <button
-                        onClick={() => {
-                          setSelectedStormIds([]);
-                          setSelectedStormId(null);
-                          setLastSelectionType(null);
-                        }}
-                        style={{
-                          fontSize: '0.75rem',
-                          padding: '4px 8px',
-                          borderRadius: '6px',
-                          border: '1px solid rgba(255,255,255,0.3)',
-                          background: 'rgba(255,255,255,0.08)',
-                          color: '#fff',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        Clear selection (show all)
-                      </button>
-                    </div>
-                  )}
-                  
-                  {/* Individual Storm Options */}
-                  {displayStorms.map(storm => {
-                    const isSelected = selectedStormIds.includes(storm.id);
-                    const categoryColor = storm.category >= 5 ? '#8B0000' : 
-                                        storm.category >= 3 ? '#FF4500' : 
-                                        storm.category >= 1 ? '#FFD700' : 
-                                        storm.classification.toLowerCase().includes('tropical storm') || storm.classification.toLowerCase() === 'ts' ? '#4FC3F7' : '#87CEEB';
-                    
-                    // Function to get badge text for category indicator
-                    const getBadgeText = (storm: any) => {
-                      if (storm.category >= 1) return storm.category.toString();
-                      const classification = storm.classification.toLowerCase();
-                      if (classification === 'ts' || classification.includes('tropical storm')) return 'TS';
-                      if (classification === 'td' || classification.includes('tropical depression')) return 'TD';
-                      if (classification === 'ss' || classification.includes('subtropical')) return 'SS';
-                      return 'TS'; // Default fallback
-                    };
-                    
-                    return (
-                      <div 
-                        key={storm.id}
-                        className={`storm-selector-box ${isSelected ? 'selected' : ''}`}
-                        onClick={() => {
-                          setSelectedStormIds(prev => {
-                            if (prev.includes(storm.id)) {
-                              const next = prev.filter(id => id !== storm.id);
-                              // If removing the primary selection, set a new primary or clear
-                              if (selectedStormId === storm.id) {
-                                setSelectedStormId(next[0] ?? null);
-                                // If no storms left selected, clear the selection type
-                                if (next.length === 0) {
-                                  setLastSelectionType(null);
-                                }
-                              }
-                              return next;
-                            } else {
-                              const next = [...prev, storm.id];
-                              // Set this as the primary selection for storm-specific layers
-                              setSelectedStormId(storm.id);
-                              // Clear invest selection when selecting a storm
-                              setSelectedInvestId(null);
-                              // Set this as a storm selection
-                              setLastSelectionType('storm');
-                              return next;
-                            }
-                          });
-                        }}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          padding: '8px',
-                          marginBottom: '8px',
-                          borderRadius: '8px',
-                          border: isSelected ? '2px solid #4FC3F7' : '1px solid rgba(255, 255, 255, 0.3)',
-                          backgroundColor: isSelected ? 'rgba(79, 195, 247, 0.2)' : 'rgba(255, 255, 255, 0.1)',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s ease'
-                        }}
-                      >
-                        {/* Storm Icon - Hurricane or Tropical Storm SVG */}
-                        <div style={{
-                          width: '64px',
-                          height: '64px',
-                          borderRadius: '8px',
-                          backgroundColor: isSelected ? 'rgba(79, 195, 247, 0.3)' : 'rgba(255, 255, 255, 0.1)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          marginRight: '12px',
-                          border: `2px solid ${categoryColor}`,
-                          position: 'relative',
-                          overflow: 'hidden'
-                        }}>
-                          {/* SVG Icon based on storm type */}
-                          <div style={{
-                            width: '48px',
-                            height: '48px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center'
-                          }}>
-                            {(() => {
-                              const isHurricane = storm.classification.toLowerCase().includes('hurricane') || 
-                                                storm.classification === 'HU' || 
-                                                (storm.category && storm.category >= 1);
-                              const isTropicalDepression = storm.classification.toLowerCase().includes('tropical depression') ||
-                                                         storm.classification.toLowerCase().includes('depression') ||
-                                                         storm.classification === 'TD';
-                              const isPostTropical = storm.classification.toLowerCase().includes('post-tropical') ||
-                                                    storm.classification.toLowerCase().includes('extratropical') ||
-                                                    storm.classification === 'EX' ||
-                                                    storm.classification === 'PC' ||
-                                                    storm.classification === 'EC' ||
-                                                    storm.classification === 'PTC';
-                              
-                              if (isPostTropical) {
-                                // Red circle with red X for post-tropical cyclones
-                                return (
-                                  <div style={{
-                                    width: '48px',
-                                    height: '48px',
-                                    borderRadius: '50%',
-                                    backgroundColor: 'transparent',
-                                    border: '2px solid #dc3545',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    boxShadow: '0 2px 4px rgba(0,0,0,0.3)'
-                                  }}>
-                                    <span style={{
-                                      color: '#dc3545',
-                                      fontSize: '32px',
-                                      fontWeight: 'bold',
-                                      fontFamily: 'monospace',
-                                      lineHeight: '1'
-                                    }}>×</span>
-                                  </div>
-                                );
-                              } else if (isTropicalDepression) {
-                                // Transparent circle with red border for tropical depressions
-                                return (
-                                  <div style={{
-                                    width: '48px',
-                                    height: '48px',
-                                    borderRadius: '50%',
-                                    backgroundColor: 'transparent',
-                                    border: '2px solid #dc3545',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    boxShadow: '0 2px 4px rgba(0,0,0,0.3)'
-                                  }}>
-                                  </div>
-                                );
-                              } else {
-                                const iconPath = isHurricane ? '/HU.svg' : '/TS.svg';
-                                
-                                return (
-                                  <img 
-                                    src={iconPath}
-                                    alt={isHurricane ? 'Hurricane' : 'Tropical Storm'}
-                                    style={{
-                                      width: '100%',
-                                      height: '100%',
-                                      filter: 'drop-shadow(1px 1px 2px rgba(0,0,0,0.3))'
-                                    }}
-                                  />
-                                );
-                              }
-                            })()}
-                          </div>
-                          
-                          {/* Category indicator */}
-                          <div style={{
-                            position: 'absolute',
-                            bottom: '2px',
-                            right: '2px',
-                            backgroundColor: categoryColor,
-                            color: 'white',
-                            fontSize: '10px',
-                            fontWeight: 'bold',
-                            padding: '1px 3px',
-                            borderRadius: '3px',
-                            minWidth: '16px',
-                            textAlign: 'center'
-                          }}>
-                            {getBadgeText(storm)}
-                          </div>
-                        </div>
-                        
-                        {/* Storm Info */}
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#ffffff' }}>
-                            {storm.name}
-                          </div>
-                          <div style={{ fontSize: '0.75rem', color: '#cccccc', marginTop: '2px' }}>
-                            {getFullIntensityName(storm)}
-                          </div>
-                          <div style={{ fontSize: '0.7rem', color: '#aaaaaa', marginTop: '1px' }}>
-                            {storm.maxWinds} mph • {storm.pressure} mb
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                  
-                  {selectedStorm && (
-                    <div style={{ fontSize: '0.7rem', color: '#cccccc', marginTop: '6px', padding: '6px', backgroundColor: 'rgba(255, 255, 255, 0.1)', borderRadius: '4px' }}>
-                      <strong>Tracking:</strong> {selectedStorm.name} - {selectedStorm.maxWinds} mph winds
-                    </div>
-                  )}
-                </div>
-              )}
-              
-              {/* Invest Areas Section */}
-              <div style={{ marginTop: '10px', padding: '8px 0', borderTop: '1px solid rgba(255, 255, 255, 0.2)' }}>
-                <div style={{ fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '5px', color: '#ffffff' }}>
-                  Areas of Interest
-                  <div style={{ fontSize: '0.7rem', fontWeight: 'normal', color: '#cccccc', marginTop: '2px' }}>
-                    Tropical development areas being monitored
-                  </div>
-                </div>
-                
-                {/* Global invest toggle */}
-                <div style={{ marginBottom: '8px' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.8rem', cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={showInvests}
-                      onChange={(e) => setShowInvests(e.target.checked)}
-                      style={{ marginRight: '6px' }}
-                    />
-                    Show All Invest Areas ({invests.length})
-                    {investLoading && (
-                      <div className="loading-spinner" style={{ marginLeft: '8px', transform: 'scale(0.6)' }}></div>
-                    )}
-                    {investError && (
-                      <span style={{ fontSize: '0.7rem', color: '#d32f2f', marginLeft: '6px' }}>
-                        Error
-                      </span>
-                    )}
-                  </label>
-                </div>
-
-                {/* Individual Invest Cards */}
-                {showInvests && invests.length > 0 && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {invests.map(invest => {
-                      // Determine color based on formation chances
-                      const maxChance = Math.max(invest.formationChance48hr, invest.formationChance7day);
-                      const investColor = maxChance >= 70 ? '#FF6B35' : // High (orange-red)
-                                         maxChance >= 40 ? '#FF8C00' : // Medium (orange) 
-                                         '#FFD700'; // Low (yellow)
-                      
-                      const isSelected = selectedInvestId === invest.id;
-                      
-                      return (
-                        <div 
-                          key={invest.id}
-                          className={`storm-selector-box ${isSelected ? 'selected' : ''}`}
-                          onClick={() => {
-                            if (selectedInvestId === invest.id) {
-                              // Deselect if clicking the same invest
-                              setSelectedInvestId(null);
-                              // Clear any storm selection too
-                              setSelectedStormId(null);
-                              setSelectedStormIds([]);
-                              // Clear selection type
-                              setLastSelectionType(null);
-                            } else {
-                              // Select this invest and center map on it
-                              setSelectedInvestId(invest.id);
-                              // Clear storm selections when selecting an invest
-                              setSelectedStormId(null);
-                              setSelectedStormIds([]);
-                              // Set this as an invest selection
-                              setLastSelectionType('invest');
-                              trackInvestSelected(invest.id, invest.formationChance48hr ?? 0, invest.formationChance7day ?? 0);
-                            }
-                          }}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            padding: '8px',
-                            borderRadius: '8px',
-                            border: isSelected ? '2px solid #FF8C00' : '1px solid rgba(255, 255, 255, 0.3)',
-                            backgroundColor: isSelected ? 'rgba(255, 140, 0, 0.2)' : 'rgba(255, 255, 255, 0.1)',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          {/* Invest Icon */}
-                          <div style={{
-                            position: 'relative',
-                            width: '32px',
-                            height: '32px',
-                            marginRight: '12px',
-                            flexShrink: 0
-                          }}>
-                            {/* Main invest icon circle */}
-                            <div style={{
-                              width: '100%',
-                              height: '100%',
-                              backgroundColor: investColor,
-                              border: '2px solid #333',
-                              borderRadius: '50%',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontSize: '14px',
-                              fontWeight: 'bold',
-                              color: '#333'
-                            }}>
-                              I
-                            </div>
-                            
-                            {/* Formation chance indicator */}
-                            <div style={{
-                              position: 'absolute',
-                              bottom: '-2px',
-                              right: '-2px',
-                              backgroundColor: maxChance >= 70 ? '#8B0000' : 
-                                             maxChance >= 40 ? '#FF4500' : '#DAA520',
-                              color: 'white',
-                              fontSize: '9px',
-                              fontWeight: 'bold',
-                              padding: '1px 3px',
-                              borderRadius: '3px',
-                              minWidth: '16px',
-                              textAlign: 'center',
-                              border: '1px solid #333'
-                            }}>
-                              {maxChance}%
-                            </div>
-                          </div>
-                          
-                          {/* Invest Info */}
-                          <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#ffffff' }}>
-                              {invest.name || `Invest ${invest.id}`}
-                            </div>
-                            <div style={{ fontSize: '0.75rem', color: '#cccccc', marginTop: '2px' }}>
-                              {invest.location || invest.basin}
-                            </div>
-                            <div style={{ fontSize: '0.7rem', color: '#aaaaaa', marginTop: '1px' }}>
-                              48hr: {invest.formationChance48hr}% • 7-day: {invest.formationChance7day}%
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-                
-                {/* Show message when no invests or hidden */}
-                {!showInvests && invests.length > 0 && (
-                  <div style={{ fontSize: '0.7rem', color: '#cccccc', fontStyle: 'italic' }}>
-                    {invests.length} invest area{invests.length !== 1 ? 's' : ''} hidden
-                  </div>
-                )}
-                
-                {showInvests && invests.length === 0 && !investLoading && (
-                  <div style={{ fontSize: '0.7rem', color: '#cccccc', fontStyle: 'italic' }}>
-                    No active invest areas
-                  </div>
-                )}
-              </div>
-              
-              {/* NHC Layers */}
-              <div className="panel-section">
-                <div className="panel-section-header" onClick={() => setIsNhcSectionOpen(o => !o)}>
-                  <span className="section-title">NHC Layers</span>
-                  <span className={`section-chevron${isNhcSectionOpen ? ' open' : ''}`}>
-                    <ExpandMoreOutlinedIcon style={{ fontSize: '1rem' }} />
-                  </span>
-                </div>
-
-                {isNhcSectionOpen && (
-                  <>
-                    {/* Historical Track */}
-                    <label className="layer-item">
-                      <div className="layer-item-left">
-                        <span className="layer-color-swatch" style={{ background: '#888888' }} />
-                        <span className="layer-name">Historical Track</span>
-                      </div>
-                      <div className="toggle-switch">
-                        <input type="checkbox" checked={showHistoricalTracks} onChange={(e) => setShowHistoricalTracks(e.target.checked)} />
-                        <span className="toggle-track" />
-                      </div>
-                    </label>
-
-                    {/* Forecast Track */}
-                    <label className="layer-item">
-                      <div className="layer-item-left">
-                        <span className="layer-color-swatch" style={{ background: '#ff3333' }} />
-                        <span className="layer-name">Forecast Track</span>
-                      </div>
-                      <div className="toggle-switch">
-                        <input type="checkbox" checked={showForecastTracks} onChange={(e) => setShowForecastTracks(e.target.checked)} />
-                        <span className="toggle-track" />
-                      </div>
-                    </label>
-
-                    {/* Forecast Cone */}
-                    <label className="layer-item">
-                      <div className="layer-item-left">
-                        <span className="layer-color-swatch" style={{ background: '#2196F3' }} />
-                        <span className="layer-name">Forecast Cone</span>
-                      </div>
-                      <div className="toggle-switch">
-                        <input type="checkbox" checked={showForecastCones} onChange={(e) => setShowForecastCones(e.target.checked)} />
-                        <span className="toggle-track" />
-                      </div>
-                    </label>
-
-                    {/* Peak Storm Surge */}
-                    <label className={`layer-item${!selectedStormId ? ' disabled' : ''}`}>
-                      <div className="layer-item-left">
-                        <span className="layer-color-swatch" style={{ background: '#cc00cc' }} />
-                        <div className="layer-item-text">
-                          <span className="layer-name">Peak Storm Surge</span>
-                          {!selectedStormId && <span className="layer-hint">Select a storm first</span>}
-                          {peakStormSurge.available === false && selectedStormId && !peakStormSurge.loading && (
-                            <span className="layer-hint">N/A for EP storms</span>
-                          )}
-                        </div>
-                        {peakStormSurge.loading && selectedStormId && (
-                          <div className="gefs-spinner" />
-                        )}
-                      </div>
-                      <div className="toggle-switch">
-                        <input type="checkbox" checked={showPeakStormSurge} onChange={(e) => setShowPeakStormSurge(e.target.checked)} disabled={!selectedStormId} />
-                        <span className="toggle-track" />
-                      </div>
-                    </label>
-
-                    {/* Wind Arrival Time */}
-                    <label className={`layer-item${!selectedStormId ? ' disabled' : ''}`}>
-                      <div className="layer-item-left">
-                        <span className="layer-color-swatch" style={{ background: '#9932CC' }} />
-                        <div className="layer-item-text">
-                          <span className="layer-name">Wind Arrival Time</span>
-                          {!selectedStormId && <span className="layer-hint">Select a storm first</span>}
-                        </div>
-                      </div>
-                      <div className="toggle-switch">
-                        <input type="checkbox" checked={showWindArrival} onChange={(e) => setShowWindArrival(e.target.checked)} disabled={!selectedStormId} />
-                        <span className="toggle-track" />
-                      </div>
-                    </label>
-
-                    {showWindArrival && selectedStormId && (
-                      <div className="layer-sub-options">
-                        <label className="sub-option-label">
-                          <input type="radio" name="windArrivalType" value="most-likely" checked={windArrivalType === 'most-likely'} onChange={(e) => setWindArrivalType(e.target.value as 'most-likely' | 'earliest')} />
-                          Most Likely Arrival
-                        </label>
-                        <label className="sub-option-label">
-                          <input type="radio" name="windArrivalType" value="earliest" checked={windArrivalType === 'earliest'} onChange={(e) => setWindArrivalType(e.target.value as 'most-likely' | 'earliest')} />
-                          Earliest Reasonable Arrival
-                        </label>
-                      </div>
-                    )}
-
-                    {/* Wind Speed Probability */}
-                    <label className={`layer-item${!isAllStormsShown ? ' disabled' : ''}`}>
-                      <div className="layer-item-left">
-                        <span className="layer-color-swatch" style={{ background: '#0066cc' }} />
-                        <div className="layer-item-text">
-                          <span className="layer-name">Wind Speed Probability</span>
-                          {!isAllStormsShown && <span className="layer-hint">View all storms to enable</span>}
-                          {isAllStormsShown && windSpeedProb.available === false && <span className="layer-hint">No data available</span>}
-                        </div>
-                      </div>
-                      <div className="toggle-switch">
-                        <input type="checkbox" checked={showWindSpeedProb} onChange={(e) => setShowWindSpeedProb(e.target.checked)} disabled={!isAllStormsShown} />
-                        <span className="toggle-track" />
-                      </div>
-                    </label>
-
-                    {showWindSpeedProb && isAllStormsShown && (
-                      <div className="wind-speed-options">
-                        {(['34kt', '50kt', '64kt'] as const).map((speed) => (
-                          <label key={speed} className="wind-speed-option">
-                            <input type="radio" name="windSpeedType" value={speed} checked={windSpeedProbType === speed} onChange={(e) => setWindSpeedProbType(e.target.value as '34kt' | '50kt' | '64kt')} />
-                            {speed}
-                          </label>
-                        ))}
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-              
-              {/* Live Track Data Control - Hidden */}
-              <div style={{ display: 'none', marginTop: '10px', padding: '8px 0', borderTop: '1px solid rgba(255, 255, 255, 0.2)' }}>
-                <div style={{ fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '5px', color: '#ffffff' }}>
-                  Track Data Options
-                </div>
-                  <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.8rem', cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={fetchLiveTrackData}
-                      onChange={(e) => setFetchLiveTrackData(e.target.checked)}
-                      style={{ marginRight: '6px' }}
-                    />
-                    Fetch Live Track Data
-                  </label>
-                  <div style={{ fontSize: '0.7rem', color: '#cccccc', marginTop: '3px', marginLeft: '20px' }}>
-                    {fetchLiveTrackData ? 
-                      'Fetching forecast paths and cones from NHC (may cause CORS errors)' : 
-                      'Using basic storm positions only (prevents CORS errors)'
-                    }
-                  </div>
-                  
-                  {/* Storm Surge Status */}
-                  {showStormSurge && (
-                    <div style={{ marginTop: '8px', padding: '6px', backgroundColor: 'rgba(255, 255, 255, 0.1)', borderRadius: '4px' }}>
-                      <div style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#d32f2f' }}>
-                        Storm Surge Status
-                      </div>
-                      <div style={{ fontSize: '0.7rem', color: '#cccccc', marginTop: '2px' }}>
-                        {stormSurge.loading ? (
-                          <span style={{ display: 'flex', alignItems: 'center' }}>
-                            <div className="loading-spinner"></div>
-                            Loading surge data...
-                          </span>
-                        ) : stormSurge.available === false ? (
-                          'No surge data (Eastern Pacific storms typically don\'t have surge products)'
-                        ) : stormSurge.surgeData ? (
-                          `Showing surge data with ${stormSurge.surgeData.features?.length || 0} areas`
-                        ) : stormSurge.error ? (
-                          `Error: ${stormSurge.error}`
-                        ) : (
-                          'Checking availability...'
-                        )}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Peak Storm Surge Status */}
-                  {showPeakStormSurge && (
-                    <div style={{ marginTop: '8px', padding: '6px', backgroundColor: 'rgba(255, 255, 255, 0.1)', borderRadius: '4px' }}>
-                      <div style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#cc00cc' }}>
-                        Peak Storm Surge Status
-                      </div>
-                      <div style={{ fontSize: '0.7rem', color: '#cccccc', marginTop: '2px' }}>
-                        {peakStormSurge.loading ? (
-                          <span style={{ display: 'flex', alignItems: 'center' }}>
-                            <div className="loading-spinner"></div>
-                            Loading peak surge data...
-                          </span>
-                        ) : peakStormSurge.available === false ? (
-                          'No peak surge data (Eastern Pacific storms typically don\'t have surge products)'
-                        ) : peakStormSurge.peakSurgeData ? (
-                          `Showing peak surge data with ${peakStormSurge.peakSurgeData.features?.length || 0} areas`
-                        ) : peakStormSurge.error ? (
-                          `Error: ${peakStormSurge.error}`
-                        ) : (
-                          'Checking availability...'
-                        )}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {showWindSpeedProb && (
-                    <div style={{ marginTop: '8px', padding: '6px', backgroundColor: 'rgba(255, 255, 255, 0.1)', borderRadius: '4px' }}>
-                      <div style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#4FC3F7' }}>
-                        Wind Probability Status
-                      </div>
-                      <div style={{ fontSize: '0.7rem', color: '#cccccc', marginTop: '2px' }}>
-                        {windSpeedProb.loading ? (
-                          <span style={{ display: 'flex', alignItems: 'center' }}>
-                            <div className="loading-spinner"></div>
-                            Loading wind probability data...
-                          </span>
-                        ) : windSpeedProb.available === false ? (
-                          'No wind probability data available (typically only available during active storm threats)'
-                        ) : windSpeedProb.probabilityData ? (
-                          (windSpeedProb.probabilityData.features?.length || 0) > 0
-                            ? `Showing ${windSpeedProb.probabilityData.features.length} probability zones for ${windSpeedProbType} winds`
-                            : `No polygon probability zones found in latest ${windSpeedProbType} KMZ (product may be raster-only this cycle)`
-                        ) : windSpeedProb.error ? (
-                          `Error: ${windSpeedProb.error}`
-                        ) : (
-                          'Checking availability...'
-                        )}
-                      </div>
-                    </div>
-                  )}
-              </div>
-              
-              {/* Hurricane Wind Fields */}
-              <div className="panel-section">
-                <div className="panel-section-header" onClick={() => setIsWindFieldsOpen(o => !o)}>
-                  <span className="section-title">Wind Fields</span>
-                  <span className={`section-chevron${isWindFieldsOpen ? ' open' : ''}`}>
-                    <ExpandMoreOutlinedIcon style={{ fontSize: '1rem' }} />
-                  </span>
-                </div>
-
-                {isWindFieldsOpen && (
-                  <>
-                    <label className="layer-item">
-                      <div className="layer-item-left">
-                        <span className="layer-badge" style={{ background: '#ff4444' }}>HWRF</span>
-                        <div className="layer-item-text">
-                          <span className="layer-name">Wind Field</span>
-                        </div>
-                        {hwrf.isLoading && <div className="gefs-spinner" />}
-                      </div>
-                      <div className="toggle-switch">
-                        <input type="checkbox" checked={showHWRFWindfield} onChange={(e) => setShowHWRFWindfield(e.target.checked)} />
-                        <span className="toggle-track" />
-                      </div>
-                    </label>
-
-                    <label className="layer-item">
-                      <div className="layer-item-left">
-                        <span className="layer-badge" style={{ background: '#4682b4' }}>HMON</span>
-                        <div className="layer-item-text">
-                          <span className="layer-name">Wind Field</span>
-                        </div>
-                        {hmon.isLoading && <div className="gefs-spinner" />}
-                      </div>
-                      <div className="toggle-switch">
-                        <input type="checkbox" checked={showHMONWindfield} onChange={(e) => setShowHMONWindfield(e.target.checked)} />
-                        <span className="toggle-track" />
-                      </div>
-                    </label>
-                  </>
-                )}
-              </div>
-              
-              {/* Model Tracks */}
-              <div className="panel-section">
-                <div className="panel-section-header" onClick={() => setIsModelTracksOpen(o => !o)}>
-                  <span className="section-title">
-                    Model Tracks
-                    {selectedStormId && (gefs.tracks?.modelsPresent?.length ?? 0) > 0 && (
-                      <span style={{ marginLeft: '6px', color: 'rgba(79,195,247,0.8)', fontWeight: 400, textTransform: 'none', letterSpacing: 0, fontSize: '0.68rem' }}>
-                        · {gefs.tracks?.modelsPresent?.length ?? 0} available
-                      </span>
-                    )}
-                  </span>
-                  <span className={`section-chevron${isModelTracksOpen ? ' open' : ''}`}>
-                    <ExpandMoreOutlinedIcon style={{ fontSize: '1rem' }} />
-                  </span>
-                </div>
-
-                {isModelTracksOpen && (
-                  <>
-                    {/* Master enable toggle */}
-                    <label className={`layer-item${!selectedStormId ? ' disabled' : ''}`}>
-                      <div className="layer-item-left">
-                        <div className="layer-item-text">
-                          <span className="layer-name" style={{ fontWeight: 600 }}>Enable Model Display</span>
-                          {!selectedStormId && <span className="layer-hint">Select a storm first</span>}
-                          {gefs.available === false && selectedStormId && <span className="layer-hint">No data found</span>}
-                        </div>
-                        {gefs.loading && <div className="gefs-spinner" />}
-                      </div>
-                      <div className="toggle-switch">
-                        <input type="checkbox" checked={showGEFSSpaghetti} onChange={(e) => setShowGEFSSpaghetti(e.target.checked)} disabled={!selectedStormId} />
-                        <span className="toggle-track" />
-                      </div>
-                    </label>
-
-                    {showGEFSSpaghetti && selectedStormId && gefs.tracks?.modelsPresent && (
+              {loading ? (
+                <span className="control-panel-loading">
+                  <div className="loading-spinner"></div>
+                  Loading storms...
+                </span>
+              ) : error && !shouldUseDemoData ? (
+                <>
+                  <div className="control-panel-error">
+                    {error.includes('CORS proxy access required') || error.includes('🔒') ? (
                       <>
-                        {/* Quick actions */}
-                        <div className="model-quick-actions">
-                          <button className="model-quick-btn model-quick-btn--all" onClick={() => { setShowOfficialTrack(true); setShowHAFS(true); setShowGFS(true); setShowECMWF(true); setShowGEFSEnsemble(true); setShowOtherModels(true); setShowHWRF(true); setShowHMON(true); }}>
-                            Select All
-                          </button>
-                          <button className="model-quick-btn model-quick-btn--clear" onClick={() => { setShowOfficialTrack(false); setShowHAFS(false); setShowGFS(false); setShowECMWF(false); setShowGEFSEnsemble(false); setShowOtherModels(false); setShowHWRF(false); setShowHMON(false); }}>
-                            Clear All
+                        <div>🔒 Proxy Access Required</div>
+                        <div style={{fontSize: '0.8rem', marginTop: '5px', lineHeight: '1.3'}}>
+                          <a href="https://cors-anywhere.herokuapp.com/corsdemo" target="_blank" rel="noopener noreferrer" style={{color: '#5e35b1', textDecoration: 'underline'}}>
+                            Click here to request access
+                          </a>
+                          <br />
+                          Then return and try "Live Data" again
+                        </div>
+                      </>
+                    ) : error.includes('CORS restrictions') || error.includes('🌐') ? (
+                      <>
+                        <div>🌐 Browser Security Restriction</div>
+                        <div style={{fontSize: '0.8rem', marginTop: '5px', lineHeight: '1.3'}}>
+                          This is normal in development.<br />
+                          <a href="https://cors-anywhere.herokuapp.com/corsdemo" target="_blank" rel="noopener noreferrer" style={{color: '#5e35b1', textDecoration: 'underline'}}>
+                            Request proxy access
+                          </a> to connect to live data
+                        </div>
+                      </>
+                    ) : error.includes('port conflict') || error.includes('🔌') || error.includes('localhost:3002') ? (
+                      <>
+                        <div>🔌 Port Configuration Issue</div>
+                        <div style={{fontSize: '0.8rem', marginTop: '5px', lineHeight: '1.3'}}>
+                          CORS proxy expects different port.<br />
+                          <button
+                            onClick={openCorsAccess}
+                            style={{ marginTop: '4px', padding: '3px 6px', fontSize: '0.7rem', backgroundColor: '#007bff', color: 'white', border: 'none', borderRadius: '3px', cursor: 'pointer' }}
+                          >
+                            🔑 Get Access
                           </button>
                         </div>
-
-                        {/* Individual model rows */}
-                        {gefs.tracks.modelsPresent.some((m: string) => m === 'OFCL' || m === 'OFCI') && (
-                          <label className="layer-item">
-                            <div className="layer-item-left">
-                              <span className="layer-badge" style={{ background: '#555', color: '#fff' }}>OFCL</span>
-                              <span className="layer-name">Official NHC Forecast</span>
-                            </div>
-                            <div className="toggle-switch">
-                              <input type="checkbox" checked={showOfficialTrack} onChange={(e) => setShowOfficialTrack(e.target.checked)} />
-                              <span className="toggle-track" />
-                            </div>
-                          </label>
-                        )}
-
-                        {gefs.tracks.modelsPresent.some((m: string) => m === 'HAFS' || m === 'HAFA' || m === 'HAFB') && (
-                          <label className="layer-item">
-                            <div className="layer-item-left">
-                              <span className="layer-badge" style={{ background: '#4444ff' }}>HAFS</span>
-                              <span className="layer-name">Analysis & Forecast System</span>
-                            </div>
-                            <div className="toggle-switch">
-                              <input type="checkbox" checked={showHAFS} onChange={(e) => setShowHAFS(e.target.checked)} />
-                              <span className="toggle-track" />
-                            </div>
-                          </label>
-                        )}
-
-                        {gefs.tracks.modelsPresent.some((m: string) => m === 'GFS' || m === 'GFSO') && (
-                          <label className="layer-item">
-                            <div className="layer-item-left">
-                              <span className="layer-badge" style={{ background: '#9c27b0' }}>GFS</span>
-                              <span className="layer-name">Global Forecast System</span>
-                            </div>
-                            <div className="toggle-switch">
-                              <input type="checkbox" checked={showGFS} onChange={(e) => setShowGFS(e.target.checked)} />
-                              <span className="toggle-track" />
-                            </div>
-                          </label>
-                        )}
-
-                        {gefs.tracks.modelsPresent.some((m: string) => m === 'ECMW' || m === 'ECM2') && (
-                          <label className="layer-item">
-                            <div className="layer-item-left">
-                              <span className="layer-badge" style={{ background: '#ff9800' }}>ECMWF</span>
-                              <span className="layer-name">European Centre Model</span>
-                            </div>
-                            <div className="toggle-switch">
-                              <input type="checkbox" checked={showECMWF} onChange={(e) => setShowECMWF(e.target.checked)} />
-                              <span className="toggle-track" />
-                            </div>
-                          </label>
-                        )}
-
-                        {gefs.tracks.modelsPresent.some((m: string) => m === 'AEMI' || m === 'AEMN' || m === 'AC00' || m.startsWith('AP')) && (
-                          <label className="layer-item">
-                            <div className="layer-item-left">
-                              <span className="layer-badge" style={{ background: '#0d47a1' }}>GEFS</span>
-                              <div className="layer-item-text">
-                                <span className="layer-name">GEFS Ensemble</span>
-                                <span className="layer-hint">{gefs.tracks.modelsPresent.filter((m: string) => m === 'AEMI' || m === 'AEMN' || m === 'AC00' || m.startsWith('AP')).length} members</span>
-                              </div>
-                            </div>
-                            <div className="toggle-switch">
-                              <input type="checkbox" checked={showGEFSEnsemble} onChange={(e) => setShowGEFSEnsemble(e.target.checked)} />
-                              <span className="toggle-track" />
-                            </div>
-                          </label>
-                        )}
-
-                        {gefs.tracks.modelsPresent.some((m: string) => m === 'HWRF') && (
-                          <label className="layer-item">
-                            <div className="layer-item-left">
-                              <span className="layer-badge" style={{ background: '#ff4444' }}>HWRF</span>
-                              <span className="layer-name">Weather Research & Forecasting</span>
-                            </div>
-                            <div className="toggle-switch">
-                              <input type="checkbox" checked={showHWRF} onChange={(e) => setShowHWRF(e.target.checked)} />
-                              <span className="toggle-track" />
-                            </div>
-                          </label>
-                        )}
-
-                        {gefs.tracks.modelsPresent.some((m: string) => m === 'HMON') && (
-                          <label className="layer-item">
-                            <div className="layer-item-left">
-                              <span className="layer-badge" style={{ background: '#4682b4' }}>HMON</span>
-                              <span className="layer-name">Multi-scale Ocean-coupled</span>
-                            </div>
-                            <div className="toggle-switch">
-                              <input type="checkbox" checked={showHMON} onChange={(e) => setShowHMON(e.target.checked)} />
-                              <span className="toggle-track" />
-                            </div>
-                          </label>
-                        )}
-
-                        {(() => {
-                          const knownModels = ['OFCL', 'OFCI', 'HWRF', 'HMON', 'HAFS', 'HAFA', 'HAFB', 'GFS', 'GFSO', 'ECMW', 'ECM2', 'AEMI', 'AEMN', 'AEM2', 'AC00'];
-                          const otherModels = gefs.tracks.modelsPresent.filter((m: string) => !knownModels.includes(m) && !m.startsWith('AP'));
-                          return otherModels.length > 0 ? (
-                            <label className="layer-item">
-                              <div className="layer-item-left">
-                                <span className="layer-badge" style={{ background: '#555' }}>+{otherModels.length}</span>
-                                <div className="layer-item-text">
-                                  <span className="layer-name">Other Models</span>
-                                  <span className="layer-hint">{otherModels.join(', ')}</span>
-                                </div>
-                              </div>
-                              <div className="toggle-switch">
-                                <input type="checkbox" checked={showOtherModels} onChange={(e) => setShowOtherModels(e.target.checked)} />
-                                <span className="toggle-track" />
-                              </div>
-                            </label>
-                          ) : null;
-                        })()}
-
-                        {/* Cycle / fetch time */}
-                        {gefs.tracks && (
-                          <div style={{ marginTop: '8px', fontSize: '0.68rem', color: 'rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            {gefs.tracks.cycleTime && (
-                              <span>
-                                Cycle {gefs.tracks.cycleTime.substring(6,8)}/{gefs.tracks.cycleTime.substring(4,6)} {gefs.tracks.cycleTime.substring(8,10)}Z
-                              </span>
-                            )}
-                            {gefs.tracks.fetchTime && (
-                              <>
-                                <span>·</span>
-                                <span>{gefs.tracks.fetchTime.toLocaleTimeString()}</span>
-                                <button
-                                  onClick={() => gefs.refresh && gefs.refresh()}
-                                  style={{ background: 'none', border: 'none', color: '#4FC3F7', cursor: 'pointer', padding: '0 2px', fontSize: '0.75rem', lineHeight: 1 }}
-                                  title="Refresh model data"
-                                >↻</button>
-                              </>
-                            )}
-                          </div>
-                        )}
+                      </>
+                    ) : error.includes('timeout') || error.includes('⏱️') ? (
+                      <>
+                        <div>⏱️ Connection Timeout</div>
+                        <div style={{fontSize: '0.8rem', marginTop: '5px', lineHeight: '1.3'}}>
+                          Likely needs CORS proxy access.<br />
+                          <button
+                            onClick={openCorsAccess}
+                            style={{ marginTop: '4px', padding: '3px 6px', fontSize: '0.7rem', backgroundColor: '#007bff', color: 'white', border: 'none', borderRadius: '3px', cursor: 'pointer' }}
+                          >
+                            🔑 Get Access
+                          </button>
+                        </div>
+                      </>
+                    ) : error.includes('Network') || error.includes('📡') ? (
+                      <>
+                        <div>📡 Network Issue</div>
+                        <div style={{fontSize: '0.8rem', marginTop: '5px'}}>
+                          Check your internet connection
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div>⚠️ Data Unavailable</div>
+                        <div style={{fontSize: '0.8rem', marginTop: '5px'}}>
+                          {error.substring(0, 50)}...
+                        </div>
                       </>
                     )}
-                  </>
-                )}
-              </div>
-              {/*<div className="control-panel-buttons">
-                <button 
-                  onClick={refresh}
-                  className="control-panel-button"
-                >
-                  Refresh
-                </button>
-              </div>*/}
-              {!hasStorms && (
-                <div className="no-storms-message">
-                  <div className="no-storms-icon">🌤️</div>
-                  <div className="no-storms-title">All Clear!</div>
-                  <div className="no-storms-subtitle">
-                    No active storms detected
                   </div>
+                </>
+              ) : (
+                <>
+                  {/* Visual Storm Selector */}
+                  {displayStorms.length > 0 && (
+                    <div style={{ padding: '8px 0' }}>
+                      <div style={{ fontSize: '0.82rem', fontWeight: 600, marginBottom: '8px', color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                        Active Storms
+                      </div>
+                      {selectedStormIds.length > 0 && (
+                        <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                          <button
+                            onClick={() => { setSelectedStormIds([]); setSelectedStormId(null); setLastSelectionType(null); }}
+                            style={{ fontSize: '0.75rem', padding: '4px 8px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer' }}
+                          >
+                            Clear selection (show all)
+                          </button>
+                        </div>
+                      )}
+                      {displayStorms.map(storm => {
+                        const isSelected = selectedStormIds.includes(storm.id);
+                        const categoryColor = storm.category >= 5 ? '#8B0000' :
+                                              storm.category >= 3 ? '#FF4500' :
+                                              storm.category >= 1 ? '#FFD700' :
+                                              storm.classification.toLowerCase().includes('tropical storm') || storm.classification.toLowerCase() === 'ts' ? '#4FC3F7' : '#87CEEB';
+                        const getBadgeText = (s: any) => {
+                          if (s.category >= 1) return s.category.toString();
+                          const cl = s.classification.toLowerCase();
+                          if (cl === 'ts' || cl.includes('tropical storm')) return 'TS';
+                          if (cl === 'td' || cl.includes('tropical depression')) return 'TD';
+                          if (cl === 'ss' || cl.includes('subtropical')) return 'SS';
+                          return 'TS';
+                        };
+                        return (
+                          <div
+                            key={storm.id}
+                            className={`storm-selector-box ${isSelected ? 'selected' : ''}`}
+                            onClick={() => {
+                              setSelectedStormIds(prev => {
+                                if (prev.includes(storm.id)) {
+                                  const next = prev.filter(id => id !== storm.id);
+                                  if (selectedStormId === storm.id) { setSelectedStormId(next[0] ?? null); if (next.length === 0) setLastSelectionType(null); }
+                                  return next;
+                                } else {
+                                  setSelectedStormId(storm.id);
+                                  setSelectedInvestId(null);
+                                  setLastSelectionType('storm');
+                                  return [...prev, storm.id];
+                                }
+                              });
+                            }}
+                            style={{ display: 'flex', alignItems: 'center', padding: '8px', marginBottom: '8px', borderRadius: '8px', border: isSelected ? '2px solid #4FC3F7' : '1px solid rgba(255,255,255,0.3)', backgroundColor: isSelected ? 'rgba(79,195,247,0.2)' : 'rgba(255,255,255,0.1)', cursor: 'pointer', transition: 'all 0.2s ease' }}
+                          >
+                            <div style={{ width: '64px', height: '64px', borderRadius: '8px', backgroundColor: isSelected ? 'rgba(79,195,247,0.3)' : 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginRight: '12px', border: `2px solid ${categoryColor}`, position: 'relative', overflow: 'hidden', flexShrink: 0 }}>
+                              <div style={{ width: '48px', height: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                {(() => {
+                                  const isHurricane = storm.classification.toLowerCase().includes('hurricane') || storm.classification === 'HU' || (storm.category && storm.category >= 1);
+                                  const isTD = storm.classification.toLowerCase().includes('tropical depression') || storm.classification.toLowerCase().includes('depression') || storm.classification === 'TD';
+                                  const isPostTropical = storm.classification.toLowerCase().includes('post-tropical') || storm.classification.toLowerCase().includes('extratropical') || ['EX','PC','EC','PTC'].includes(storm.classification);
+                                  if (isPostTropical) return (
+                                    <div style={{ width: '48px', height: '48px', borderRadius: '50%', border: '2px solid #dc3545', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                      <span style={{ color: '#dc3545', fontSize: '32px', fontWeight: 'bold', fontFamily: 'monospace', lineHeight: '1' }}>×</span>
+                                    </div>
+                                  );
+                                  if (isTD) return (
+                                    <div style={{ width: '48px', height: '48px', borderRadius: '50%', border: '2px solid #dc3545' }} />
+                                  );
+                                  return <img src={isHurricane ? '/HU.svg' : '/TS.svg'} alt={isHurricane ? 'Hurricane' : 'Tropical Storm'} style={{ width: '100%', height: '100%', filter: 'drop-shadow(1px 1px 2px rgba(0,0,0,0.3))' }} />;
+                                })()}
+                              </div>
+                              <div style={{ position: 'absolute', bottom: '2px', right: '2px', backgroundColor: categoryColor, color: 'white', fontSize: '10px', fontWeight: 'bold', padding: '1px 3px', borderRadius: '3px', minWidth: '16px', textAlign: 'center' }}>
+                                {getBadgeText(storm)}
+                              </div>
+                            </div>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#ffffff' }}>{storm.name}</div>
+                              <div style={{ fontSize: '0.75rem', color: '#cccccc', marginTop: '2px' }}>{getFullIntensityName(storm)}</div>
+                              <div style={{ fontSize: '0.7rem', color: '#aaaaaa', marginTop: '1px' }}>{storm.maxWinds} mph • {storm.pressure} mb</div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                      {selectedStorm && (
+                        <div style={{ fontSize: '0.7rem', color: '#cccccc', marginTop: '6px', padding: '6px', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: '4px' }}>
+                          <strong>Tracking:</strong> {selectedStorm.name} - {selectedStorm.maxWinds} mph winds
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Invest Areas */}
+                  <div style={{ padding: '8px 0', borderTop: '1px solid rgba(255,255,255,0.12)' }}>
+                    <div style={{ fontSize: '0.82rem', fontWeight: 600, marginBottom: '8px', color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                      Areas of Interest
+                    </div>
+                    <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.8rem', cursor: 'pointer', marginBottom: '8px' }}>
+                      <input type="checkbox" checked={showInvests} onChange={(e) => setShowInvests(e.target.checked)} style={{ marginRight: '6px' }} />
+                      Show All Invest Areas ({invests.length})
+                      {investLoading && <div className="loading-spinner" style={{ marginLeft: '8px', transform: 'scale(0.6)' }}></div>}
+                      {investError && <span style={{ fontSize: '0.7rem', color: '#d32f2f', marginLeft: '6px' }}>Error</span>}
+                    </label>
+                    {showInvests && invests.length > 0 && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {invests.map(invest => {
+                          const maxChance = Math.max(invest.formationChance48hr, invest.formationChance7day);
+                          const investColor = maxChance >= 70 ? '#FF6B35' : maxChance >= 40 ? '#FF8C00' : '#FFD700';
+                          const isSelected = selectedInvestId === invest.id;
+                          return (
+                            <div
+                              key={invest.id}
+                              className={`storm-selector-box ${isSelected ? 'selected' : ''}`}
+                              onClick={() => {
+                                if (selectedInvestId === invest.id) { setSelectedInvestId(null); setSelectedStormId(null); setSelectedStormIds([]); setLastSelectionType(null); }
+                                else { setSelectedInvestId(invest.id); setSelectedStormId(null); setSelectedStormIds([]); setLastSelectionType('invest'); trackInvestSelected(invest.id, invest.formationChance48hr ?? 0, invest.formationChance7day ?? 0); }
+                              }}
+                              style={{ display: 'flex', alignItems: 'center', padding: '8px', borderRadius: '8px', border: isSelected ? '2px solid #FF8C00' : '1px solid rgba(255,255,255,0.3)', backgroundColor: isSelected ? 'rgba(255,140,0,0.2)' : 'rgba(255,255,255,0.1)', cursor: 'pointer' }}
+                            >
+                              <div style={{ position: 'relative', width: '32px', height: '32px', marginRight: '12px', flexShrink: 0 }}>
+                                <div style={{ width: '100%', height: '100%', backgroundColor: investColor, border: '2px solid #333', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 'bold', color: '#333' }}>I</div>
+                                <div style={{ position: 'absolute', bottom: '-2px', right: '-2px', backgroundColor: maxChance >= 70 ? '#8B0000' : maxChance >= 40 ? '#FF4500' : '#DAA520', color: 'white', fontSize: '9px', fontWeight: 'bold', padding: '1px 3px', borderRadius: '3px', minWidth: '16px', textAlign: 'center', border: '1px solid #333' }}>{maxChance}%</div>
+                              </div>
+                              <div style={{ flex: 1 }}>
+                                <div style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#ffffff' }}>{invest.name || `Invest ${invest.id}`}</div>
+                                <div style={{ fontSize: '0.75rem', color: '#cccccc', marginTop: '2px' }}>{invest.location || invest.basin}</div>
+                                <div style={{ fontSize: '0.7rem', color: '#aaaaaa', marginTop: '1px' }}>48hr: {invest.formationChance48hr}% • 7-day: {invest.formationChance7day}%</div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                    {!showInvests && invests.length > 0 && <div style={{ fontSize: '0.7rem', color: '#cccccc', fontStyle: 'italic' }}>{invests.length} invest area{invests.length !== 1 ? 's' : ''} hidden</div>}
+                    {showInvests && invests.length === 0 && !investLoading && <div style={{ fontSize: '0.7rem', color: '#cccccc', fontStyle: 'italic' }}>No active invest areas</div>}
+                  </div>
+
+                  {!hasStorms && (
+                    <div className="no-storms-message">
+                      <div className="no-storms-icon">🌤️</div>
+                      <div className="no-storms-title">All Clear!</div>
+                      <div className="no-storms-subtitle">No active storms detected</div>
+                    </div>
+                  )}
+                </>
+              )}
+            </>
+          )}
+
+          {/* ── NHC LAYERS TAB ── */}
+          {activeDrawer === 'layers' && (
+            <>
+              {/* ── Satellite & Radar section ── */}
+              <div style={{ fontSize: '0.72rem', fontWeight: 600, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '6px' }}>
+                Satellite &amp; Radar
+              </div>
+
+              <label className="layer-item">
+                <div className="layer-item-left">
+                  <span className="layer-color-swatch" style={{ background: 'linear-gradient(135deg, #c8e6f5 0%, #ffffff 50%, #aad4f5 100%)' }} />
+                  <div className="layer-item-text">
+                    <span className="layer-name">Satellite</span>
+                    <span className="layer-hint">GOES-East · NASA GIBS</span>
+                  </div>
+                </div>
+                <div className="toggle-switch">
+                  <input type="checkbox" checked={showSatellite} onChange={e => setShowSatellite(e.target.checked)} />
+                  <span className="toggle-track" />
+                </div>
+              </label>
+
+              {showSatellite && (
+                <div className="layer-sub-options">
+                  <label className="sub-option-label">
+                    <input type="radio" name="satelliteType" value="geocolor" checked={satelliteType === 'geocolor'} onChange={() => setSatelliteType('geocolor')} />
+                    GeoColor <span style={{ opacity: 0.55, fontSize: '0.7rem' }}>(true-color day / IR night)</span>
+                  </label>
+                  <label className="sub-option-label">
+                    <input type="radio" name="satelliteType" value="visible" checked={satelliteType === 'visible'} onChange={() => setSatelliteType('visible')} />
+                    Visible <span style={{ opacity: 0.55, fontSize: '0.7rem' }}>(daytime only)</span>
+                  </label>
+                  <label className="sub-option-label">
+                    <input type="radio" name="satelliteType" value="infrared" checked={satelliteType === 'infrared'} onChange={() => setSatelliteType('infrared')} />
+                    Infrared <span style={{ opacity: 0.55, fontSize: '0.7rem' }}>(24 / 7)</span>
+                  </label>
+                </div>
+              )}
+
+              <label className="layer-item">
+                <div className="layer-item-left">
+                  <span className="layer-color-swatch" style={{ background: 'linear-gradient(135deg, #00cc00 0%, #ffff00 50%, #ff0000 100%)' }} />
+                  <div className="layer-item-text">
+                    <span className="layer-name">Radar</span>
+                    <span className="layer-hint">NEXRAD · RainViewer</span>
+                  </div>
+                  {radarLoading && <div className="gefs-spinner" />}
+                </div>
+                <div className="toggle-switch">
+                  <input type="checkbox" checked={showRadar} onChange={e => setShowRadar(e.target.checked)} />
+                  <span className="toggle-track" />
+                </div>
+              </label>
+
+              <div style={{ height: '1px', background: 'rgba(255,255,255,0.1)', margin: '8px 0 10px' }} />
+
+              <label className={`layer-item${!selectedStormId ? ' disabled' : ''}`}>
+                <div className="layer-item-left">
+                  <span className="layer-color-swatch" style={{ background: 'linear-gradient(135deg,#CC0000 50%,#FF00FF 50%)' }} />
+                  <div className="layer-item-text">
+                    <span className="layer-name">Watches &amp; Warnings</span>
+                    {!selectedStormId && <span className="layer-hint">Select a storm first</span>}
+                    {selectedStormId && watchWarning.available === false && !watchWarning.loading && <span className="layer-hint">None issued</span>}
+                  </div>
+                  {watchWarning.loading && selectedStormId && <div className="gefs-spinner" />}
+                </div>
+                <div className="toggle-switch">
+                  <input type="checkbox" checked={showWatchWarning} onChange={(e) => setShowWatchWarning(e.target.checked)} disabled={!selectedStormId} />
+                  <span className="toggle-track" />
+                </div>
+              </label>
+
+              <label className={`layer-item${!selectedStormId ? ' disabled' : ''}`}>
+                <div className="layer-item-left">
+                  <span className="layer-color-swatch" style={{ background: 'linear-gradient(135deg,#ffdd00 33%,#ff8800 66%,#ff4444 100%)' }} />
+                  <div className="layer-item-text">
+                    <span className="layer-name">Current Wind Extent</span>
+                    {!selectedStormId && <span className="layer-hint">Select a storm first</span>}
+                    {selectedStormId && initialWindExtent.available === false && !initialWindExtent.loading && <span className="layer-hint">No data</span>}
+                  </div>
+                  {initialWindExtent.loading && selectedStormId && <div className="gefs-spinner" />}
+                </div>
+                <div className="toggle-switch">
+                  <input type="checkbox" checked={showInitialWindExtent} onChange={(e) => setShowInitialWindExtent(e.target.checked)} disabled={!selectedStormId} />
+                  <span className="toggle-track" />
+                </div>
+              </label>
+
+              <label className={`layer-item${!selectedStormId ? ' disabled' : ''}`}>
+                <div className="layer-item-left">
+                  <span className="layer-color-swatch" style={{ background: '#ffdd00' }} />
+                  <div className="layer-item-text">
+                    <span className="layer-name">Forecast Wind Radii</span>
+                    {!selectedStormId && <span className="layer-hint">Select a storm first</span>}
+                    {selectedStormId && forecastWindRadii.available === false && !forecastWindRadii.loading && <span className="layer-hint">No data</span>}
+                  </div>
+                  {forecastWindRadii.loading && selectedStormId && <div className="gefs-spinner" />}
+                </div>
+                <div className="toggle-switch">
+                  <input type="checkbox" checked={showForecastWindRadii} onChange={(e) => setShowForecastWindRadii(e.target.checked)} disabled={!selectedStormId} />
+                  <span className="toggle-track" />
+                </div>
+              </label>
+
+              <label className="layer-item">
+                <div className="layer-item-left">
+                  <span className="layer-color-swatch" style={{ background: '#888888' }} />
+                  <span className="layer-name">Historical Track</span>
+                </div>
+                <div className="toggle-switch">
+                  <input type="checkbox" checked={showHistoricalTracks} onChange={(e) => setShowHistoricalTracks(e.target.checked)} />
+                  <span className="toggle-track" />
+                </div>
+              </label>
+
+              <label className="layer-item">
+                <div className="layer-item-left">
+                  <span className="layer-color-swatch" style={{ background: '#ff3333' }} />
+                  <span className="layer-name">Forecast Track</span>
+                </div>
+                <div className="toggle-switch">
+                  <input type="checkbox" checked={showForecastTracks} onChange={(e) => setShowForecastTracks(e.target.checked)} />
+                  <span className="toggle-track" />
+                </div>
+              </label>
+
+              <label className="layer-item">
+                <div className="layer-item-left">
+                  <span className="layer-color-swatch" style={{ background: '#2196F3' }} />
+                  <span className="layer-name">Forecast Cone</span>
+                </div>
+                <div className="toggle-switch">
+                  <input type="checkbox" checked={showForecastCones} onChange={(e) => setShowForecastCones(e.target.checked)} />
+                  <span className="toggle-track" />
+                </div>
+              </label>
+
+              <label className={`layer-item${!selectedStormId ? ' disabled' : ''}`}>
+                <div className="layer-item-left">
+                  <span className="layer-color-swatch" style={{ background: '#cc00cc' }} />
+                  <div className="layer-item-text">
+                    <span className="layer-name">Peak Storm Surge</span>
+                    {!selectedStormId && <span className="layer-hint">Select a storm first</span>}
+                    {peakStormSurge.available === false && selectedStormId && !peakStormSurge.loading && <span className="layer-hint">N/A for EP storms</span>}
+                  </div>
+                  {peakStormSurge.loading && selectedStormId && <div className="gefs-spinner" />}
+                </div>
+                <div className="toggle-switch">
+                  <input type="checkbox" checked={showPeakStormSurge} onChange={(e) => setShowPeakStormSurge(e.target.checked)} disabled={!selectedStormId} />
+                  <span className="toggle-track" />
+                </div>
+              </label>
+
+              <label className={`layer-item${!selectedStormId ? ' disabled' : ''}`}>
+                <div className="layer-item-left">
+                  <span className="layer-color-swatch" style={{ background: '#9932CC' }} />
+                  <div className="layer-item-text">
+                    <span className="layer-name">Wind Arrival Time</span>
+                    {!selectedStormId && <span className="layer-hint">Select a storm first</span>}
+                  </div>
+                </div>
+                <div className="toggle-switch">
+                  <input type="checkbox" checked={showWindArrival} onChange={(e) => setShowWindArrival(e.target.checked)} disabled={!selectedStormId} />
+                  <span className="toggle-track" />
+                </div>
+              </label>
+              {showWindArrival && selectedStormId && (
+                <div className="layer-sub-options">
+                  <label className="sub-option-label">
+                    <input type="radio" name="windArrivalType" value="most-likely" checked={windArrivalType === 'most-likely'} onChange={(e) => setWindArrivalType(e.target.value as 'most-likely' | 'earliest')} />
+                    Most Likely Arrival
+                  </label>
+                  <label className="sub-option-label">
+                    <input type="radio" name="windArrivalType" value="earliest" checked={windArrivalType === 'earliest'} onChange={(e) => setWindArrivalType(e.target.value as 'most-likely' | 'earliest')} />
+                    Earliest Reasonable Arrival
+                  </label>
+                </div>
+              )}
+
+              <label className={`layer-item${!isAllStormsShown ? ' disabled' : ''}`}>
+                <div className="layer-item-left">
+                  <span className="layer-color-swatch" style={{ background: '#0066cc' }} />
+                  <div className="layer-item-text">
+                    <span className="layer-name">Wind Speed Probability</span>
+                    {!isAllStormsShown && <span className="layer-hint">View all storms to enable</span>}
+                    {isAllStormsShown && windSpeedProb.available === false && <span className="layer-hint">No data available</span>}
+                  </div>
+                </div>
+                <div className="toggle-switch">
+                  <input type="checkbox" checked={showWindSpeedProb} onChange={(e) => setShowWindSpeedProb(e.target.checked)} disabled={!isAllStormsShown} />
+                  <span className="toggle-track" />
+                </div>
+              </label>
+              {showWindSpeedProb && isAllStormsShown && (
+                <div className="wind-speed-options">
+                  {(['34kt', '50kt', '64kt'] as const).map((speed) => (
+                    <label key={speed} className="wind-speed-option">
+                      <input type="radio" name="windSpeedType" value={speed} checked={windSpeedProbType === speed} onChange={(e) => setWindSpeedProbType(e.target.value as '34kt' | '50kt' | '64kt')} />
+                      {speed}
+                    </label>
+                  ))}
                 </div>
               )}
             </>
           )}
-        </div>
-        {/* Pinned footer */}
+
+          {/* ── MODELS TAB ── */}
+          {activeDrawer === 'models' && (
+            <>
+              <label className={`layer-item${!selectedStormId ? ' disabled' : ''}`}>
+                <div className="layer-item-left">
+                  <div className="layer-item-text">
+                    <span className="layer-name" style={{ fontWeight: 600 }}>Enable Model Display</span>
+                    {!selectedStormId && <span className="layer-hint">Select a storm first</span>}
+                    {gefs.available === false && selectedStormId && <span className="layer-hint">No data found</span>}
+                  </div>
+                  {gefs.loading && <div className="gefs-spinner" />}
+                </div>
+                <div className="toggle-switch">
+                  <input type="checkbox" checked={showGEFSSpaghetti} onChange={(e) => setShowGEFSSpaghetti(e.target.checked)} disabled={!selectedStormId} />
+                  <span className="toggle-track" />
+                </div>
+              </label>
+
+              {showGEFSSpaghetti && selectedStormId && gefs.tracks?.modelsPresent && (
+                <>
+                  <div className="model-quick-actions">
+                    <button className="model-quick-btn model-quick-btn--all" onClick={() => { setShowOfficialTrack(true); setShowHAFS(true); setShowGFS(true); setShowECMWF(true); setShowGEFSEnsemble(true); setShowOtherModels(true); setShowHWRF(true); setShowHMON(true); }}>Select All</button>
+                    <button className="model-quick-btn model-quick-btn--clear" onClick={() => { setShowOfficialTrack(false); setShowHAFS(false); setShowGFS(false); setShowECMWF(false); setShowGEFSEnsemble(false); setShowOtherModels(false); setShowHWRF(false); setShowHMON(false); }}>Clear All</button>
+                  </div>
+
+                  {gefs.tracks.modelsPresent.some((m: string) => m === 'OFCL' || m === 'OFCI') && (
+                    <label className="layer-item">
+                      <div className="layer-item-left">
+                        <span className="layer-badge" style={{ background: '#555', color: '#fff' }}>OFCL</span>
+                        <span className="layer-name">Official NHC Forecast</span>
+                      </div>
+                      <div className="toggle-switch">
+                        <input type="checkbox" checked={showOfficialTrack} onChange={(e) => setShowOfficialTrack(e.target.checked)} />
+                        <span className="toggle-track" />
+                      </div>
+                    </label>
+                  )}
+                  {gefs.tracks.modelsPresent.some((m: string) => m === 'HAFS' || m === 'HAFA' || m === 'HAFB') && (
+                    <label className="layer-item">
+                      <div className="layer-item-left">
+                        <span className="layer-badge" style={{ background: '#4444ff' }}>HAFS</span>
+                        <span className="layer-name">Analysis &amp; Forecast System</span>
+                      </div>
+                      <div className="toggle-switch">
+                        <input type="checkbox" checked={showHAFS} onChange={(e) => setShowHAFS(e.target.checked)} />
+                        <span className="toggle-track" />
+                      </div>
+                    </label>
+                  )}
+                  {gefs.tracks.modelsPresent.some((m: string) => m === 'GFS' || m === 'GFSO') && (
+                    <label className="layer-item">
+                      <div className="layer-item-left">
+                        <span className="layer-badge" style={{ background: '#9c27b0' }}>GFS</span>
+                        <span className="layer-name">Global Forecast System</span>
+                      </div>
+                      <div className="toggle-switch">
+                        <input type="checkbox" checked={showGFS} onChange={(e) => setShowGFS(e.target.checked)} />
+                        <span className="toggle-track" />
+                      </div>
+                    </label>
+                  )}
+                  {gefs.tracks.modelsPresent.some((m: string) => m === 'ECMW' || m === 'ECM2') && (
+                    <label className="layer-item">
+                      <div className="layer-item-left">
+                        <span className="layer-badge" style={{ background: '#ff9800' }}>ECMWF</span>
+                        <span className="layer-name">European Centre Model</span>
+                      </div>
+                      <div className="toggle-switch">
+                        <input type="checkbox" checked={showECMWF} onChange={(e) => setShowECMWF(e.target.checked)} />
+                        <span className="toggle-track" />
+                      </div>
+                    </label>
+                  )}
+                  {gefs.tracks.modelsPresent.some((m: string) => m === 'AEMI' || m === 'AEMN' || m === 'AC00' || m.startsWith('AP')) && (
+                    <label className="layer-item">
+                      <div className="layer-item-left">
+                        <span className="layer-badge" style={{ background: '#0d47a1' }}>GEFS</span>
+                        <div className="layer-item-text">
+                          <span className="layer-name">GEFS Ensemble</span>
+                          <span className="layer-hint">{gefs.tracks.modelsPresent.filter((m: string) => m === 'AEMI' || m === 'AEMN' || m === 'AC00' || m.startsWith('AP')).length} members</span>
+                        </div>
+                      </div>
+                      <div className="toggle-switch">
+                        <input type="checkbox" checked={showGEFSEnsemble} onChange={(e) => setShowGEFSEnsemble(e.target.checked)} />
+                        <span className="toggle-track" />
+                      </div>
+                    </label>
+                  )}
+                  {gefs.tracks.modelsPresent.some((m: string) => m === 'HWRF') && (
+                    <label className="layer-item">
+                      <div className="layer-item-left">
+                        <span className="layer-badge" style={{ background: '#ff4444' }}>HWRF</span>
+                        <span className="layer-name">Weather Research &amp; Forecasting</span>
+                      </div>
+                      <div className="toggle-switch">
+                        <input type="checkbox" checked={showHWRF} onChange={(e) => setShowHWRF(e.target.checked)} />
+                        <span className="toggle-track" />
+                      </div>
+                    </label>
+                  )}
+                  {gefs.tracks.modelsPresent.some((m: string) => m === 'HMON') && (
+                    <label className="layer-item">
+                      <div className="layer-item-left">
+                        <span className="layer-badge" style={{ background: '#4682b4' }}>HMON</span>
+                        <span className="layer-name">Multi-scale Ocean-coupled</span>
+                      </div>
+                      <div className="toggle-switch">
+                        <input type="checkbox" checked={showHMON} onChange={(e) => setShowHMON(e.target.checked)} />
+                        <span className="toggle-track" />
+                      </div>
+                    </label>
+                  )}
+                  {(() => {
+                    const knownModels = ['OFCL','OFCI','HWRF','HMON','HAFS','HAFA','HAFB','GFS','GFSO','ECMW','ECM2','AEMI','AEMN','AEM2','AC00'];
+                    const otherModels = gefs.tracks.modelsPresent.filter((m: string) => !knownModels.includes(m) && !m.startsWith('AP'));
+                    return otherModels.length > 0 ? (
+                      <label className="layer-item">
+                        <div className="layer-item-left">
+                          <span className="layer-badge" style={{ background: '#555' }}>+{otherModels.length}</span>
+                          <div className="layer-item-text">
+                            <span className="layer-name">Other Models</span>
+                            <span className="layer-hint">{otherModels.join(', ')}</span>
+                          </div>
+                        </div>
+                        <div className="toggle-switch">
+                          <input type="checkbox" checked={showOtherModels} onChange={(e) => setShowOtherModels(e.target.checked)} />
+                          <span className="toggle-track" />
+                        </div>
+                      </label>
+                    ) : null;
+                  })()}
+
+                  {gefs.tracks && (
+                    <div style={{ marginTop: '8px', fontSize: '0.68rem', color: 'rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {gefs.tracks.cycleTime && <span>Cycle {gefs.tracks.cycleTime.substring(6,8)}/{gefs.tracks.cycleTime.substring(4,6)} {gefs.tracks.cycleTime.substring(8,10)}Z</span>}
+                      {gefs.tracks.fetchTime && (
+                        <>
+                          <span>·</span>
+                          <span>{gefs.tracks.fetchTime.toLocaleTimeString()}</span>
+                          <button onClick={() => gefs.refresh && gefs.refresh()} style={{ background: 'none', border: 'none', color: '#4FC3F7', cursor: 'pointer', padding: '0 2px', fontSize: '0.75rem', lineHeight: 1 }} title="Refresh model data">↻</button>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+            </>
+          )}
+
+          {/* ── WIND FIELDS TAB ── */}
+          {activeDrawer === 'wind' && (
+            <>
+              <label className="layer-item">
+                <div className="layer-item-left">
+                  <span className="layer-badge" style={{ background: '#ff4444' }}>HWRF</span>
+                  <div className="layer-item-text">
+                    <span className="layer-name">Wind Field</span>
+                  </div>
+                  {hwrf.isLoading && <div className="gefs-spinner" />}
+                </div>
+                <div className="toggle-switch">
+                  <input type="checkbox" checked={showHWRFWindfield} onChange={(e) => setShowHWRFWindfield(e.target.checked)} />
+                  <span className="toggle-track" />
+                </div>
+              </label>
+
+              <label className="layer-item">
+                <div className="layer-item-left">
+                  <span className="layer-badge" style={{ background: '#4682b4' }}>HMON</span>
+                  <div className="layer-item-text">
+                    <span className="layer-name">Wind Field</span>
+                  </div>
+                  {hmon.isLoading && <div className="gefs-spinner" />}
+                </div>
+                <div className="toggle-switch">
+                  <input type="checkbox" checked={showHMONWindfield} onChange={(e) => setShowHMONWindfield(e.target.checked)} />
+                  <span className="toggle-track" />
+                </div>
+              </label>
+            </>
+          )}
+
+          {/* ── MAP STYLE TAB ── */}
+          {activeDrawer === 'style' && (
+            <div className="basemap-picker">
+              {BASEMAPS.map(bm => (
+                <button
+                  key={bm.id}
+                  className={`basemap-btn${basemapId === bm.id ? ' active' : ''}`}
+                  onClick={() => setBasemapId(bm.id)}
+                >
+                  {bm.label}
+                </button>
+              ))}
+            </div>
+          )}
+
+        </div>{/* end tab-drawer-content */}
+
         {lastUpdated && (
-          <div className="control-panel-footer">
+          <div className="tab-drawer-footer">
             Updated: {lastUpdated.toLocaleTimeString()}
           </div>
         )}
-      </div>
+      </div>{/* end tab-drawer */}
+
     </div>
   );
 };
