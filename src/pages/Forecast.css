@@ -269,6 +269,488 @@
   margin: 0;
 }
 
+/* ─── Storm selector ───────────────────────────────── */
+.fc-storm-selector {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+
+.fc-storm-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.fc-storm-tab {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(232, 244, 255, 0.6);
+  border-radius: 10px;
+  padding: 8px 16px;
+  font-size: 0.88rem;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.fc-storm-tab:hover {
+  border-color: rgba(0, 212, 255, 0.35);
+  color: rgba(232, 244, 255, 0.9);
+  background: rgba(0, 212, 255, 0.06);
+}
+
+.fc-storm-tab.active {
+  background: rgba(0, 212, 255, 0.12);
+  border-color: rgba(0, 212, 255, 0.5);
+  color: #e8f4ff;
+  font-weight: 600;
+}
+
+.fc-storm-tab-icon {
+  font-size: 1rem !important;
+  color: #00d4ff;
+}
+
+.fc-storm-tab-name {
+  text-transform: capitalize;
+}
+
+.fc-storm-tab-cat {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  letter-spacing: 0.04em;
+}
+
+.fc-storm-tab-cat.cat-0 { background: rgba(90,185,234,0.2); color: #5ab9ea; }
+.fc-storm-tab-cat.cat-1 { background: rgba(255,253,86,0.2); color: #fffd56; }
+.fc-storm-tab-cat.cat-2 { background: rgba(255,180,70,0.2); color: #ffb446; }
+.fc-storm-tab-cat.cat-3 { background: rgba(255,90,60,0.2); color: #ff5a3c; }
+.fc-storm-tab-cat.cat-4 { background: rgba(200,30,120,0.2); color: #e0509a; }
+.fc-storm-tab-cat.cat-5 { background: rgba(120,20,200,0.2); color: #b070e8; }
+
+.fc-refresh-row {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.fc-last-updated {
+  font-size: 0.72rem;
+  color: rgba(232, 244, 255, 0.3);
+}
+
+.fc-refresh-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(232, 244, 255, 0.45);
+  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  transition: all 0.18s;
+}
+
+.fc-refresh-btn:hover {
+  border-color: rgba(0, 212, 255, 0.35);
+  color: #00d4ff;
+  background: rgba(0, 212, 255, 0.07);
+}
+
+.fc-refresh-btn svg {
+  font-size: 1.1rem !important;
+}
+
+/* ─── Active Storm Banner ──────────────────────────── */
+.fc-storm-banner {
+  background: rgba(0, 212, 255, 0.05);
+  border: 1px solid rgba(0, 212, 255, 0.15);
+  border-radius: 14px;
+  padding: 18px 24px;
+  margin-bottom: 28px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+}
+
+.fc-storm-banner-name {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.fc-storm-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 3px 10px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.fc-storm-badge.cat-0 { background: rgba(90,185,234,0.15); color: #5ab9ea; border: 1px solid rgba(90,185,234,0.3); }
+.fc-storm-badge.cat-1 { background: rgba(255,253,86,0.1); color: #fffd56; border: 1px solid rgba(255,253,86,0.3); }
+.fc-storm-badge.cat-2 { background: rgba(255,180,70,0.12); color: #ffb446; border: 1px solid rgba(255,180,70,0.3); }
+.fc-storm-badge.cat-3 { background: rgba(255,90,60,0.12); color: #ff5a3c; border: 1px solid rgba(255,90,60,0.3); }
+.fc-storm-badge.cat-4 { background: rgba(200,30,120,0.12); color: #e0509a; border: 1px solid rgba(200,30,120,0.3); }
+.fc-storm-badge.cat-5 { background: rgba(120,20,200,0.12); color: #b070e8; border: 1px solid rgba(120,20,200,0.3); }
+
+.fc-storm-banner-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #e8f4ff;
+  text-transform: capitalize;
+}
+
+.fc-storm-stats {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  flex: 1;
+}
+
+.fc-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 16px;
+}
+
+.fc-stat-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: rgba(232, 244, 255, 0.35);
+  text-transform: uppercase;
+}
+
+.fc-stat-value {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #e8f4ff;
+}
+
+.fc-stat-sub {
+  font-size: 0.72rem;
+  color: rgba(232, 244, 255, 0.35);
+}
+
+.fc-stat-movement {
+  font-size: 0.85rem;
+}
+
+.fc-stat-divider {
+  width: 1px;
+  height: 36px;
+  background: rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+}
+
+.fc-advisory-link {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 16px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #00d4ff;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: opacity 0.15s;
+}
+
+.fc-advisory-link:hover { opacity: 0.75; }
+
+.fc-advisory-icon {
+  font-size: 0.85rem !important;
+}
+
+/* ─── Loading / Error ──────────────────────────────── */
+.fc-loading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 24px 0;
+  color: rgba(232, 244, 255, 0.45);
+  font-size: 0.9rem;
+}
+
+.fc-loading-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(0, 212, 255, 0.15);
+  border-top-color: #00d4ff;
+  border-radius: 50%;
+  animation: fc-spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes fc-spin {
+  to { transform: rotate(360deg); }
+}
+
+.fc-error {
+  background: rgba(255, 90, 60, 0.08);
+  border: 1px solid rgba(255, 90, 60, 0.2);
+  border-radius: 10px;
+  padding: 14px 18px;
+  font-size: 0.88rem;
+  color: rgba(255, 150, 120, 0.9);
+  margin-bottom: 24px;
+}
+
+/* ─── Off-Season State ─────────────────────────────── */
+.fc-offseason {
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(0, 212, 255, 0.08);
+  border-radius: 18px;
+  padding: 48px 36px;
+  text-align: center;
+  margin-bottom: 36px;
+}
+
+.fc-offseason-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: rgba(0, 212, 255, 0.08);
+  border: 1px solid rgba(0, 212, 255, 0.15);
+  color: #00d4ff;
+  margin: 0 auto 20px;
+}
+
+.fc-offseason-icon svg {
+  font-size: 1.7rem !important;
+}
+
+.fc-offseason-title {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #e8f4ff;
+  margin: 0 0 12px;
+}
+
+.fc-offseason-body {
+  font-size: 0.92rem;
+  color: rgba(232, 244, 255, 0.5);
+  line-height: 1.7;
+  max-width: 560px;
+  margin: 0 auto 28px;
+}
+
+.fc-offseason-season {
+  max-width: 680px;
+  margin: 0 auto;
+}
+
+.fc-season-bar {
+  display: flex;
+  gap: 4px;
+  align-items: flex-end;
+  justify-content: center;
+  margin-bottom: 10px;
+}
+
+.fc-season-month {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+}
+
+.fc-season-month-label {
+  font-size: 0.65rem;
+  color: rgba(232, 244, 255, 0.3);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.fc-season-month-bar {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.fc-season-month.active .fc-season-month-bar {
+  background: rgba(0, 212, 255, 0.3);
+  height: 10px;
+}
+
+.fc-season-month.active .fc-season-month-label {
+  color: rgba(232, 244, 255, 0.55);
+}
+
+.fc-season-month.peak .fc-season-month-bar {
+  background: #00d4ff;
+  height: 16px;
+}
+
+.fc-season-month.peak .fc-season-month-label {
+  color: #00d4ff;
+}
+
+.fc-season-caption {
+  font-size: 0.78rem;
+  color: rgba(232, 244, 255, 0.35);
+  margin: 8px 0 0;
+}
+
+/* ─── Model tab dot indicator ──────────────────────── */
+.fc-model-tab {
+  position: relative;
+}
+
+.fc-model-dot {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #00d4ff;
+}
+
+/* ─── Card header ──────────────────────────────────── */
+.fc-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  gap: 12px;
+}
+
+.fc-card-header h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #e8f4ff;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.fc-card-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: #00d4ff;
+  background: rgba(0, 212, 255, 0.1);
+  border: 1px solid rgba(0, 212, 255, 0.2);
+  border-radius: 5px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+
+.fc-card-loading {
+  font-size: 0.78rem;
+  color: rgba(232, 244, 255, 0.35);
+  font-style: italic;
+}
+
+/* ─── Wide card ────────────────────────────────────── */
+.fc-card-wide {
+  grid-column: 1 / -1;
+}
+
+/* ─── Chart empty state ────────────────────────────── */
+.fc-chart-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  gap: 10px;
+  color: rgba(232, 244, 255, 0.25);
+}
+
+.fc-chart-empty svg {
+  font-size: 2.2rem !important;
+  opacity: 0.4;
+}
+
+.fc-chart-empty p {
+  font-size: 0.88rem;
+  margin: 0;
+  text-align: center;
+}
+
+.fc-chart-empty-lg {
+  height: 240px;
+}
+
+.fc-chart-empty-sub {
+  font-size: 0.78rem !important;
+  max-width: 420px;
+  opacity: 0.65;
+}
+
+/* ─── A-deck live status ───────────────────────────── */
+.fc-info-value-active {
+  color: #00d4ff !important;
+}
+
+/* ─── Saffir-Simpson Legend ────────────────────────── */
+.fc-ss-legend {
+  margin-top: 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding-top: 16px;
+}
+
+.fc-ss-legend-title {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(232, 244, 255, 0.3);
+  margin: 0 0 10px;
+}
+
+.fc-ss-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+}
+
+.fc-ss-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.fc-ss-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: rgba(232, 244, 255, 0.7);
+  min-width: 44px;
+}
+
+.fc-ss-range {
+  font-size: 0.75rem;
+  color: rgba(232, 244, 255, 0.35);
+}
+
 /* ─── Responsive ───────────────────────────────────── */
 @media (max-width: 768px) {
   .fc-hero {
@@ -283,7 +765,38 @@
     grid-template-columns: 1fr;
   }
 
+  .fc-card-wide {
+    grid-column: 1;
+  }
+
   .fc-analysis-grid {
     grid-template-columns: 1fr;
+  }
+
+  .fc-storm-banner {
+    padding: 14px 16px;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .fc-storm-stats {
+    gap: 2px;
+    flex-wrap: wrap;
+  }
+
+  .fc-stat {
+    padding: 0 10px;
+  }
+
+  .fc-offseason {
+    padding: 32px 20px;
+  }
+
+  .fc-season-bar {
+    gap: 2px;
+  }
+
+  .fc-season-month-label {
+    font-size: 0.55rem;
   }
 }
