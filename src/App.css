@@ -5,6 +5,12 @@
   padding: 0;
 }
 
+@media (max-width: 768px) {
+  .App {
+    padding-bottom: calc(58px + env(safe-area-inset-bottom));
+  }
+}
+
 main {
   height: 100%;
   width: 100%;

@@ -425,3 +425,10 @@
     width: 18px;
   }
 }
+
+/* Bottom nav takes over primary navigation on mobile */
+@media (max-width: 768px) {
+  .hamburger {
+    display: none;
+  }
+}

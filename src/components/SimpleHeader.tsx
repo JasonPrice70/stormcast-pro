@@ -10,12 +10,15 @@ import BarChartOutlinedIcon from '@mui/icons-material/BarChartOutlined'
 import SatelliteAltOutlinedIcon from '@mui/icons-material/SatelliteAltOutlined'
 import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined'
 import LayersOutlinedIcon from '@mui/icons-material/LayersOutlined'
+import WbSunnyOutlinedIcon from '@mui/icons-material/WbSunnyOutlined'
+import BottomNav from './BottomNav'
 import './Header.css'
 
 const navLinks = [
   { to: '/',           label: 'Home',      icon: <HomeOutlinedIcon fontSize="small" /> },
   { to: '/tracker',    label: 'Tracker',   icon: <TrackChangesOutlinedIcon fontSize="small" /> },
   { to: '/satellite',  label: 'Satellite', icon: <SatelliteAltOutlinedIcon fontSize="small" /> },
+  { to: '/outlook',    label: 'Outlook',   icon: <WbSunnyOutlinedIcon fontSize="small" /> },
   { to: '/forecast',   label: 'Forecast',  icon: <ShowChartOutlinedIcon fontSize="small" /> },
   { to: '/models',     label: 'Models',    icon: <CloudQueueOutlinedIcon fontSize="small" /> },
   { to: '/wind',       label: 'Wind Field', icon: <TornadoOutlinedIcon fontSize="small" /> },
@@ -113,6 +116,8 @@ const SimpleHeader = ({ layersPanelOpen = false, onLayersToggle }: SimpleHeaderP
           ))}
         </ul>
       </nav>
+
+      <BottomNav />
     </>
   )
 }

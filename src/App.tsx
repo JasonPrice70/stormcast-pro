@@ -8,6 +8,7 @@ import WindFieldPage from './pages/WindFieldPage'
 import About from './pages/About'
 import Analytics from './pages/Analytics'
 import SatellitePage from './pages/SatellitePage'
+import TropicalOutlookPage from './pages/TropicalOutlookPage'
 import './App.css'
 
 function App() {
@@ -23,6 +24,7 @@ function App() {
         <Route path="/about" element={<About />} />
         <Route path="/analytics" element={<Analytics />} />
         <Route path="/satellite" element={<SatellitePage />} />
+        <Route path="/outlook" element={<TropicalOutlookPage />} />
         <Route path="*" element={<LandingPage />} />
       </Routes>
     </div>
