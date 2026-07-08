@@ -1,0 +1,157 @@
+/* ── Bottom tab bar: mobile-only, mimics a native app shell ── */
+.bottom-nav,
+.more-sheet,
+.bottom-sheet-overlay {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .bottom-nav {
+    display: flex;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 3000;
+    background: rgba(5, 13, 26, 0.88);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-top: 1px solid rgba(0, 212, 255, 0.15);
+    padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
+    box-shadow: 0 -2px 16px rgba(0, 0, 0, 0.35);
+  }
+
+  .bottom-nav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 6px 2px;
+    color: rgba(232, 244, 255, 0.5);
+    text-decoration: none;
+    background: none;
+    border: none;
+    font-family: inherit;
+    cursor: pointer;
+    border-radius: 10px;
+    transition: color 0.15s ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .bottom-nav-icon {
+    display: flex;
+    font-size: 1.35rem;
+  }
+
+  .bottom-nav-icon svg {
+    font-size: 1.35rem;
+  }
+
+  .bottom-nav-label {
+    font-size: 0.62rem;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+  }
+
+  .bottom-nav-item.active {
+    color: #00d4ff;
+  }
+
+  .bottom-nav-item:active {
+    background: rgba(0, 212, 255, 0.08);
+  }
+
+  /* ── Overflow "More" sheet ── */
+  .bottom-sheet-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 3998;
+    background: rgba(0, 0, 0, 0.5);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.25s ease, visibility 0.25s ease;
+  }
+
+  .bottom-sheet-overlay.active {
+    opacity: 1;
+    visibility: visible;
+  }
+
+  .more-sheet {
+    display: block;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 3999;
+    background: rgba(9, 18, 34, 0.98);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border-top: 1px solid rgba(0, 212, 255, 0.18);
+    border-radius: 18px 18px 0 0;
+    padding: 10px 16px calc(20px + env(safe-area-inset-bottom));
+    box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.5);
+    transform: translateY(100%);
+    transition: transform 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+  }
+
+  .more-sheet.active {
+    transform: translateY(0);
+  }
+
+  .more-sheet-handle {
+    width: 36px;
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.2);
+    margin: 0 auto 14px;
+  }
+
+  .more-sheet-grid {
+    list-style: none;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+  }
+
+  .more-sheet-grid a {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 16px 8px;
+    color: rgba(232, 244, 255, 0.75);
+    text-decoration: none;
+    font-size: 0.78rem;
+    font-weight: 500;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    transition: all 0.15s ease;
+  }
+
+  .more-sheet-grid a:active {
+    background: rgba(0, 212, 255, 0.1);
+  }
+
+  .more-sheet-grid a.active {
+    color: #00d4ff;
+    border-color: rgba(0, 212, 255, 0.35);
+    background: rgba(0, 212, 255, 0.08);
+  }
+
+  .more-sheet-icon {
+    display: flex;
+    font-size: 1.4rem;
+  }
+
+  .more-sheet-icon svg {
+    font-size: 1.4rem;
+  }
+}
