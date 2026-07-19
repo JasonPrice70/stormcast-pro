@@ -225,17 +225,17 @@
 }
 
 .formation-badge.high {
-  background: #FF8C00;
+  background: #E4002B;
   color: white;
 }
 
 .formation-badge.medium {
-  background: #FFD700;
-  color: #333;
+  background: #FF8C00;
+  color: white;
 }
 
 .formation-badge.low {
-  background: #FFFF99;
+  background: #FFD700;
   color: #333;
 }
 

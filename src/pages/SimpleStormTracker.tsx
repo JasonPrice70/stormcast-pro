@@ -270,16 +270,16 @@ const createStormIcon = (category: any, classification: string) => {
   }
 };
 
+// NHC's standard formation-chance color scale: red (high) / orange (medium) / yellow (low)
+const getFormationChanceColor = (chance: number) => {
+  if (chance >= 60) return '#E4002B'; // High chance - Red
+  if (chance >= 40) return '#FF8C00'; // Medium chance - Orange
+  return '#FFD700'; // Low chance - Yellow
+};
+
 // Create invest icon based on formation probability
 const createInvestIcon = (formationChance: number) => {
-  const getColor = () => {
-    if (formationChance >= 70) return '#FF8C00'; // High chance - Orange
-    if (formationChance >= 40) return '#FFD700'; // Medium chance - Gold
-    if (formationChance >= 20) return '#FFFF99'; // Low chance - Light Yellow
-    return '#E6E6FA'; // Very low chance - Light Purple
-  };
-
-  const color = getColor();
+  const color = getFormationChanceColor(formationChance);
   
   return L.divIcon({
     html: `<div class="invest-icon" style="background: ${color}; border: 2px solid #333; border-radius: 50%; width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: bold; color: #333;">I</div>`,
@@ -856,15 +856,15 @@ const SimpleStormTracker: React.FC = () => {
                 </Popup>
               </Marker>
               
-              {/* Add a subtle circle to show general area */}
+              {/* Circle around the invest, colored by formation chance (NHC red/orange/yellow scale) */}
               <Circle
                 center={invest.position}
                 radius={100000} // 100km radius
-                color={invest.formationChance7day >= 70 ? '#FF8C00' : invest.formationChance7day >= 40 ? '#FFD700' : '#FFFF99'}
-                fillColor={invest.formationChance7day >= 70 ? '#FF8C00' : invest.formationChance7day >= 40 ? '#FFD700' : '#FFFF99'}
-                fillOpacity={0.05}
-                weight={1}
-                opacity={0.2}
+                color={getFormationChanceColor(invest.formationChance7day)}
+                fillColor={getFormationChanceColor(invest.formationChance7day)}
+                fillOpacity={0.4}
+                weight={3}
+                opacity={1}
               />
             </React.Fragment>
           );

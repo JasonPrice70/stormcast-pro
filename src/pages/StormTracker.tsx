@@ -50,27 +50,27 @@ const StormTracker = () => {
     })
   }
 
+  // NHC's standard formation-chance color scale: red (high) / orange (medium) / yellow (low)
+  const getFormationChanceColor = (chance7day: number) => {
+    if (chance7day >= 60) return '#E4002B' // High chance - Red
+    if (chance7day >= 40) return '#FF8C00' // Medium chance - Orange
+    return '#FFD700' // Low chance - Yellow
+  }
+
   // Create custom invest icons based on formation chances
   const createInvestIcon = (invest: InvestArea) => {
-    const getColor = () => {
-      if (invest.formationChance7day >= 70) return '#FF8C00' // High chance - Orange
-      if (invest.formationChance7day >= 40) return '#FFD700' // Medium chance - Gold
-      if (invest.formationChance7day >= 20) return '#FFFF99' // Low chance - Light Yellow
-      return '#E6E6FA' // Very low chance - Light Purple
-    }
+    const color = getFormationChanceColor(invest.formationChance7day)
 
-    const color = getColor()
-    
     // Create SVG icon with "I" for Invest
     const svgIcon = `
       <svg width="20" height="20" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="10" cy="10" r="8" fill="${color}" stroke="#000" stroke-width="1" opacity="0.8"/>
+        <circle cx="10" cy="10" r="8" fill="${color}" stroke="#000" stroke-width="1" opacity="0.9"/>
         <text x="10" y="14" text-anchor="middle" font-size="12" font-weight="bold" fill="#000">
           I
         </text>
       </svg>
     `
-    
+
     return new Icon({
       iconUrl: `data:image/svg+xml;base64,${btoa(svgIcon)}`,
       iconSize: [20, 20],
@@ -228,15 +228,15 @@ const StormTracker = () => {
                     </Popup>
                   </Marker>
                   
-                  {/* Add a circle to show general area of interest */}
+                  {/* Circle around the invest, colored by formation chance (NHC red/orange/yellow scale) */}
                   <Circle
                     center={invest.position}
                     radius={200000} // 200km radius
-                    color={invest.formationChance7day >= 70 ? '#FF8C00' : invest.formationChance7day >= 40 ? '#FFD700' : '#FFFF99'}
-                    fillColor={invest.formationChance7day >= 70 ? '#FF8C00' : invest.formationChance7day >= 40 ? '#FFD700' : '#FFFF99'}
-                    fillOpacity={0.1}
-                    weight={1}
-                    opacity={0.3}
+                    color={getFormationChanceColor(invest.formationChance7day)}
+                    fillColor={getFormationChanceColor(invest.formationChance7day)}
+                    fillOpacity={0.4}
+                    weight={3}
+                    opacity={1}
                   />
                 </div>
               );
@@ -297,7 +297,7 @@ const StormTracker = () => {
                     >
                       <div className="invest-header">
                         <h4>{invest.name}</h4>
-                        <span className={`formation-badge ${invest.formationChance7day >= 70 ? 'high' : invest.formationChance7day >= 40 ? 'medium' : 'low'}`}>
+                        <span className={`formation-badge ${invest.formationChance7day >= 60 ? 'high' : invest.formationChance7day >= 40 ? 'medium' : 'low'}`}>
                           {invest.formationChance7day}% (7-day)
                         </span>
                       </div>
