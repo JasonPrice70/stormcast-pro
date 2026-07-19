@@ -2082,17 +2082,19 @@ class NHCApiService {
 
     console.log(`⏰ Extracted time: ${lastUpdate}`)
 
-    // Look for specific invest areas by ID pattern (e.g., AL91)
-    const directInvestPattern = /(?:Tropical\s+(?:Atlantic|Pacific)|(?:Eastern|Central|Western)\s+(?:Atlantic|Pacific))\s*\(([A-Z]{2}\d+)\):\s*([\s\S]*?)(?=(?:(?:Tropical\s+(?:Atlantic|Pacific)|(?:Eastern|Central|Western)\s+(?:Atlantic|Pacific))\s*\([A-Z]{2}\d+\):|$))/gi
+    // Look for specific invest areas by ID pattern (e.g., AL91). NHC labels each
+    // area with a free-form geographic description (e.g. "Northern Gulf of America
+    // and near Florida (AL91):"), not a fixed "Eastern/Central/Western Atlantic"
+    // phrase, so match on the "<description> (ID):" shape generically.
+    const directInvestPattern = /(?:^|\n)([A-Z][A-Za-z0-9 ,.'-]+?)\s*\(([A-Z]{2}\d{2,3})\):\s*\n([\s\S]*?)(?=\n[A-Z][A-Za-z0-9 ,.'-]+?\s*\([A-Z]{2}\d{2,3}\):|\n\$\$|$)/g
     
     console.log(`🔎 Using direct invest pattern for specific IDs like AL91`)
     
     let directMatch
     while ((directMatch = directInvestPattern.exec(text)) !== null) {
-      console.log(`🎯 Direct invest match found:`, { id: directMatch[1], contentLength: directMatch[2].length })
-      
-      const [fullMatch, investId, content] = directMatch
-      const area = fullMatch.split(':')[0].replace(/\([^)]*\)/, '').trim() // Extract area name without ID
+      console.log(`🎯 Direct invest match found:`, { id: directMatch[2], contentLength: directMatch[3].length })
+
+      const [, area, investId, content] = directMatch
       
       // Extract description (everything before first *)
       const description = content.split('*')[0].trim()
@@ -2397,9 +2399,21 @@ class NHCApiService {
         console.log(`📍 Using Southwestern Atlantic position for: ${area}`)
         return [25.0, -65.0] // Southwestern Atlantic
       }
+      if (areaLower.includes('northeastern gulf') || (areaLower.includes('northern gulf') && areaLower.includes('florida'))) {
+        console.log(`📍 Using Northeastern Gulf (off FL Panhandle/Big Bend) position for: ${area}`)
+        return [28.5, -85.5] // Northeastern Gulf, near FL Panhandle/Big Bend
+      }
+      if (areaLower.includes('northern gulf') || areaLower.includes('north central gulf')) {
+        console.log(`📍 Using North-Central Gulf (off LA/MS) position for: ${area}`)
+        return [28.0, -89.0] // North-central Gulf, off LA/MS coast
+      }
+      if (areaLower.includes('western gulf')) {
+        console.log(`📍 Using Western Gulf (off TX) position for: ${area}`)
+        return [26.0, -94.5] // Western Gulf, off Texas coast
+      }
       if (areaLower.includes('gulf') || areaLower.includes('bay of campeche')) {
         console.log(`📍 Using Gulf of Mexico position for: ${area}`)
-        return [25.0, -88.0] // Gulf of Mexico
+        return [25.0, -88.0] // Gulf of Mexico (generic fallback)
       }
       if (areaLower.includes('caribbean') || areaLower.includes('lesser antilles') || areaLower.includes('windward')) {
         console.log(`📍 Using Caribbean position for: ${area}`)
