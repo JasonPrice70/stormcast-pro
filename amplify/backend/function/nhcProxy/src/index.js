@@ -1132,7 +1132,7 @@ function parseAdeckGEFSTracks(text) {
   const sortedCycles = Array.from(allCycles).sort().reverse();
   
   // Enhanced regex to include operational hurricane models plus GEFS ensemble
-  const operationalModels = /^(A(EMN|EMI|C00|P\d{2})|HWRF|HWRI|HWF2|HMON|HM0N|HAFS|HAFA|HAFB|GFS[A-Z]?|GFSO|ECMW|ECM2|EMXI|CMC|CMCI|NVGM|NAM|OFCL|OFCI|CARQ|SHIP|LGEM|DSHP|UKM[A-Z]?|UKMO|CTL[A-Z]?|TVCN|FSSE|MMSE|CTCI|CTCX)$/i;
+  const operationalModels = /^(A(EMN|EMI|C00|P\d{2})|HWRF|HWRI|HWF2|HMON|HM0N|HAFS|HAFA|HAFB|GFS[A-Z]?|GFSO|ECMW|ECM2|EMXI|CMC|CMCI|NVGM|NAM|OFCL|OFCI|CARQ|SHIP|LGEM|DSHP|UKM[A-Z]?|UKMO|CTL[A-Z]?|TVCN|FSSE|MMSE|CTCI|CTCX|GDMN|GDMI)$/i;
   
   let targetCycle = latestCycle;
   let latest = records.filter(p => p[2] === targetCycle);
@@ -1206,6 +1206,7 @@ function parseAdeckGEFSTracks(text) {
     if (m === 'OFCL' || m === 'OFCI') return 0;     // Official forecast highest priority
     if (m === 'HWRF' || m === 'HMON') return 1;      // High-res models second
     if (m === 'HAFS' || m === 'HAFA' || m === 'HAFB') return 2; // HAFS models
+    if (m === 'GDMN' || m === 'GDMI') return 2.5;    // Google DeepMind AI model
     if (m === 'GFS' || m === 'GFSO') return 3;       // GFS
     if (m === 'ECMW' || m === 'ECM2') return 4;      // ECMWF
     if (m === 'AEMN' || m === 'AEMI') return 5;      // GEFS ensemble mean
