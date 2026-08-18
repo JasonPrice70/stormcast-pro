@@ -132,6 +132,24 @@ class NHCApiService {
   }
 
   /**
+   * Fetch ECMWF ensemble (EPS) member tracks for a storm from ECMWF Open Data.
+   * Matched server-side by storm name (ECMWF's BUFR product doesn't use ATCF storm IDs).
+   * Returns { filename, modelsPresent, tracks: [{ modelId, points: [{tau,lat,lon,vmax}]}], cycleTime }
+   * No client-side fallback: the source data is binary BUFR and can only be decoded server-side.
+   */
+  async getECMWFEnsembleTracks(stormId: string, stormName: string): Promise<{
+    filename: string | null;
+    modelsPresent: string[];
+    tracks: Array<{ modelId: string; points: Array<{ tau: number; lat: number; lon: number; vmax: number | null }> }>;
+    cycleTime?: string;
+  } | null> {
+    if (!stormId || !stormName) return null;
+    const data = await this.fetchWithLambdaFallback('ecmwf-ensemble', { stormId, stormName });
+    if (data && data.tracks) return data;
+    return null;
+  }
+
+  /**
    * Try next CORS proxy if current one fails
    */
   private tryNextProxy(): boolean {

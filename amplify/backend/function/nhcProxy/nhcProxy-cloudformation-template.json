@@ -15,6 +15,14 @@
     },
     "s3Key": {
       "Type": "String"
+    },
+    "functionecmwfEnsembleProxyName": {
+      "Type": "String",
+      "Default": "functionecmwfEnsembleProxyName"
+    },
+    "functionecmwfEnsembleProxyArn": {
+      "Type": "String",
+      "Default": "functionecmwfEnsembleProxyArn"
     }
   },
   "Conditions": {
@@ -184,7 +192,8 @@
             "REGION": { "Ref": "AWS::Region" },
             "STORM_ARCHIVE_TABLE": { "Ref": "StormArchiveTable" },
             "INVEST_ARCHIVE_TABLE": { "Ref": "InvestArchiveTable" },
-            "MODEL_TRACKS_TABLE": { "Ref": "ModelTracksTable" }
+            "MODEL_TRACKS_TABLE": { "Ref": "ModelTracksTable" },
+            "ECMWF_ENSEMBLE_FUNCTION_NAME": { "Ref": "functionecmwfEnsembleProxyName" }
           }
         },
         "Role": {
@@ -270,6 +279,15 @@
                 { "Fn::Sub": "${StormArchiveTable.Arn}/index/*"  },
                 { "Fn::Sub": "${InvestArchiveTable.Arn}/index/*" },
                 { "Fn::Sub": "${ModelTracksTable.Arn}/index/*"   }
+              ]
+            },
+            {
+              "Effect": "Allow",
+              "Action": [
+                "lambda:InvokeFunction"
+              ],
+              "Resource": [
+                { "Ref": "functionecmwfEnsembleProxyArn" }
               ]
             }
           ]
