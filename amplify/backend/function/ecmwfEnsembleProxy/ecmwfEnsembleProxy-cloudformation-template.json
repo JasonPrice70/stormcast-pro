@@ -76,7 +76,7 @@
             "Arn"
           ]
         },
-        "Runtime": "python3.11",
+        "Runtime": "python3.12",
         "Layers": [],
         "Timeout": 60,
         "MemorySize": 512
