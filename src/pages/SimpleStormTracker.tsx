@@ -6,6 +6,7 @@ import './SimpleStormTracker.css';
 import { useNHCData, useStormSurge, usePeakStormSurge, useWindSpeedProbability, useWindArrival, useWatchWarning, useInitialWindExtent, useForecastWindRadii } from '../hooks/useNHCData';
 import { useInvestData } from '../hooks/useInvestData';
 import { useGEFSSpaghetti } from '../hooks/useGEFSSpaghetti';
+import { useECMWFEnsemble } from '../hooks/useECMWFEnsemble';
 import WindSpeedLegend from '../components/WindSpeedLegend';
 import { useHWRFData, useHMONData } from '../hooks/useHWRFData';
 import SimpleHeader from '../components/SimpleHeader';
@@ -109,6 +110,26 @@ const MapController: React.FC<MapControllerProps> = ({ selectedStorm, stormsToDi
   }, [selectedInvest, selectedStorm, lastSelectionType, map]);
   
   return null;
+};
+
+// Unwrap a lat/lon path so it draws correctly across the antimeridian (180°).
+// Consecutive points are expected to differ by a small amount; if a raw jump
+// exceeds 180° (e.g. 179.4W -> 179.1E), it's really a short crossing of the
+// date line, not a trip across the whole globe, so we add/subtract 360° to
+// keep longitude continuous instead of snapping back into [-180, 180].
+const unwrapAntimeridian = (positions: [number, number][]): [number, number][] => {
+  if (positions.length < 2) return positions;
+  let offset = 0;
+  const result: [number, number][] = [positions[0]];
+  for (let i = 1; i < positions.length; i++) {
+    const [lat, lon] = positions[i];
+    const prevLon = result[i - 1][1];
+    let adjusted = lon + offset;
+    while (adjusted - prevLon > 180) { offset -= 360; adjusted -= 360; }
+    while (adjusted - prevLon < -180) { offset += 360; adjusted += 360; }
+    result.push([lat, adjusted]);
+  }
+  return result;
 };
 
 // Format forecast time for labels (e.g., "6 PM MON")
@@ -409,6 +430,8 @@ const SimpleStormTracker: React.FC = () => {
   const [showGFS, setShowGFS] = useState(true);
   const [showECMWF, setShowECMWF] = useState(true);
   const [showGEFSEnsemble, setShowGEFSEnsemble] = useState(true);
+  const [showECMWFEnsemble, setShowECMWFEnsemble] = useState(true);
+  const [showGoogleDeepMind, setShowGoogleDeepMind] = useState(true);
   const [showOtherModels, setShowOtherModels] = useState(false);
   
   // Individual model windfield toggles
@@ -584,6 +607,7 @@ const SimpleStormTracker: React.FC = () => {
 
   // Use NOAA NOMADS spaghetti models hook when enabled and a storm is selected
   const gefs = useGEFSSpaghetti(showGEFSSpaghetti && !!selectedStormId, selectedStormId);
+  const ecmwfEns = useECMWFEnsemble(showGEFSSpaghetti && showECMWFEnsemble && !!selectedStormId, selectedStormId, selectedStorm?.name ?? null);
 
   // Use HWRF and HMON wind field hooks when enabled and a storm is selected
   const hwrf = useHWRFData();
@@ -1049,6 +1073,8 @@ const SimpleStormTracker: React.FC = () => {
                 shouldShow = true;
               } else if ((modelId === 'HAFS' || modelId === 'HAFA' || modelId === 'HAFB') && showHAFS) {
                 shouldShow = true;
+              } else if ((modelId === 'GDMN' || modelId === 'GDMI') && showGoogleDeepMind) {
+                shouldShow = true;
               } else if ((modelId === 'GFS' || modelId === 'GFSO') && showGFS) {
                 shouldShow = true;
               } else if ((modelId === 'ECMW' || modelId === 'ECM2') && showECMWF) {
@@ -1057,7 +1083,7 @@ const SimpleStormTracker: React.FC = () => {
                 shouldShow = true;
               } else if (showOtherModels) {
                 // Show other/miscellaneous models when "Other Models" is enabled
-                const knownModels = ['OFCL', 'OFCI', 'HWRF', 'HMON', 'HAFS', 'HAFA', 'HAFB', 'GFS', 'GFSO', 'ECMW', 'ECM2', 'AEMI', 'AEMN', 'AEM2', 'AC00'];
+                const knownModels = ['OFCL', 'OFCI', 'HWRF', 'HMON', 'HAFS', 'HAFA', 'HAFB', 'GDMN', 'GDMI', 'GFS', 'GFSO', 'ECMW', 'ECM2', 'AEMI', 'AEMN', 'AEM2', 'AC00'];
                 if (!knownModels.includes(modelId) && !modelId.startsWith('AP')) {
                   shouldShow = true;
                 }
@@ -1078,10 +1104,11 @@ const SimpleStormTracker: React.FC = () => {
                 seen.add(key);
                 return true;
               });
-              const positions = deduped
+              const rawPositions = deduped
                 .map((p: any) => [p.lat, p.lon] as [number, number])
                 .filter(([lat, lon]) => isFinite(lat) && isFinite(lon));
-              if (positions.length < 2) return null;
+              if (rawPositions.length < 2) return null;
+              const positions = unwrapAntimeridian(rawPositions);
               
               // Enhanced model categorization and styling
               let color, weight, opacity, dashArray;
@@ -1104,6 +1131,12 @@ const SimpleStormTracker: React.FC = () => {
                 weight = 3;
                 opacity = 0.9;
                 dashArray = undefined;
+              } else if (modelId === 'GDMN' || modelId === 'GDMI') {
+                // Google DeepMind AI model - thick green line
+                color = '#34a853';
+                weight = 3;
+                opacity = 0.9;
+                dashArray = modelId === 'GDMI' ? '6, 3' : undefined;
               } else if (modelId === 'GFS' || modelId === 'GFSO') {
                 // GFS - medium purple line
                 color = '#9c27b0';
@@ -1157,6 +1190,8 @@ const SimpleStormTracker: React.FC = () => {
                       {modelId === 'HWRF' && <div style={{fontSize: '0.8em', color: '#666'}}>Hurricane Weather Research & Forecasting</div>}
                       {modelId === 'HMON' && <div style={{fontSize: '0.8em', color: '#666'}}>Hurricane Multi-scale Ocean-coupled</div>}
                       {(modelId === 'HAFS' || modelId === 'HAFA' || modelId === 'HAFB') && <div style={{fontSize: '0.8em', color: '#666'}}>Hurricane Analysis & Forecast System</div>}
+                      {modelId === 'GDMN' && <div style={{fontSize: '0.8em', color: '#666'}}>Google DeepMind WeatherNext (ensemble mean)</div>}
+                      {modelId === 'GDMI' && <div style={{fontSize: '0.8em', color: '#666'}}>Google DeepMind WeatherNext (interpolated)</div>}
                       {(modelId === 'GFS' || modelId === 'GFSO') && <div style={{fontSize: '0.8em', color: '#666'}}>Global Forecast System</div>}
                       {(modelId === 'ECMW' || modelId === 'ECM2') && <div style={{fontSize: '0.8em', color: '#666'}}>European Centre Model</div>}
                       {(modelId === 'AEMI' || modelId === 'AEMN') && <div style={{fontSize: '0.8em', color: '#666'}}>GEFS Ensemble Mean</div>}
@@ -1170,6 +1205,59 @@ const SimpleStormTracker: React.FC = () => {
           </React.Fragment>
           );
         })()}
+
+        {/* ECMWF Ensemble (EPS) Spaghetti */}
+        {showGEFSSpaghetti && showECMWFEnsemble && selectedStormId && ecmwfEns.tracks && ecmwfEns.tracks.tracks && (
+          <React.Fragment>
+            {ecmwfEns.tracks.tracks.map((t, idx) => {
+              const modelId = t.modelId;
+
+              // Deduplicate repeated points and unwrap antimeridian crossings, same as GEFS spaghetti above
+              const seen = new Set<string>();
+              const deduped = t.points.filter((p: any) => {
+                const key = `${p.tau}:${p.lat?.toFixed(2)}:${p.lon?.toFixed(2)}`;
+                if (seen.has(key)) return false;
+                seen.add(key);
+                return true;
+              });
+              const rawPositions = deduped
+                .map((p: any) => [p.lat, p.lon] as [number, number])
+                .filter(([lat, lon]) => isFinite(lat) && isFinite(lon));
+              if (rawPositions.length < 2) return null;
+              const positions = unwrapAntimeridian(rawPositions);
+
+              let color, weight, opacity;
+              if (modelId === 'EPSCTRL') {
+                // ECMWF ensemble control run - thick purple line
+                color = '#6a1b9a';
+                weight = 3;
+                opacity = 0.95;
+              } else {
+                // ECMWF ensemble perturbations - thin magenta-family lines
+                const colors = ['#ab47bc', '#d81b60', '#8e24aa', '#c2185b', '#9c27b0', '#e91e8c', '#7b1fa2', '#ec407a', '#ba68c8', '#f06292'];
+                color = colors[idx % colors.length];
+                weight = 1.5;
+                opacity = 0.55;
+              }
+
+              return (
+                <Polyline
+                  key={`ecmwf-eps-${modelId}-${idx}`}
+                  positions={positions}
+                  pathOptions={{ color, weight, opacity }}
+                >
+                  <Tooltip sticky>
+                    <div>
+                      <strong>ECMWF {modelId}</strong>
+                      {modelId === 'EPSCTRL' && <div style={{ fontSize: '0.8em', color: '#666' }}>ECMWF Ensemble Control Run</div>}
+                      {modelId !== 'EPSCTRL' && <div style={{ fontSize: '0.8em', color: '#666' }}>ECMWF Ensemble Member {modelId.replace('EPS', '')}</div>}
+                    </div>
+                  </Tooltip>
+                </Polyline>
+              );
+            })}
+          </React.Fragment>
+        )}
 
         {/* Render forecast tracks from KMZ data or forecast data */}
         {showForecastTracks && stormsToDisplay.map((storm) => {
@@ -3009,8 +3097,8 @@ const SimpleStormTracker: React.FC = () => {
               {showGEFSSpaghetti && selectedStormId && gefs.tracks?.modelsPresent && (
                 <>
                   <div className="model-quick-actions">
-                    <button className="model-quick-btn model-quick-btn--all" onClick={() => { setShowOfficialTrack(true); setShowHAFS(true); setShowGFS(true); setShowECMWF(true); setShowGEFSEnsemble(true); setShowOtherModels(true); setShowHWRF(true); setShowHMON(true); }}>Select All</button>
-                    <button className="model-quick-btn model-quick-btn--clear" onClick={() => { setShowOfficialTrack(false); setShowHAFS(false); setShowGFS(false); setShowECMWF(false); setShowGEFSEnsemble(false); setShowOtherModels(false); setShowHWRF(false); setShowHMON(false); }}>Clear All</button>
+                    <button className="model-quick-btn model-quick-btn--all" onClick={() => { setShowOfficialTrack(true); setShowHAFS(true); setShowGoogleDeepMind(true); setShowGFS(true); setShowECMWF(true); setShowGEFSEnsemble(true); setShowOtherModels(true); setShowHWRF(true); setShowHMON(true); }}>Select All</button>
+                    <button className="model-quick-btn model-quick-btn--clear" onClick={() => { setShowOfficialTrack(false); setShowHAFS(false); setShowGoogleDeepMind(false); setShowGFS(false); setShowECMWF(false); setShowGEFSEnsemble(false); setShowOtherModels(false); setShowHWRF(false); setShowHMON(false); }}>Clear All</button>
                   </div>
 
                   {gefs.tracks.modelsPresent.some((m: string) => m === 'OFCL' || m === 'OFCI') && (
@@ -3033,6 +3121,18 @@ const SimpleStormTracker: React.FC = () => {
                       </div>
                       <div className="toggle-switch">
                         <input type="checkbox" checked={showHAFS} onChange={(e) => setShowHAFS(e.target.checked)} />
+                        <span className="toggle-track" />
+                      </div>
+                    </label>
+                  )}
+                  {gefs.tracks.modelsPresent.some((m: string) => m === 'GDMN' || m === 'GDMI') && (
+                    <label className="layer-item">
+                      <div className="layer-item-left">
+                        <span className="layer-badge" style={{ background: '#34a853' }}>GDM</span>
+                        <span className="layer-name">Google DeepMind WeatherNext</span>
+                      </div>
+                      <div className="toggle-switch">
+                        <input type="checkbox" checked={showGoogleDeepMind} onChange={(e) => setShowGoogleDeepMind(e.target.checked)} />
                         <span className="toggle-track" />
                       </div>
                     </label>
@@ -3076,6 +3176,22 @@ const SimpleStormTracker: React.FC = () => {
                       </div>
                     </label>
                   )}
+                  {ecmwfEns.available && ecmwfEns.tracks?.modelsPresent && (
+                    <label className="layer-item">
+                      <div className="layer-item-left">
+                        <span className="layer-badge" style={{ background: '#6a1b9a' }}>ECMWF</span>
+                        <div className="layer-item-text">
+                          <span className="layer-name">ECMWF Ensemble (EPS)</span>
+                          <span className="layer-hint">{ecmwfEns.tracks.modelsPresent.length} members</span>
+                        </div>
+                        {ecmwfEns.loading && <div className="gefs-spinner" />}
+                      </div>
+                      <div className="toggle-switch">
+                        <input type="checkbox" checked={showECMWFEnsemble} onChange={(e) => setShowECMWFEnsemble(e.target.checked)} />
+                        <span className="toggle-track" />
+                      </div>
+                    </label>
+                  )}
                   {gefs.tracks.modelsPresent.some((m: string) => m === 'HWRF') && (
                     <label className="layer-item">
                       <div className="layer-item-left">
@@ -3101,7 +3217,7 @@ const SimpleStormTracker: React.FC = () => {
                     </label>
                   )}
                   {(() => {
-                    const knownModels = ['OFCL','OFCI','HWRF','HMON','HAFS','HAFA','HAFB','GFS','GFSO','ECMW','ECM2','AEMI','AEMN','AEM2','AC00'];
+                    const knownModels = ['OFCL','OFCI','HWRF','HMON','HAFS','HAFA','HAFB','GDMN','GDMI','GFS','GFSO','ECMW','ECM2','AEMI','AEMN','AEM2','AC00'];
                     const otherModels = gefs.tracks.modelsPresent.filter((m: string) => !knownModels.includes(m) && !m.startsWith('AP'));
                     return otherModels.length > 0 ? (
                       <label className="layer-item">

@@ -132,6 +132,24 @@ class NHCApiService {
   }
 
   /**
+   * Fetch ECMWF ensemble (EPS) member tracks for a storm from ECMWF Open Data.
+   * Matched server-side by storm name (ECMWF's BUFR product doesn't use ATCF storm IDs).
+   * Returns { filename, modelsPresent, tracks: [{ modelId, points: [{tau,lat,lon,vmax}]}], cycleTime }
+   * No client-side fallback: the source data is binary BUFR and can only be decoded server-side.
+   */
+  async getECMWFEnsembleTracks(stormId: string, stormName: string): Promise<{
+    filename: string | null;
+    modelsPresent: string[];
+    tracks: Array<{ modelId: string; points: Array<{ tau: number; lat: number; lon: number; vmax: number | null }> }>;
+    cycleTime?: string;
+  } | null> {
+    if (!stormId || !stormName) return null;
+    const data = await this.fetchWithLambdaFallback('ecmwf-ensemble', { stormId, stormName });
+    if (data && data.tracks) return data;
+    return null;
+  }
+
+  /**
    * Try next CORS proxy if current one fails
    */
   private tryNextProxy(): boolean {
@@ -336,7 +354,7 @@ class NHCApiService {
     const latest = records.filter(p => p[2] === latestCycle);
     
     // Enhanced model filter to include operational hurricane models
-    const operationalModels = /^(A(EMN|EMI|C00|P\d{2})|HWRF|HWRI|HWF2|HMON|HM0N|HAFS|HAFA|HAFB|GFS[A-Z]?|GFSO|ECMW|ECM2|EMXI|CMC|CMCI|NVGM|NAM|OFCL|OFCI|CARQ|SHIP|LGEM|DSHP|UKM[A-Z]?|UKMO|CTL[A-Z]?|TVCN|FSSE|MMSE|CTCI|CTCX)$/i;
+    const operationalModels = /^(A(EMN|EMI|C00|P\d{2})|HWRF|HWRI|HWF2|HMON|HM0N|HAFS|HAFA|HAFB|GFS[A-Z]?|GFSO|ECMW|ECM2|EMXI|CMC|CMCI|NVGM|NAM|OFCL|OFCI|CARQ|SHIP|LGEM|DSHP|UKM[A-Z]?|UKMO|CTL[A-Z]?|TVCN|FSSE|MMSE|CTCI|CTCX|GDMN|GDMI)$/i;
     
     const modelMap = new Map<string, Array<{ tau: number; lat: number; lon: number; vmax: number | null }>>();
 
@@ -372,6 +390,7 @@ class NHCApiService {
       if (m === 'OFCL' || m === 'OFCI') return 0;     // Official forecast highest priority
       if (m === 'HWRF' || m === 'HMON') return 1;      // High-res models second
       if (m === 'HAFS' || m === 'HAFA' || m === 'HAFB') return 2; // HAFS models
+      if (m === 'GDMN' || m === 'GDMI') return 2.5;    // Google DeepMind AI model
       if (m === 'GFS' || m === 'GFSO') return 3;       // GFS
       if (m === 'ECMW' || m === 'ECM2') return 4;      // ECMWF
       if (m === 'AEMN' || m === 'AEMI') return 5;      // GEFS ensemble mean

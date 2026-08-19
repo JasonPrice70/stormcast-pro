@@ -6,16 +6,41 @@ const zlib = require('zlib');
 // ─── DynamoDB Archive (AWS SDK v3 is built into Lambda Node 18+) ─────────────
 const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
 const { DynamoDBDocumentClient, PutCommand, QueryCommand, GetCommand } = require('@aws-sdk/lib-dynamodb');
+const { LambdaClient, InvokeCommand } = require('@aws-sdk/client-lambda');
 
 const ddbClient = new DynamoDBClient({ region: process.env.REGION || 'us-east-1' });
 const ddb = DynamoDBDocumentClient.from(ddbClient, {
   marshallOptions:   { removeUndefinedValues: true },
   unmarshallOptions: { wrapNumbers: false }
 });
+const lambdaClient = new LambdaClient({ region: process.env.REGION || 'us-east-1' });
 
 const STORM_TABLE  = process.env.STORM_ARCHIVE_TABLE  || 'cyclotrak-storm-archive-dev';
 const INVEST_TABLE = process.env.INVEST_ARCHIVE_TABLE || 'cyclotrak-invest-archive-dev';
 const MODEL_TABLE  = process.env.MODEL_TRACKS_TABLE   || 'cyclotrak-model-tracks-dev';
+const ECMWF_ENSEMBLE_FUNCTION_NAME = process.env.ECMWF_ENSEMBLE_FUNCTION_NAME;
+
+/**
+ * Invoke the ecmwfEnsembleProxy Lambda directly (not via API Gateway) to
+ * fetch and decode ECMWF's ensemble tropical cyclone track BUFR product for
+ * a storm, matched by name. Returns its JSON payload, or throws.
+ */
+async function invokeEcmwfEnsembleProxy(stormName) {
+  if (!ECMWF_ENSEMBLE_FUNCTION_NAME) {
+    throw new Error('ECMWF_ENSEMBLE_FUNCTION_NAME is not configured');
+  }
+  const command = new InvokeCommand({
+    FunctionName: ECMWF_ENSEMBLE_FUNCTION_NAME,
+    Payload: Buffer.from(JSON.stringify({ stormName }))
+  });
+  const response = await lambdaClient.send(command);
+  if (response.FunctionError) {
+    const errText = response.Payload ? Buffer.from(response.Payload).toString('utf-8') : response.FunctionError;
+    throw new Error(`ecmwfEnsembleProxy invocation failed: ${errText}`);
+  }
+  const payload = response.Payload ? Buffer.from(response.Payload).toString('utf-8') : '{}';
+  return JSON.parse(payload);
+}
 
 // TTL = 2 years from now (DynamoDB TTL is seconds since epoch)
 const archiveTtl = () => Math.floor(Date.now() / 1000) + 2 * 365 * 24 * 3600;
@@ -1132,7 +1157,7 @@ function parseAdeckGEFSTracks(text) {
   const sortedCycles = Array.from(allCycles).sort().reverse();
   
   // Enhanced regex to include operational hurricane models plus GEFS ensemble
-  const operationalModels = /^(A(EMN|EMI|C00|P\d{2})|HWRF|HWRI|HWF2|HMON|HM0N|HAFS|HAFA|HAFB|GFS[A-Z]?|GFSO|ECMW|ECM2|EMXI|CMC|CMCI|NVGM|NAM|OFCL|OFCI|CARQ|SHIP|LGEM|DSHP|UKM[A-Z]?|UKMO|CTL[A-Z]?|TVCN|FSSE|MMSE|CTCI|CTCX)$/i;
+  const operationalModels = /^(A(EMN|EMI|C00|P\d{2})|HWRF|HWRI|HWF2|HMON|HM0N|HAFS|HAFA|HAFB|GFS[A-Z]?|GFSO|ECMW|ECM2|EMXI|CMC|CMCI|NVGM|NAM|OFCL|OFCI|CARQ|SHIP|LGEM|DSHP|UKM[A-Z]?|UKMO|CTL[A-Z]?|TVCN|FSSE|MMSE|CTCI|CTCX|GDMN|GDMI)$/i;
   
   let targetCycle = latestCycle;
   let latest = records.filter(p => p[2] === targetCycle);
@@ -1206,6 +1231,7 @@ function parseAdeckGEFSTracks(text) {
     if (m === 'OFCL' || m === 'OFCI') return 0;     // Official forecast highest priority
     if (m === 'HWRF' || m === 'HMON') return 1;      // High-res models second
     if (m === 'HAFS' || m === 'HAFA' || m === 'HAFB') return 2; // HAFS models
+    if (m === 'GDMN' || m === 'GDMI') return 2.5;    // Google DeepMind AI model
     if (m === 'GFS' || m === 'GFSO') return 3;       // GFS
     if (m === 'ECMW' || m === 'ECM2') return 4;      // ECMWF
     if (m === 'AEMN' || m === 'AEMI') return 5;      // GEFS ensemble mean
@@ -2822,7 +2848,37 @@ exports.handler = async (event) => {
           };
         }
       }
-        
+
+      case 'ecmwf-ensemble': {
+        const stormName = queryStringParameters?.stormName;
+        if (!stormName) {
+          return {
+            statusCode: 400,
+            headers: corsHeaders,
+            body: JSON.stringify({ error: 'stormName parameter is required for ecmwf-ensemble endpoint' })
+          };
+        }
+
+        try {
+          const result = await invokeEcmwfEnsembleProxy(stormName);
+          if (result && result.error) {
+            console.warn('ecmwfEnsembleProxy returned an error:', result.error);
+          }
+          return {
+            statusCode: 200,
+            headers: corsHeaders,
+            body: JSON.stringify({ success: true, data: result })
+          };
+        } catch (err) {
+          console.warn('Failed to invoke ecmwfEnsembleProxy:', err?.message);
+          return {
+            statusCode: 502,
+            headers: corsHeaders,
+            body: JSON.stringify({ error: 'Failed to retrieve ECMWF ensemble tracks', details: err?.message })
+          };
+        }
+      }
+
       case 'track-kmz':
         const trackStormId = queryStringParameters?.stormId;
         const trackYear = queryStringParameters?.year || new Date().getFullYear();
