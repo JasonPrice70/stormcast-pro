@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import SimpleHeader from '../components/SimpleHeader'
+import { cartoTileUrl } from '../config/mapTiles'
 import { windSpeedKt, rmaxFromVmax, windToRGBA, categoryLabel, categoryColor } from '../utils/windField'
 import { buildLandMask, isLand, type LandMask } from '../utils/landMask'
 import './WindFieldPage.css'
@@ -94,13 +95,13 @@ const BASEMAPS = [
     id: 'satellite',
     label: 'Satellite',
     tiles: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    labels: 'https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png',
+    labels: cartoTileUrl('dark_only_labels'),
   },
   {
     id: 'light',
     label: 'Light',
-    tiles: 'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png',
-    labels: 'https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png',
+    tiles: cartoTileUrl('light_nolabels'),
+    labels: cartoTileUrl('light_only_labels'),
   },
   {
     id: 'terrain',
@@ -111,8 +112,8 @@ const BASEMAPS = [
   {
     id: 'dark',
     label: 'Dark',
-    tiles: 'https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png',
-    labels: 'https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png',
+    tiles: cartoTileUrl('dark_nolabels'),
+    labels: cartoTileUrl('dark_only_labels'),
   },
 ]
 

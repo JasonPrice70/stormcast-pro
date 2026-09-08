@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, CircleMarker, Tooltip, Popup } from 'react-lea
 import 'leaflet/dist/leaflet.css'
 import SimpleHeader from '../components/SimpleHeader'
 import { useInvestData } from '../hooks/useInvestData'
+import { cartoTileUrl } from '../config/mapTiles'
 import './TropicalOutlookPage.css'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -376,7 +377,7 @@ export default function TropicalOutlookPage() {
                 className="to-map"
               >
                 <TileLayer
-                  url="https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png"
+                  url={cartoTileUrl('dark_nolabels')}
                   attribution='&copy; <a href="https://carto.com/attributions">CARTO</a>'
                 />
                 {basinInvests.map(invest => {
