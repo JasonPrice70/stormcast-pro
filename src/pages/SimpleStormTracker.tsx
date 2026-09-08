@@ -19,6 +19,7 @@ import TimelineOutlinedIcon from '@mui/icons-material/TimelineOutlined';
 import AirOutlinedIcon from '@mui/icons-material/Air';
 import MapOutlinedIcon from '@mui/icons-material/MapOutlined';
 import { formatWindSpeed, getIntensityCategoryFromKnots } from '../utils/windSpeed';
+import { cartoTileUrl } from '../config/mapTiles';
 import {
   trackPageView,
   trackStormSelected,
@@ -42,13 +43,13 @@ const BASEMAPS = [
   {
     id: 'light',
     label: 'Light',
-    tiles: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+    tiles: cartoTileUrl('light_all'),
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
   },
   {
     id: 'dark',
     label: 'Dark',
-    tiles: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    tiles: cartoTileUrl('dark_all'),
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
   },
   {

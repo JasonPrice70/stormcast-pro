@@ -11,10 +11,11 @@ import BarChartOutlinedIcon from '@mui/icons-material/BarChartOutlined'
 import SimpleHeader from '../components/SimpleHeader'
 import { useNHCData } from '../hooks/useNHCData'
 import { useInvestData } from '../hooks/useInvestData'
+import { cartoTileUrl } from '../config/mapTiles'
 import './LandingPage.css'
 
 const GIBS_BASE = 'https://gibs.earthdata.nasa.gov/wmts/epsg3857/best'
-const DARK_TILES = 'https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png'
+const DARK_TILES = cartoTileUrl('dark_nolabels')
 
 const BASINS = [
   {
