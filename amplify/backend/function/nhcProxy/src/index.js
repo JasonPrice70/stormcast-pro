@@ -1132,7 +1132,7 @@ async function extractSurgeFromKML(kmlContent) {
 
 /**
  * Parse A-deck text and extract operational model tracks (including GEFS ensemble, GFS, ECMWF, etc.) for the latest cycle.
- * Returns { modelsPresent: string[], tracks: [{ modelId, points: [{ tau, lat, lon, vmax }] }] }
+ * Returns { modelsPresent: string[], tracks: [{ modelId, points: [{ tau, lat, lon, vmax, mslp }] }] }
  */
 function parseAdeckGEFSTracks(text) {
   const lines = text.split(/\r?\n/).filter(l => l && l.includes(','));
@@ -1196,6 +1196,7 @@ function parseAdeckGEFSTracks(text) {
       const lat = parseATCFLat(p[6] || '');
       const lon = parseATCFLon(p[7] || '');
       const vmax = toNumberOrNull(p[8] || '');
+      const mslp = toNumberOrNull(p[9] || '');
       
       if (isNaN(tau) || lat == null || lon == null) {
         debugInfo.invalidCoords.push({
@@ -1206,7 +1207,7 @@ function parseAdeckGEFSTracks(text) {
       }
       
       if (!modelMap.has(tech)) modelMap.set(tech, []);
-      modelMap.get(tech).push({ tau, lat, lon, vmax });
+      modelMap.get(tech).push({ tau, lat, lon, vmax, mslp });
       debugInfo.processedModels.push(tech);
     }
   }
