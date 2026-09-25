@@ -13,7 +13,7 @@ import TornadoOutlinedIcon from '@mui/icons-material/TornadoOutlined'
 import AirOutlinedIcon from '@mui/icons-material/Air'
 import SimpleHeader from '../components/SimpleHeader'
 import { useNHCData } from '../hooks/useNHCData'
-import NHCApiService from '../services/nhcApi'
+import NHCApiService, { AdeckTrackPoint } from '../services/nhcApi'
 import { knotsToMph, getHurricaneCategoryFromKnots } from '../utils/windSpeed'
 import { ProcessedStorm } from '../types/nhc'
 import './Forecast.css'
@@ -152,9 +152,9 @@ function parseForecastTrack(forecastTrack: any): ChartPoint[] {
     .filter((f: any) => f.geometry?.type === 'Point')
     .map((f: any) => {
       const p = f.properties || {}
-      const hour = parseInt(p.FHOUR ?? p.TAU ?? p.FCST_HR ?? p.forecastHour ?? '0') || 0
-      const windKnots = parseInt(p.MAXWIND ?? p.INTENSITY ?? p.windSpeed ?? '0') || 0
-      const pressure = parseInt(p.MSLP ?? p.PRESSURE ?? p.pressure ?? '0') || 0
+      const hour = parseInt(p.FHOUR ?? p.TAU ?? p.FCST_HR ?? p.forecastHour ?? p.forecast_hour ?? '0') || 0
+      const windKnots = parseInt(p.MAXWIND ?? p.INTENSITY ?? p.intensity ?? p.windSpeed ?? '0') || 0
+      const pressure = parseInt(p.MSLP ?? p.PRESSURE ?? p.minSeaLevelPres ?? p.pressure ?? '0') || 0
       return {
         hour,
         label: hourToLabel(hour),
@@ -191,7 +191,7 @@ function buildCurrentPointChart(storm: ProcessedStorm): ChartPoint[] {
 
 /** Build model comparison dataset from A-deck tracks */
 function buildComparisonData(
-  tracks: Array<{ modelId: string; points: Array<{ tau: number; lat: number; lon: number; vmax: number | null }> }>,
+  tracks: Array<{ modelId: string; points: AdeckTrackPoint[] }>,
   visibleModels: string[],
 ): { label: string; hour: number; [modelId: string]: any }[] {
   const allHours = new Set<number>()
@@ -211,6 +211,44 @@ function buildComparisonData(
     })
     return row
   })
+}
+
+function buildAdeckPressureData(
+  track: { modelId: string; points: AdeckTrackPoint[] } | undefined,
+): { hour: number; label: string; pressure: number }[] {
+  if (!track) return []
+  return track.points
+    .filter(point => point.mslp != null && point.mslp > 0)
+    .map(point => ({
+      hour: point.tau,
+      label: hourToLabel(point.tau),
+      pressure: point.mslp as number,
+    }))
+    .sort((a, b) => a.hour - b.hour)
+}
+
+function findAdeckPressureTrack(
+  tracks: Array<{ modelId: string; points: AdeckTrackPoint[] }>,
+  preferredModelId: string | undefined,
+): { modelId: string; data: { hour: number; label: string; pressure: number }[] } | null {
+  const getData = (modelId: string | undefined) => {
+    const track = tracks.find(t => t.modelId === modelId)
+    const data = buildAdeckPressureData(track)
+    return modelId && data.length > 1 ? { modelId, data } : null
+  }
+
+  const preferred = getData(preferredModelId)
+  if (preferred) return preferred
+
+  const official = getData('OFCL') ?? getData('OFCI')
+  if (official) return official
+
+  for (const track of tracks) {
+    const data = buildAdeckPressureData(track)
+    if (data.length > 1) return { modelId: track.modelId, data }
+  }
+
+  return null
 }
 
 /** Get category color for wind speed */
@@ -245,7 +283,7 @@ const Forecast = () => {
   const [adeckData, setAdeckData] = useState<{
     filename: string
     modelsPresent: string[]
-    tracks: Array<{ modelId: string; points: Array<{ tau: number; lat: number; lon: number; vmax: number | null }> }>
+    tracks: Array<{ modelId: string; points: AdeckTrackPoint[] }>
   } | null>(null)
   const [adeckLoading, setAdeckLoading] = useState(false)
 
@@ -311,7 +349,11 @@ const Forecast = () => {
   const modelInfo = MODEL_TABS[selectedModel]
   const hasActiveStorms = storms.length > 0
   const hasChartData = officialChartData.length > 1
-  const hasPressureData = officialChartData.some(p => p.pressure > 0)
+  const adeckPressure = findAdeckPressureTrack(adeckData?.tracks ?? [], selectedAdeckModel)
+  const pressureChartData = adeckPressure?.data ?? officialChartData.filter(p => p.pressure > 0)
+  const hasPressureData = pressureChartData.length > 1
+  const pressureSource = adeckPressure?.modelId ?? 'NHC Official'
+  const currentPressure = pressureChartData[0]?.pressure ?? selectedStorm?.pressure ?? 0
 
   // Wind chart domain
   const windMax = Math.max(...officialChartData.map(p => p.windMph), 160)
@@ -598,12 +640,14 @@ const Forecast = () => {
             <div className="fc-card-header">
               <h3>5-Day Pressure Forecast</h3>
               {hasPressureData && (
-                <span className="fc-card-badge">NHC Official</span>
+                <span className="fc-card-badge">
+                  {pressureSource === 'NHC Official' ? pressureSource : `${pressureSource} A-deck`}
+                </span>
               )}
             </div>
             {hasPressureData ? (
               <ResponsiveContainer width="100%" height={280}>
-                <LineChart data={officialChartData.filter(p => p.pressure > 0)} margin={{ top: 8, right: 12, bottom: 0, left: 8 }}>
+                <LineChart data={pressureChartData} margin={{ top: 8, right: 12, bottom: 0, left: 8 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
                   <XAxis
                     dataKey="label"
@@ -620,7 +664,7 @@ const Forecast = () => {
                   />
                   <Tooltip
                     contentStyle={chartTooltipStyle}
-                    formatter={(v: any) => [`${v} mb`, 'Central Pressure']}
+                    formatter={(v: any) => [`${v} mb`, `${pressureSource} Pressure`]}
                   />
                   <ReferenceLine y={1013} stroke="rgba(255,255,255,0.12)" strokeDasharray="4 3" label={{ value: 'Ambient (1013 mb)', position: 'right', fill: 'rgba(232,244,255,0.3)', fontSize: 10 }} />
                   <Line
@@ -637,7 +681,16 @@ const Forecast = () => {
             ) : (
               <div className="fc-chart-empty">
                 <TornadoOutlinedIcon />
-                <p>No pressure forecast available</p>
+                <p>
+                  {adeckLoading
+                    ? 'Loading A-deck pressure guidance…'
+                    : currentPressure > 0
+                    ? 'Future pressure values are not included in this NHC forecast package or current A-deck guidance.'
+                    : 'No pressure forecast available'}
+                </p>
+                {!adeckLoading && currentPressure > 0 && (
+                  <p className="fc-chart-empty-sub">Current central pressure: {currentPressure} mb</p>
+                )}
               </div>
             )}
           </div>

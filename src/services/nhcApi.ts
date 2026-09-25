@@ -1,6 +1,21 @@
 import axios from 'axios'
 import { NHCActiveStorms, NHCStorm, ProcessedStorm, StormForecastPoint, StormHistoricalPoint, TropicalWeatherOutlook, InvestArea } from '../types/nhc'
 
+export interface AdeckTrackPoint {
+  tau: number
+  lat: number
+  lon: number
+  vmax: number | null
+  mslp?: number | null
+}
+
+interface AdeckTrackData {
+  filename: string
+  modelsPresent: string[]
+  tracks: Array<{ modelId: string; points: AdeckTrackPoint[] }>
+  cycleTime?: string
+}
+
 // NHC API endpoints
 const NHC_BASE_URL = 'https://www.nhc.noaa.gov'
 const ACTIVE_STORMS_URL = `${NHC_BASE_URL}/CurrentStorms.json`
@@ -93,12 +108,7 @@ class NHCApiService {
    * Fetch ensemble and operational model tracks from NHC ATCF A-deck for a stormId.
    * Returns { filename, modelsPresent, tracks: [{ modelId, points: [{tau,lat,lon,vmax}]}] }
    */
-  async getGEFSAdeckTracks(stormId: string): Promise<{
-    filename: string;
-    modelsPresent: string[];
-    tracks: Array<{ modelId: string; points: Array<{ tau: number; lat: number; lon: number; vmax: number | null }> }>;
-    cycleTime?: string;
-  } | null> {
+  async getGEFSAdeckTracks(stormId: string): Promise<AdeckTrackData | null> {
     if (!stormId) return null;
     // Try Lambda first
     const data = await this.fetchWithLambdaFallback('gefs-adeck', { stormId });
@@ -109,7 +119,7 @@ class NHCApiService {
       return {
         ...data,
         cycleTime
-      };
+      } as AdeckTrackData;
     }
 
     // Fallback: fetch A-deck directly via CORS proxies and parse client-side
@@ -233,11 +243,7 @@ class NHCApiService {
   /**
    * Client-side fallback to fetch and parse A-deck from NHC aid_public using CORS proxies
    */
-  private async fetchAdeckViaProxies(stormId: string): Promise<{
-    filename: string;
-    modelsPresent: string[];
-    tracks: Array<{ modelId: string; points: Array<{ tau: number; lat: number; lon: number; vmax: number | null }> }>;
-  } | null> {
+  private async fetchAdeckViaProxies(stormId: string): Promise<AdeckTrackData | null> {
     const match = /^(AL|EP|CP)(\d{2})(\d{4})$/i.exec(stormId.trim());
     if (!match) {
       throw new Error(`Invalid stormId format: ${stormId}`);
@@ -285,8 +291,7 @@ class NHCApiService {
                 throw new Error('Unexpected gzipped data format');
               }
               
-              // Note: Browser doesn't have zlib, so we'll need to use a different approach
-              // For now, skip gzipped files in browser fallback
+              // Browser fallback cannot reliably decompress NHC gzip through public CORS proxies.
               console.warn('Gzipped A-deck files not supported in browser fallback, skipping');
               continue;
             } catch (gzipErr) {
@@ -334,7 +339,7 @@ class NHCApiService {
    */
   private parseAdeckGEFSTracks(text: string): {
     modelsPresent: string[];
-    tracks: Array<{ modelId: string; points: Array<{ tau: number; lat: number; lon: number; vmax: number | null }> }>;
+    tracks: Array<{ modelId: string; points: AdeckTrackPoint[] }>;
   } {
     const lines = text.split(/\r?\n/).filter(l => l && l.includes(','));
     if (lines.length === 0) return { modelsPresent: [], tracks: [] };
@@ -356,7 +361,7 @@ class NHCApiService {
     // Enhanced model filter to include operational hurricane models
     const operationalModels = /^(A(EMN|EMI|C00|P\d{2})|HWRF|HWRI|HWF2|HMON|HM0N|HAFS|HAFA|HAFB|GFS[A-Z]?|GFSO|ECMW|ECM2|EMXI|CMC|CMCI|NVGM|NAM|OFCL|OFCI|CARQ|SHIP|LGEM|DSHP|UKM[A-Z]?|UKMO|CTL[A-Z]?|TVCN|FSSE|MMSE|CTCI|CTCX|GDMN|GDMI)$/i;
     
-    const modelMap = new Map<string, Array<{ tau: number; lat: number; lon: number; vmax: number | null }>>();
+    const modelMap = new Map<string, AdeckTrackPoint[]>();
 
     for (const p of latest) {
       const tech = (p[4] || '').toUpperCase();
@@ -365,15 +370,16 @@ class NHCApiService {
       const lat = this.parseATCFLat(p[6] || '');
       const lon = this.parseATCFLon(p[7] || '');
       const vmax = this.toNumberOrNull(p[8] || '');
+      const mslp = this.toNumberOrNull(p[9] || '');
       if (isNaN(tau) || lat == null || lon == null) continue;
       if (!modelMap.has(tech)) modelMap.set(tech, []);
-      modelMap.get(tech)!.push({ tau, lat, lon, vmax });
+      modelMap.get(tech)!.push({ tau, lat, lon, vmax, mslp });
     }
 
-    const tracks: Array<{ modelId: string; points: Array<{ tau: number; lat: number; lon: number; vmax: number | null }> }> = [];
+    const tracks: Array<{ modelId: string; points: AdeckTrackPoint[] }> = [];
     const modelsPresent: string[] = [];
     for (const [modelId, points] of modelMap.entries()) {
-      const byTau = new Map<number, { tau: number; lat: number; lon: number; vmax: number | null }>();
+      const byTau = new Map<number, AdeckTrackPoint>();
       points.sort((a, b) => a.tau - b.tau);
       for (const pt of points) {
         if (!byTau.has(pt.tau)) byTau.set(pt.tau, pt);
