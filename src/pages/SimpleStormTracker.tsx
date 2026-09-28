@@ -14,7 +14,8 @@ import ExpandLessOutlinedIcon from '@mui/icons-material/ExpandLessOutlined';
 import ExpandMoreOutlinedIcon from '@mui/icons-material/ExpandMoreOutlined';
 import LayersOutlinedIcon from '@mui/icons-material/LayersOutlined';
 import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined';
-import TornadoOutlinedIcon from '@mui/icons-material/TornadoOutlined';
+import MenuOutlinedIcon from '@mui/icons-material/MenuOutlined';
+import CycloneOutlinedIcon from '@mui/icons-material/CycloneOutlined';
 import TimelineOutlinedIcon from '@mui/icons-material/TimelineOutlined';
 import AirOutlinedIcon from '@mui/icons-material/Air';
 import MapOutlinedIcon from '@mui/icons-material/MapOutlined';
@@ -441,10 +442,22 @@ const SimpleStormTracker: React.FC = () => {
   
   const [activeDrawer, setActiveDrawer] = useState<string | null>(null);
   const [basemapId, setBasemapId] = useState<BasemapId>('light');
+
+  useEffect(() => {
+    if (!activeDrawer) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setActiveDrawer(null);
+        menuButtonRef.current?.focus();
+      }
+    };
+    document.addEventListener('keydown', closeOnEscape);
+    return () => document.removeEventListener('keydown', closeOnEscape);
+  }, [activeDrawer]);
   
   // Refs for layer button
   const layerButtonRef = useRef<HTMLButtonElement>(null);
-  const controlPanelRef = useRef<HTMLDivElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
 
   const [fetchLiveTrackData, setFetchLiveTrackData] = useState(true); // Enable track data fetching by default
   const [selectedStormId, setSelectedStormId] = useState<string | null>(null); // Primary selected storm for storm-specific layers
@@ -2610,10 +2623,27 @@ const SimpleStormTracker: React.FC = () => {
       )}
       </div>
 
-      {/* ── Floating Tab Strip ── */}
-      <div className="tab-strip">
+      {activeDrawer && <div className="tab-drawer-backdrop" onClick={() => setActiveDrawer(null)} aria-hidden="true" />}
+      <button
+        ref={menuButtonRef}
+        className={`drawer-toggle${activeDrawer ? ' open' : ''}`}
+        onClick={() => setActiveDrawer(activeDrawer ? null : 'storms')}
+        aria-label={activeDrawer ? 'Close map controls' : 'Open map controls'}
+        aria-expanded={Boolean(activeDrawer)}
+        aria-controls="map-controls-drawer"
+        title={activeDrawer ? 'Close map controls' : 'Open map controls'}
+      >
+        {activeDrawer ? <CloseOutlinedIcon /> : <MenuOutlinedIcon />}
+      </button>
+
+      {/* ── Sliding Tab Drawer ── */}
+      <div id="map-controls-drawer" className={`tab-drawer${activeDrawer ? ' open' : ''}`} aria-hidden={!activeDrawer}>
+        <div className="tab-drawer-header">
+          <span className="tab-drawer-title">Map controls</span>
+        </div>
+        <div className="tab-strip" role="group" aria-label="Map control sections">
         {([
-          { id: 'storms',  label: 'Storms',  icon: <TornadoOutlinedIcon fontSize="small" /> },
+          { id: 'storms',  label: 'Storms',  icon: <CycloneOutlinedIcon fontSize="small" /> },
           { id: 'layers',  label: 'Layers',  icon: <LayersOutlinedIcon fontSize="small" /> },
           { id: 'models',  label: 'Models',  icon: <TimelineOutlinedIcon fontSize="small" /> },
           { id: 'wind',    label: 'Wind',    icon: <AirOutlinedIcon fontSize="small" /> },
@@ -2622,29 +2652,14 @@ const SimpleStormTracker: React.FC = () => {
           <button
             key={tab.id}
             className={`tab-btn${activeDrawer === tab.id ? ' active' : ''}`}
-            onClick={() => setActiveDrawer(activeDrawer === tab.id ? null : tab.id)}
+            onClick={() => setActiveDrawer(tab.id)}
             aria-label={tab.label}
+            aria-pressed={activeDrawer === tab.id}
           >
             {tab.icon}
             <span className="tab-label">{tab.label}</span>
           </button>
         ))}
-      </div>
-
-      {/* ── Sliding Tab Drawer ── */}
-      <div ref={controlPanelRef} className={`tab-drawer${activeDrawer ? ' open' : ''}`}>
-        {/* Drawer header */}
-        <div className="tab-drawer-header">
-          <span className="tab-drawer-title">
-            {activeDrawer === 'storms' ? 'Storms' :
-             activeDrawer === 'layers' ? 'NHC Layers' :
-             activeDrawer === 'models' ? 'Model Tracks' :
-             activeDrawer === 'wind'   ? 'Wind Fields' :
-             activeDrawer === 'style'  ? 'Map Style' : ''}
-          </span>
-          <button className="tab-drawer-close" onClick={() => setActiveDrawer(null)} aria-label="Close panel">
-            <CloseOutlinedIcon fontSize="small" />
-          </button>
         </div>
 
         {/* Drawer scrollable content */}
