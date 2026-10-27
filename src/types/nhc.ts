@@ -113,6 +113,9 @@ export interface ProcessedStorm {
   cone?: any  // Forecast cone data (optional)
   forecastTrack?: any  // Forecast track data from KMZ (optional)
   advisoryUrl: string
+  advisoryNumber?: string
+  advisoryIssued?: Date
+  discussionUrl?: string
   trackUrl: string
   coneUrl: string
 }

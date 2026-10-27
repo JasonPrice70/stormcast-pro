@@ -52,11 +52,11 @@ export const formatWindSpeedMphOnly = (knots: number): string => {
  * @returns Hurricane category (0-5)
  */
 export const getHurricaneCategoryFromKnots = (knots: number): number => {
-  if (knots >= 157) return 5;
-  if (knots >= 130) return 4;
-  if (knots >= 111) return 3;
-  if (knots >= 96) return 2;
-  if (knots >= 74) return 1;
+  if (knots >= 137) return 5;
+  if (knots >= 113) return 4;
+  if (knots >= 96) return 3;
+  if (knots >= 83) return 2;
+  if (knots >= 64) return 1;
   return 0; // Tropical Storm or Depression
 };
 
