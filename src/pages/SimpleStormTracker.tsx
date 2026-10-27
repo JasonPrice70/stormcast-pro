@@ -1217,7 +1217,7 @@ const SimpleStormTracker: React.FC = () => {
                   <Tooltip sticky>
                     <div>
                       <strong>{t.modelId}</strong>
-                      {modelId === 'OFCL' && <div style={{fontSize: '0.8em', color: '#666'}}>Official NHC Forecast</div>}
+                      {modelId === 'OFCL' && <div style={{fontSize: '0.8em', color: '#666'}}>NHC Forecast</div>}
                       {modelId === 'HWRF' && <div style={{fontSize: '0.8em', color: '#666'}}>Hurricane Weather Research & Forecasting</div>}
                       {modelId === 'HMON' && <div style={{fontSize: '0.8em', color: '#666'}}>Hurricane Multi-scale Ocean-coupled</div>}
                       {(modelId === 'HAFS' || modelId === 'HAFA' || modelId === 'HAFB') && <div style={{fontSize: '0.8em', color: '#666'}}>Hurricane Analysis & Forecast System</div>}
@@ -3146,7 +3146,7 @@ const SimpleStormTracker: React.FC = () => {
                     <label className="layer-item">
                       <div className="layer-item-left">
                         <span className="layer-badge" style={{ background: '#555', color: '#fff' }}>OFCL</span>
-                        <span className="layer-name">Official NHC Forecast</span>
+                        <span className="layer-name">NHC Forecast</span>
                       </div>
                       <div className="toggle-switch">
                         <input type="checkbox" checked={showOfficialTrack} onChange={(e) => setShowOfficialTrack(e.target.checked)} />

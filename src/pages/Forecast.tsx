@@ -54,12 +54,12 @@ const MODEL_TABS: Record<string, {
   color: string
 }> = {
   Official: {
-    label: 'Official',
-    fullName: 'NHC Official Forecast',
+    label: 'NHC',
+    fullName: 'NHC Forecast',
     resolution: '5-day track & intensity',
     updateFreq: 'Every 6 hours',
     range: '5 days (120 hours)',
-    note: 'The NHC official forecast is the authoritative guidance used in public advisories.',
+    note: 'The NHC forecast is the authoritative guidance used in public advisories.',
     adeckIds: ['OFCL', 'OFCI'],
     color: '#00d4ff',
   },
@@ -352,7 +352,7 @@ const Forecast = () => {
   const adeckPressure = findAdeckPressureTrack(adeckData?.tracks ?? [], selectedAdeckModel)
   const pressureChartData = adeckPressure?.data ?? officialChartData.filter(p => p.pressure > 0)
   const hasPressureData = pressureChartData.length > 1
-  const pressureSource = adeckPressure?.modelId ?? 'NHC Official'
+  const pressureSource = adeckPressure?.modelId ?? 'NHC'
   const currentPressure = pressureChartData[0]?.pressure ?? selectedStorm?.pressure ?? 0
 
   // Wind chart domain
@@ -369,7 +369,7 @@ const Forecast = () => {
         <div className="fc-hero-content">
           <p className="fc-eyebrow">STORM FORECASTS</p>
           <h1 className="fc-headline">
-            Official NHC <span className="fc-accent">Forecasts</span>
+            NHC <span className="fc-accent">Forecasts</span>
           </h1>
           <p className="fc-subheadline">
             Real-time 5-day track and intensity guidance from NHC advisories, with
@@ -494,7 +494,7 @@ const Forecast = () => {
               The NHC is not issuing advisories on any tropical storms or hurricanes at this
               time. The Atlantic hurricane season runs{' '}
               <strong>June 1 – November 30</strong>. During an active storm, this page shows
-              the NHC official 5-day track and intensity forecast alongside real-time model
+              the NHC 5-day track and intensity forecast alongside real-time model
               comparison from the ATCF A-deck.
             </p>
             <div className="fc-offseason-season">
@@ -546,7 +546,7 @@ const Forecast = () => {
             <div className="fc-card-header">
               <h3>5-Day Wind Speed Forecast</h3>
               {hasChartData && (
-                <span className="fc-card-badge">NHC Official</span>
+                <span className="fc-card-badge">NHC</span>
               )}
             </div>
             {hasChartData ? (
@@ -641,7 +641,7 @@ const Forecast = () => {
               <h3>5-Day Pressure Forecast</h3>
               {hasPressureData && (
                 <span className="fc-card-badge">
-                  {pressureSource === 'NHC Official' ? pressureSource : `${pressureSource} A-deck`}
+                  {pressureSource === 'NHC' ? pressureSource : `${pressureSource} A-deck`}
                 </span>
               )}
             </div>
@@ -788,7 +788,7 @@ const Forecast = () => {
 
           {/* Model Info Card */}
           <div className="fc-card fc-card-info">
-            <h3>Model: <span className="fc-accent">{selectedModel}</span></h3>
+            <h3>Model: <span className="fc-accent">{modelInfo.label}</span></h3>
             <p className="fc-info-name">{modelInfo.fullName}</p>
             <div className="fc-info-rows">
               <div className="fc-info-row">
@@ -851,7 +851,7 @@ const Forecast = () => {
               {
                 icon: <GroupsOutlinedIcon />,
                 title: 'Model agreement = higher confidence',
-                body: 'When GFS, ECMWF, HWRF, and HAFS agree on a track, forecasters have greater confidence in the official NHC outlook.',
+                body: 'When GFS, ECMWF, HWRF, and HAFS agree on a track, forecasters have greater confidence in the NHC outlook.',
               },
               {
                 icon: <GpsFixedOutlinedIcon />,
