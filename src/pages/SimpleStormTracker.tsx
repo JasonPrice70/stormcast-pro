@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MapContainer, TileLayer, WMSTileLayer, Marker, Popup, Polyline, CircleMarker, Polygon, Tooltip, useMap, Circle } from 'react-leaflet';
+import { MapContainer, TileLayer, WMSTileLayer, Marker, Popup, Polyline, CircleMarker, Polygon, Tooltip, useMap, Circle, ZoomControl } from 'react-leaflet';
 import L from 'leaflet';
+import { useSearchParams } from 'react-router-dom';
 import 'leaflet/dist/leaflet.css';
 import './SimpleStormTracker.css';
 import { useNHCData, useStormSurge, usePeakStormSurge, useWindSpeedProbability, useWindArrival, useWatchWarning, useInitialWindExtent, useForecastWindRadii } from '../hooks/useNHCData';
@@ -10,6 +11,7 @@ import { useECMWFEnsemble } from '../hooks/useECMWFEnsemble';
 import WindSpeedLegend from '../components/WindSpeedLegend';
 import { useHWRFData, useHMONData } from '../hooks/useHWRFData';
 import SimpleHeader from '../components/SimpleHeader';
+import StormDetailPanel, { type WatchWarningAlert } from '../components/StormDetailPanel';
 import ExpandLessOutlinedIcon from '@mui/icons-material/ExpandLessOutlined';
 import ExpandMoreOutlinedIcon from '@mui/icons-material/ExpandMoreOutlined';
 import LayersOutlinedIcon from '@mui/icons-material/LayersOutlined';
@@ -390,6 +392,18 @@ const getForecastIntensityColor = (stormType: string, styleCategory: string) => 
   }
 };
 
+// Map an NHC watch/warning feature to its display label and color
+const classifyWatchWarning = (feature: any): WatchWarningAlert => {
+  const styleId = (feature.properties?.styleId || '').toLowerCase();
+  const name = (feature.properties?.name || '').toLowerCase();
+  if (styleId.includes('hurricanewarning') || name.includes('hurricane warning')) return { color: '#CC0000', label: 'Hurricane Warning' };
+  if (styleId.includes('hurricanewatch') || name.includes('hurricane watch')) return { color: '#FF00FF', label: 'Hurricane Watch' };
+  if (styleId.includes('tropicalstormwarning') || name.includes('tropical storm warning')) return { color: '#0000FF', label: 'Tropical Storm Warning' };
+  if (styleId.includes('tropicalstormwatch') || name.includes('tropical storm watch')) return { color: '#FFFF00', label: 'Tropical Storm Watch' };
+  if (styleId.includes('posttropical') || name.includes('post-tropical')) return { color: '#888888', label: 'Post-Tropical Warning' };
+  return { color: '#888888', label: 'Watch/Warning' };
+};
+
 // Get intensity category from wind speed (in knots or mph)
 const getIntensityCategoryFromWinds = (windSpeed: number, isKnots: boolean = true): string => {
   if (isKnots) {
@@ -465,6 +479,7 @@ const SimpleStormTracker: React.FC = () => {
   const [selectedInvestId, setSelectedInvestId] = useState<string | null>(null); // Selected invest for map centering
   const [expandedDescriptions, setExpandedDescriptions] = useState<Set<string>>(new Set()); // Track which invest descriptions are expanded
   const [lastSelectionType, setLastSelectionType] = useState<'storm' | 'invest' | null>(null); // Track what was selected last
+  const [dismissedDetailStormId, setDismissedDetailStormId] = useState<string | null>(null); // Storm whose detail panel the user closed
   const liveData = useNHCData({ 
     autoRefresh: false, // Disable auto-refresh - only call when user requests
     fetchOnMount: true, // Fetch on mount - load live data by default
@@ -489,9 +504,23 @@ const SimpleStormTracker: React.FC = () => {
   const displayStorms = storms || []; // Always use live storms (empty array if none)
   const hasStorms = displayStorms.length > 0;
 
+  // Shareable selection: ?storm=<id> is read once storms load, then kept in sync
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlStormIdRef = useRef<string | null>(searchParams.get('storm'));
+
   // Auto-select first storm when storms are available and none is selected
   React.useEffect(() => {
     if (displayStorms.length > 0) {
+      const urlStormId = urlStormIdRef.current;
+      if (urlStormId) {
+        urlStormIdRef.current = null;
+        const linked = displayStorms.find(s => s.id.toLowerCase() === urlStormId.toLowerCase());
+        if (linked) {
+          setSelectedStormId(linked.id);
+          setLastSelectionType('storm'); // centers the map on the linked storm
+          return;
+        }
+      }
       if (selectedStormId) {
         // Check if currently selected storm still exists
         const stormExists = displayStorms.find(s => s.id === selectedStormId);
@@ -507,6 +536,23 @@ const SimpleStormTracker: React.FC = () => {
       setSelectedStormId(null);
     }
   }, [displayStorms, selectedStormId]);
+
+  React.useEffect(() => {
+    if (loading || urlStormIdRef.current) return; // don't clobber a link before storms load
+    const current = searchParams.get('storm');
+    if ((selectedStormId ?? null) === current) return;
+    const next = new URLSearchParams(searchParams);
+    if (selectedStormId) next.set('storm', selectedStormId);
+    else next.delete('storm');
+    setSearchParams(next, { replace: true });
+  }, [selectedStormId, loading]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  React.useEffect(() => {
+    const storm = displayStorms.find(s => s.id === selectedStormId);
+    const previous = document.title;
+    if (storm) document.title = `${storm.name} · CycloTrak`;
+    return () => { document.title = previous; };
+  }, [selectedStormId, displayStorms]);
 
   // Clean up expanded descriptions when invest data changes
   useEffect(() => {
@@ -619,6 +665,17 @@ const SimpleStormTracker: React.FC = () => {
   const initialWindExtent = useInitialWindExtent(showInitialWindExtent && !!selectedStormId, selectedStormId);
   const forecastWindRadii = useForecastWindRadii(showForecastWindRadii && !!selectedStormId, selectedStormId);
 
+  // Unique watch/warning types for the selected storm, most severe first
+  const stormAlerts: WatchWarningAlert[] = React.useMemo(() => {
+    const severity = ['Hurricane Warning', 'Hurricane Watch', 'Tropical Storm Warning', 'Tropical Storm Watch', 'Post-Tropical Warning'];
+    const byLabel = new Map<string, WatchWarningAlert>();
+    (watchWarning.data?.features ?? []).forEach((f: any) => {
+      const alert = classifyWatchWarning(f);
+      if (severity.includes(alert.label)) byLabel.set(alert.label, alert);
+    });
+    return [...byLabel.values()].sort((a, b) => severity.indexOf(a.label) - severity.indexOf(b.label));
+  }, [watchWarning.data]);
+
   // Use NOAA NOMADS spaghetti models hook when enabled and a storm is selected
   const gefs = useGEFSSpaghetti(showGEFSSpaghetti && !!selectedStormId, selectedStormId);
   const ecmwfEns = useECMWFEnsemble(showGEFSSpaghetti && showECMWFEnsemble && !!selectedStormId, selectedStormId, selectedStorm?.name ?? null);
@@ -694,8 +751,9 @@ const SimpleStormTracker: React.FC = () => {
           zoom={6} 
           style={{ height: '100%', width: '100%' }}
           scrollWheelZoom={true}
-          zoomControl={true}
+          zoomControl={false}
         >
+        <ZoomControl position="bottomright" />
         {(() => {
           const bm = BASEMAPS.find(b => b.id === basemapId) ?? BASEMAPS[0];
           return <TileLayer key={bm.id} url={bm.tiles} attribution={bm.attribution} />;
@@ -757,6 +815,7 @@ const SimpleStormTracker: React.FC = () => {
                 click: () => {
                   // Set this storm as the primary selected storm for auto-zoom and overlays
                   setSelectedStormId(storm.id);
+                  setDismissedDetailStormId(null);
                   // Also add to selected storms display list if not already there
                   if (!selectedStormIds.includes(storm.id)) {
                     setSelectedStormIds(prev => [...prev, storm.id]);
@@ -764,48 +823,6 @@ const SimpleStormTracker: React.FC = () => {
                 }
               }}
             >
-            <Popup closeOnClick={true} autoClose={true}>
-              <div className="storm-popup">
-                <div className="storm-popup-header">
-                  <h3 className="storm-popup-title">
-                    {storm.name}
-                  </h3>
-                </div>
-                <div className="storm-popup-content">
-                  <p className="storm-popup-field">
-                    <strong>Classification:</strong> {getFullIntensityName(storm)}
-                  </p>
-                  <p className="storm-popup-field">
-                    <strong>Category:</strong> {storm.category > 0 ? storm.category : 'N/A'}
-                  </p>
-                  <p className="storm-popup-field storm-popup-winds">
-                    <strong>Max Winds:</strong> {formatWindSpeed(storm.maxWinds)}
-                  </p>
-                  <p className="storm-popup-field">
-                    <strong>Pressure:</strong> {storm.pressure} mb
-                  </p>
-                  <p className="storm-popup-field">
-                    <strong>Movement:</strong> {storm.movement}
-                  </p>
-                  <p className="storm-popup-last-update">
-                    Last Updated: {storm.lastUpdate.toLocaleString()}
-                  </p>
-                  <div className="storm-popup-advisory-container">
-                    <a 
-                      href={storm.advisoryUrl} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="storm-popup-advisory-link"
-                    >
-                      View Advisory
-                    </a>
-                  </div>
-                  <div style={{ marginTop: '8px', fontSize: '0.8rem', color: '#666' }}>
-                    <em>Click marker to zoom and track this storm</em>
-                  </div>
-                </div>
-              </div>
-            </Popup>
           </Marker>
           );
         })}
@@ -1200,7 +1217,7 @@ const SimpleStormTracker: React.FC = () => {
                   <Tooltip sticky>
                     <div>
                       <strong>{t.modelId}</strong>
-                      {modelId === 'OFCL' && <div style={{fontSize: '0.8em', color: '#666'}}>Official NHC Forecast</div>}
+                      {modelId === 'OFCL' && <div style={{fontSize: '0.8em', color: '#666'}}>NHC Forecast</div>}
                       {modelId === 'HWRF' && <div style={{fontSize: '0.8em', color: '#666'}}>Hurricane Weather Research & Forecasting</div>}
                       {modelId === 'HMON' && <div style={{fontSize: '0.8em', color: '#666'}}>Hurricane Multi-scale Ocean-coupled</div>}
                       {(modelId === 'HAFS' || modelId === 'HAFA' || modelId === 'HAFB') && <div style={{fontSize: '0.8em', color: '#666'}}>Hurricane Analysis & Forecast System</div>}
@@ -2166,15 +2183,7 @@ const SimpleStormTracker: React.FC = () => {
         {/* Watch/Warning Layer */}
         {showWatchWarning && selectedStormId && watchWarning.data?.features && watchWarning.data.features.map((feature: any, index: number) => {
           if (!feature.geometry) return null;
-          const styleId = (feature.properties?.styleId || '').toLowerCase();
-          const name = (feature.properties?.name || '').toLowerCase();
-          let color = '#888888';
-          let label = 'Watch/Warning';
-          if (styleId.includes('hurricanewarning') || name.includes('hurricane warning')) { color = '#CC0000'; label = 'Hurricane Warning'; }
-          else if (styleId.includes('hurricanewatch') || name.includes('hurricane watch')) { color = '#FF00FF'; label = 'Hurricane Watch'; }
-          else if (styleId.includes('tropicalstormwarning') || name.includes('tropical storm warning')) { color = '#0000FF'; label = 'Tropical Storm Warning'; }
-          else if (styleId.includes('tropicalstormwatch') || name.includes('tropical storm watch')) { color = '#FFFF00'; label = 'Tropical Storm Watch'; }
-          else if (styleId.includes('posttropical') || name.includes('post-tropical')) { color = '#888888'; label = 'Post-Tropical Warning'; }
+          const { color, label } = classifyWatchWarning(feature);
 
           const geomType = feature.geometry.type;
           if (geomType === 'Polygon' || geomType === 'MultiPolygon') {
@@ -2622,6 +2631,22 @@ const SimpleStormTracker: React.FC = () => {
         </div>
       )}
       </div>
+
+      {selectedStorm && dismissedDetailStormId !== selectedStorm.id && (
+        <StormDetailPanel
+          storm={selectedStorm}
+          storms={displayStorms}
+          alerts={showWatchWarning ? stormAlerts : []}
+          onSelectStorm={(id) => {
+            setSelectedStormId(id);
+            setSelectedInvestId(null);
+            setLastSelectionType('storm');
+            setSelectedStormIds(prev => (prev.length === 0 || prev.includes(id) ? prev : [...prev, id]));
+          }}
+          onClose={() => setDismissedDetailStormId(selectedStorm.id)}
+          onRefresh={refresh}
+        />
+      )}
 
       {activeDrawer && <div className="tab-drawer-backdrop" onClick={() => setActiveDrawer(null)} aria-hidden="true" />}
       <button
@@ -3121,7 +3146,7 @@ const SimpleStormTracker: React.FC = () => {
                     <label className="layer-item">
                       <div className="layer-item-left">
                         <span className="layer-badge" style={{ background: '#555', color: '#fff' }}>OFCL</span>
-                        <span className="layer-name">Official NHC Forecast</span>
+                        <span className="layer-name">NHC Forecast</span>
                       </div>
                       <div className="toggle-switch">
                         <input type="checkbox" checked={showOfficialTrack} onChange={(e) => setShowOfficialTrack(e.target.checked)} />

@@ -844,6 +844,9 @@ class NHCApiService {
             forecast: [],
             historical: [],
             advisoryUrl: storm.publicAdvisory?.url || '',
+            advisoryNumber: storm.publicAdvisory?.advNum?.replace(/^0+(?=\d)/, ''),
+            advisoryIssued: storm.publicAdvisory?.issuance ? new Date(storm.publicAdvisory.issuance) : undefined,
+            discussionUrl: (storm as any).forecastDiscussion?.url,
             trackUrl: storm.track?.url || '',
             coneUrl: (storm as any).trackCone?.kmzFile || ''
           };

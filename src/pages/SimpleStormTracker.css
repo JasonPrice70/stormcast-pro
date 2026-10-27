@@ -598,6 +598,13 @@
   margin-top: 10px;
 }
 
+/* Pinch-zoom on touch; the bottom-right control would sit under the bottom nav */
+@media (max-width: 768px) {
+  .simple-storm-tracker .leaflet-control-zoom {
+    display: none;
+  }
+}
+
 /* =====================================================
    MODERN LAYER PANEL COMPONENTS
    ===================================================== */
